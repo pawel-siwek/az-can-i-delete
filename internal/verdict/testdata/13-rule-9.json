@@ -1,0 +1,73 @@
+{
+  "number": 13,
+  "name": "rule 9",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 13 | rule 9 | disk `disk.ownership.age-ge-30d` absent, rest present, age(v,400) | tentative / inconclusive / [required.missing:disk.ownership.age-ge-30d] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/disks",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "disk.state.unattached",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "disk.ownership.age-ge-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "disk.state.unattached",
+      "disk.ownership.age-ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "required.missing:disk.ownership.age-ge-30d"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

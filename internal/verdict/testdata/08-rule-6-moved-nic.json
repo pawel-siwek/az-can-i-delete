@@ -1,0 +1,73 @@
+{
+  "number": 8,
+  "name": "rule 6 (moved NIC)",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 8 | rule 6 (moved NIC) | nic IDLE(all), age(i) | tentative / inconclusive / [age.inferred-only] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/networkInterfaces",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "nic.structural.detached",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "nic.detached.ge-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 90,
+      "confidence": "inferred",
+      "source": "activitylog.no-events",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "nic.structural.detached",
+      "nic.detached.ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "age.inferred-only"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 90,
+      "confidence": "inferred",
+      "source": "activitylog.no-events",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

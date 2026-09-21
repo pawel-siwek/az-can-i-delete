@@ -1,0 +1,66 @@
+{
+  "number": 64,
+  "name": "LIVE with age unknown",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 64 | LIVE with age unknown | P3 `site.metrics.real-traffic` over W=90, age(?) | no / in-use (LIVE over Requested) |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "site.metrics.real-traffic",
+        "tier": 3,
+        "tierName": "LIVE_ACTIVITY",
+        "status": "present",
+        "critical": true,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 0,
+      "confidence": "unknown",
+      "source": "none",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "site.metrics.real-traffic"
+    ],
+    "effective": {
+      "start": "2026-09-21T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 0,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 0,
+      "confidence": "unknown",
+      "source": "none",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

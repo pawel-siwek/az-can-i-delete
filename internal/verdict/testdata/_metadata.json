@@ -1,0 +1,47 @@
+{
+  "source": "docs/architect-3.md section 2.7, original rows 1-66",
+  "kind": "synthetic pure-engine acceptance fixtures, not recorded Azure responses",
+  "fixtureCount": 66,
+  "constructionConventions": [
+    "Every source name and raw table row is retained exactly. Expected full reasons are explicit expansions of the source shorthand, not captured evaluator output.",
+    "When W is omitted, fixtures explicitly use the source section 2.3 historical W=90, not the product default of 30. Case49 needs W>=45 for its prescribed Effective45.",
+    "The fixed observation cutoff is 2026-09-21T00:00:00Z. Omitted ages are explicit verified400d construction inputs, not source-authored values. Case38 needs old age and the other Required observations present to reach missing vm.silence.any.",
+    "Unspecified type is storage except where the scenario identifies another type. PE and lock shorthand use storage.pe.approved and generic.lock.cannotdelete. DI shorthand uses storage.sku.geo. P3 shorthand uses storage.metrics.user-writes.",
+    "A Required list is always the complete trusted per-type list; missing evidence is NOT a missing catalogue definition. IDLE(all) expands to present Required evidence. Rows21/57/58 use the bounded source-derived ARG expansion documented in argNormalization below; INFO remains non-critical. This does not establish analyzer or collector completeness.",
+    "Cases39/40/41/59 retain raw metric stimuli alongside source-prescribed normalized evidence. No classifier runs here; classifier/replay tests are deferred to storage. In particular case39 only prescribes user-writes despite raw reads which a full classifier must resolve.",
+    "Cases60/61/65 call internal/age.ResolveAge from the external verdict_test package using raw normalized events/deployments; input.age is unknown and expected age is asserted separately. The resolver returns verdict.Age; no duplicate resolver or verdict-to-age import exists.",
+    "Case63's stop200d is synthetic only; native Activity Log retains90d. The fixture does not claim a collector could retrieve that event.",
+    "Cases36/51/52 retain cordon refusal metadata but do not execute or implement cordon.",
+    "Cases28/46 assert prescribed Evidence.nextSteps metadata only; Result intentionally follows A's schema with no NextSteps field. No renderer is implemented.",
+    "Extended VNet/ACA/job types are engine fixtures only, not supported CLI analyzers. G6 additions live in TestG6Validation outside the original66.",
+    "Age sources omitted by the source table are represented by rp.timestamp for verified, deployments for bounded, activitylog.no-events for inferred, and none for unknown. Those labels are construction conventions unless the source explicitly states them."
+  ],
+  "argNormalization": {
+    "source": "docs/architect-3.md sections 5.0/5.1",
+    "rows": [21, 57, 58],
+    "boundary": "Constructed storage scenario, not an ARG response or complete collector test. Includes every named ARG-backed observation signal in these two tables for the selected paths, with catalogue criticality. ARM-only, metrics, and Activity Log signals are not arbitrarily marked ARG failures.",
+    "selectedPaths": [
+      "generic.dns.records uses the public-zone HARD_DEPENDENCY alternative; private-zone DESIGN_INTENT is not simultaneously represented by a duplicate ID.",
+      "storage.reverse.generic-has uses the Flex HARD_DEPENDENCY alternative, rather than the generic properties-has DESIGN_INTENT alternative.",
+      "storage.vmext.diagnostics models permission failure on K9, not the separate H9 projection-unavailable non-critical unsupported path.",
+      "generic.arg.visible is absent per K0; it is not an unknown critical observation.",
+      "generic.age uses the stipulated RP timestamp, so the optional ARG age source is not needed.",
+      "storage.kb.match:<entryId> is dynamically instantiated only for actual stipulated matches. No artifact names or KB matches are supplied in these rows, so none are invented here."
+    ],
+    "signals": [
+      {"id": "generic.rg.managedby", "tier": 2, "critical": true, "source": "5.0 ARG K2 plus K3"},
+      {"id": "generic.dns.records", "tier": 2, "critical": true, "source": "5.0 ARG K-DNS, public-zone path"},
+      {"id": "generic.tags.hidden-link", "tier": 2, "critical": false, "source": "5.0 tags plus ARG K3"},
+      {"id": "generic.tags.hidden-link-dangling", "tier": 6, "critical": false, "source": "5.0 same source as hidden-link"},
+      {"id": "generic.advisor", "tier": 5, "critical": false, "source": "5.0 ARG K4"},
+      {"id": "storage.netacl.resource-instances", "tier": 2, "critical": true, "source": "5.1 ARM resourceAccessRules plus ARG K3"},
+      {"id": "storage.bootdiag.vms", "tier": 2, "critical": true, "source": "5.1 ARG K8"},
+      {"id": "storage.flowlogs", "tier": 2, "critical": true, "source": "5.1 ARG K7b"},
+      {"id": "storage.backup.items", "tier": 2, "critical": true, "source": "5.1 ARG K5b"},
+      {"id": "storage.reverse.generic-has", "tier": 2, "critical": true, "source": "5.1 ARG K6, Flex path"},
+      {"id": "storage.vmext.diagnostics", "tier": 2, "critical": true, "source": "5.1 ARG K9, permission failure"}
+    ],
+    "unknownCount": 11,
+    "criticalUnknownCount": 8
+  }
+}

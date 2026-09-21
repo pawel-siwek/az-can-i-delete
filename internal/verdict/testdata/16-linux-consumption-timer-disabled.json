@@ -1,0 +1,99 @@
+{
+  "number": 16,
+  "name": "Linux Consumption, timer disabled",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 16 | Linux Consumption, timer disabled | U! `site.metrics.silence`(unsupported), U! `site.metrics.function-executions`(unsupported), triggers http-only, age(v,400) | tentative / inconclusive / [function-executions, silence] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "site.metrics.silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "unsupported",
+          "message": "Synthetic normalized source-table observation"
+        },
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.metrics.function-executions",
+        "tier": 3,
+        "tierName": "LIVE_ACTIVITY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "unsupported",
+          "message": "Synthetic normalized source-table observation"
+        },
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.triggers.http-only-or-none",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "site.metrics.function-executions",
+      "site.metrics.silence"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 2
+  },
+  "rawStimuli": {
+    "hostingClass": "linux-consumption",
+    "timerDisabled": true
+  }
+}

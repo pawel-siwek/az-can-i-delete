@@ -1,0 +1,238 @@
+{
+  "number": 21,
+  "name": "ARG probe empty",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 21 | ARG probe empty | every ARG-backed signal U!(permission), `generic.arg.visible` absent, rest IDLE | tentative / inconclusive / first = lowest-tier ARG unknown id |"
+  },
+  "conventions": [
+    "Bounded normalization of docs/architect-3.md sections 5.0/5.1: all 11 named ARG-backed observation signals applicable to this constructed storage case are unknown(permission); generic.arg.visible is separately absent. See _metadata.json argNormalization for IDs, tiers and source paths. This is not a collector completeness test.",
+    "The table's U! shorthand does not override catalogue non-criticality for hidden-link, hidden-link-dangling and Advisor. Public-zone DNS and the Flex reference path select the catalogue's tier-2 alternatives. No concrete dynamic KB match is stipulated."
+  ],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.metrics.user-transactions-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.metrics.count-delta-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.activitylog.control-plane-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.lists.complete",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "generic.rg.managedby",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.dns.records",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.tags.hidden-link",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.tags.hidden-link-dangling",
+        "tier": 6,
+        "tierName": "INFO",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.advisor",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.netacl.resource-instances",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.bootdiag.vms",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.flowlogs",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.backup.items",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.reverse.generic-has",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.vmext.diagnostics",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "generic.dns.records",
+      "generic.rg.managedby",
+      "storage.backup.items",
+      "storage.bootdiag.vms",
+      "storage.flowlogs",
+      "storage.netacl.resource-instances",
+      "storage.reverse.generic-has",
+      "storage.vmext.diagnostics"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 8
+  }
+}

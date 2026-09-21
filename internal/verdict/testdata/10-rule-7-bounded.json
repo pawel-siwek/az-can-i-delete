@@ -1,0 +1,73 @@
+{
+  "number": 10,
+  "name": "rule 7 bounded",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 10 | rule 7 bounded | vnet IDLE(all), age(b,20) | tentative / [window.too-short-for-yes] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/virtualNetworks",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vnet.structural.empty",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vnet.activitylog.no-write-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 20,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vnet.structural.empty",
+      "vnet.activitylog.no-write-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "window.too-short-for-yes"
+    ],
+    "effective": {
+      "start": "2026-09-01T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 20,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 20,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "number": 5,
+  "name": "non-critical unknown",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 5 | non-critical unknown | U `site.appsettings.storage-refs`, site IDLE(all), age(v,400) | yes / no-evidence-of-use |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.silence.any",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.triggers.http-only-or-none",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.activitylog.no-deploy-events",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.appsettings.storage-refs",
+        "tier": 6,
+        "tierName": "INFO",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "generic.arg.visible",
+      "site.activitylog.no-deploy-events",
+      "site.silence.any",
+      "site.triggers.http-only-or-none"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

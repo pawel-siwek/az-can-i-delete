@@ -1,0 +1,64 @@
+{
+  "number": 34,
+  "name": "public site scanner hits",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 34 | public site scanner hits | DI `site.metrics.low-volume` (40 req/day, ceiling 0) | tentative / design-intent |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "site.metrics.low-volume",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "site.metrics.low-volume"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "requestsPerDay": 40,
+    "ceiling": 0
+  }
+}

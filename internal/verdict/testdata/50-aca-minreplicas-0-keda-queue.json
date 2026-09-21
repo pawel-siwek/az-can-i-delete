@@ -1,0 +1,66 @@
+{
+  "number": 50,
+  "name": "ACA minReplicas 0 + KEDA queue",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 50 | ACA minReplicas 0 + KEDA queue | DI `aca.scale.rules` (azureQueue), Replicas max 0, Requests 0 | tentative / design-intent / [aca.scale.rules] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.App/containerApps",
+    "evidence": [
+      {
+        "id": "aca.scale.rules",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "aca.silence.any",
+      "aca.scale.http-only",
+      "aca.revisions.no-activity"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "aca.scale.rules"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "minReplicas": 0,
+    "rule": "azureQueue",
+    "replicasMax": 0,
+    "requests": 0
+  }
+}

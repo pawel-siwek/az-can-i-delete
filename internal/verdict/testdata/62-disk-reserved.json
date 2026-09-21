@@ -1,0 +1,63 @@
+{
+  "number": 62,
+  "name": "disk Reserved",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 62 | disk Reserved | `diskState == Reserved`, `managedBy` set → P1 `disk.state.attached` | no / blocked |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/disks",
+    "evidence": [
+      {
+        "id": "disk.state.attached",
+        "tier": 1,
+        "tierName": "BLOCKER",
+        "status": "present",
+        "critical": true
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "disk.state.unattached",
+      "disk.ownership.age-ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "blocked",
+    "reasons": [
+      "disk.state.attached"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "diskState": "Reserved",
+    "managedBy": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/fixture"
+  }
+}
