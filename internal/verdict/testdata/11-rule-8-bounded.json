@@ -1,0 +1,75 @@
+{
+  "number": 11,
+  "name": "rule 8 bounded",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 11 | rule 8 bounded | vnet IDLE(all), age(b,45), W=90 | yes; Effective.Days == 45 |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/virtualNetworks",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vnet.structural.empty",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vnet.activitylog.no-write-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 45,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vnet.structural.empty",
+      "vnet.activitylog.no-write-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "generic.arg.visible",
+      "vnet.activitylog.no-write-30d",
+      "vnet.structural.empty"
+    ],
+    "effective": {
+      "start": "2026-08-07T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 45,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 45,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

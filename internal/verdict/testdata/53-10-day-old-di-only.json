@@ -1,0 +1,114 @@
+{
+  "number": 53,
+  "name": "10-day-old, DI only",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 53 | 10-day-old, DI only | DI `generic.iac.deployment`, IDLE(all), age(v,10) | tentative / design-intent / [generic.iac.deployment] (rule 4 before 7) |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "storage.metrics.user-transactions-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-11T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 10,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.metrics.count-delta-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-11T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 10,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.activitylog.control-plane-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-11T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 10,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.lists.complete",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "generic.iac.deployment",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 10,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "generic.iac.deployment"
+    ],
+    "effective": {
+      "start": "2026-09-11T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 10,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 10,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

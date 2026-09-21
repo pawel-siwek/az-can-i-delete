@@ -1,0 +1,49 @@
+{
+  "number": 14,
+  "name": "unsupported type",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 14 | unsupported type | keyvault, no evidence, age(v,400) | tentative / inconclusive / [generic.never] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.KeyVault/vaults",
+    "evidence": [],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.never"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "generic.never"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

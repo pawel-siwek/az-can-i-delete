@@ -1,0 +1,77 @@
+{
+  "number": 39,
+  "name": "SMB-only share",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 39 | SMB-only share | fileServices `Transactions` `Read` 300/d, `Write` 40/d on 10 d, no REST names | no / in-use / [storage.metrics.user-writes] |"
+  },
+  "conventions": [
+    "Only source-prescribed normalized user-writes evidence is supplied. This does not test SMB/read classification; raw reads may independently need classifier treatment at the storage checkpoint."
+  ],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.metrics.user-writes",
+        "tier": 3,
+        "tierName": "LIVE_ACTIVITY",
+        "status": "present",
+        "critical": true,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "storage.metrics.user-writes"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "service": "fileServices",
+    "metric": "Transactions",
+    "ReadPerDay": 300,
+    "WritePerDay": 40,
+    "days": 10,
+    "restApiNames": []
+  }
+}

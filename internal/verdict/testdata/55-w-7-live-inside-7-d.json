@@ -1,0 +1,69 @@
+{
+  "number": 55,
+  "name": "W=7 + LIVE inside 7 d",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 55 | W=7 + LIVE inside 7 d | P3 evaluated over W=7 | no / in-use |"
+  },
+  "conventions": [
+    "Unspecified P3 expanded to existing storage.metrics.user-writes, evaluated over Requested=7."
+  ],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.metrics.user-writes",
+        "tier": 3,
+        "tierName": "LIVE_ACTIVITY",
+        "status": "present",
+        "critical": true,
+        "window": {
+          "start": "2026-09-14T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 7,
+          "grain": "P1D"
+        }
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-09-14T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 7,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "storage.metrics.user-writes"
+    ],
+    "effective": {
+      "start": "2026-09-14T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 7,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

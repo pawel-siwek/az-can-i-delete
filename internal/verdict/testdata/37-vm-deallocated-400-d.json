@@ -1,0 +1,91 @@
+{
+  "number": 37,
+  "name": "VM deallocated 400 d",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 37 | VM deallocated 400 d | P5 `vm.power.deallocated-silence` → `vm.silence.any`, `vm.activitylog.no-start-events`, IDLE(all), age(v,600) | yes |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/virtualMachines",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vm.silence.any",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vm.activitylog.no-start-events",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "vm.power.deallocated-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 600,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vm.silence.any",
+      "vm.activitylog.no-start-events"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "generic.arg.visible",
+      "vm.activitylog.no-start-events",
+      "vm.silence.any"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 600,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "deallocatedDays": 400
+  }
+}

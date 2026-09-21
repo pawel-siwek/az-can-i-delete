@@ -1,0 +1,83 @@
+{
+  "number": 31,
+  "name": "SP write",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 31 | SP write | nsg IDLE(all), DI `generic.activitylog.recent-write` | tentative / design-intent |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/networkSecurityGroups",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "nsg.structural.no-associations",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "nsg.unassociated.ge-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "generic.activitylog.recent-write",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "nsg.structural.no-associations",
+      "nsg.unassociated.ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "generic.activitylog.recent-write"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "callerClass": "servicePrincipal"
+  }
+}

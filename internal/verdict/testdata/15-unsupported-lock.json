@@ -1,0 +1,57 @@
+{
+  "number": 15,
+  "name": "unsupported + lock",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 15 | unsupported + lock | keyvault + P1 lock | no / blocked |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.KeyVault/vaults",
+    "evidence": [
+      {
+        "id": "generic.lock.cannotdelete",
+        "tier": 1,
+        "tierName": "BLOCKER",
+        "status": "present",
+        "critical": true
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.never"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "blocked",
+    "reasons": [
+      "generic.lock.cannotdelete"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

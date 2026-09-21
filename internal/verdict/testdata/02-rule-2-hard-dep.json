@@ -1,0 +1,61 @@
+{
+  "number": 2,
+  "name": "rule 2 HARD_DEP",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 2 | rule 2 HARD_DEP | P2 `storage.pe.approved` | no / in-use / [pe] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.pe.approved",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "present",
+        "critical": true
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "storage.pe.approved"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

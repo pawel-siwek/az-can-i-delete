@@ -1,0 +1,74 @@
+{
+  "number": 28,
+  "name": "VM backup + reservation",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 28 | VM backup + reservation | P2 `vm.backup.protected` + DI `vm.deallocated.with-reservation` | no / in-use; NextSteps contains \"stop backup\" |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/virtualMachines",
+    "evidence": [
+      {
+        "id": "vm.backup.protected",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "present",
+        "critical": true,
+        "nextSteps": [
+          "stop backup"
+        ]
+      },
+      {
+        "id": "vm.deallocated.with-reservation",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vm.silence.any",
+      "vm.activitylog.no-start-events"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "vm.backup.protected"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0,
+    "nextSteps": {
+      "vm.backup.protected": [
+        "stop backup"
+      ]
+    }
+  }
+}

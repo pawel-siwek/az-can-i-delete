@@ -1,0 +1,191 @@
+{
+  "number": 57,
+  "name": "ARG empty + lock",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 57 | ARG empty + lock | ARG signals U!(permission), P1 lock | no / blocked; CriticalUnknown printed |"
+  },
+  "conventions": [
+    "Uses the same bounded section-5.0/5.1 ARG expansion as row21: 11 source-defined unknown(permission) signals, eight critical, generic.arg.visible absent. The known lock remains independent ARM evidence. See _metadata.json argNormalization; no collector implementation or completeness is claimed."
+  ],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "generic.rg.managedby",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.dns.records",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.tags.hidden-link",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.tags.hidden-link-dangling",
+        "tier": 6,
+        "tierName": "INFO",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.advisor",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.netacl.resource-instances",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.bootdiag.vms",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.flowlogs",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.backup.items",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.reverse.generic-has",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "storage.vmext.diagnostics",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "unknown",
+        "critical": true,
+        "unknown": {
+          "code": "permission",
+          "message": "Synthetic normalized source-table observation"
+        }
+      },
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      },
+      {
+        "id": "generic.lock.cannotdelete",
+        "tier": 1,
+        "tierName": "BLOCKER",
+        "status": "present",
+        "critical": true
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "blocked",
+    "reasons": [
+      "generic.lock.cannotdelete"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 8
+  }
+}

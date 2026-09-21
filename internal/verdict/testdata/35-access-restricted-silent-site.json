@@ -1,0 +1,110 @@
+{
+  "number": 35,
+  "name": "access-restricted silent site",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 35 | access-restricted silent site | site IDLE(all) (`site.silence.any` via metrics.silence), INFO `site.config.access-restricted`, age(v,200) | yes |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.silence.any",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.triggers.http-only-or-none",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.activitylog.no-deploy-events",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.metrics.silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.config.access-restricted",
+        "tier": 6,
+        "tierName": "INFO",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 200,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "generic.arg.visible",
+      "site.activitylog.no-deploy-events",
+      "site.silence.any",
+      "site.triggers.http-only-or-none"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 200,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

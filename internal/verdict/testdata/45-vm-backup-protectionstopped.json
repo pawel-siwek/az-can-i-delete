@@ -1,0 +1,69 @@
+{
+  "number": 45,
+  "name": "VM backup ProtectionStopped",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 45 | VM backup ProtectionStopped | DI `vm.backup.retained`, `vm.power.deallocated-silence`, age(v,300) | tentative / design-intent / [vm.backup.retained] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/virtualMachines",
+    "evidence": [
+      {
+        "id": "vm.backup.retained",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vm.power.deallocated-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 300,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vm.silence.any",
+      "vm.activitylog.no-start-events"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "vm.backup.retained"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 300,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "currentProtectionState": "ProtectionStopped"
+  }
+}

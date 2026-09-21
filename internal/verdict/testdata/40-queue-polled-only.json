@@ -1,0 +1,74 @@
+{
+  "number": 40,
+  "name": "queue polled only",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 40 | queue polled only | `GetMessages` 20,000/d 90 d, `GetMessageRead == GetMessages`, `PutMessage 0`, `GetMessageWrite 0` | no / in-use / [storage.metrics.queue-polling] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.metrics.queue-polling",
+        "tier": 3,
+        "tierName": "LIVE_ACTIVITY",
+        "status": "present",
+        "critical": true,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "storage.metrics.queue-polling"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "GetMessagesPerDay": 20000,
+    "days": 90,
+    "GetMessageReadEqualsGetMessages": true,
+    "PutMessage": 0,
+    "GetMessageWrite": 0
+  }
+}

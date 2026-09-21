@@ -1,0 +1,78 @@
+{
+  "number": 36,
+  "name": "event job suspended",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 36 | event job suspended | DI `job.state.suspended` + DI `job.trigger.event`, executions none | tentative / design-intent; cordon refuses `already-suspended` |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.App/jobs",
+    "evidence": [
+      {
+        "id": "job.state.suspended",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "job.trigger.event",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "job.executions.none",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "job.executions.none",
+      "job.trigger.manual"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "job.state.suspended",
+      "job.trigger.event"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "retained": {
+    "cordonRefusal": "already-suspended",
+    "implemented": false
+  }
+}
