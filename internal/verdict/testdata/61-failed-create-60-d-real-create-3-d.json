@@ -1,0 +1,132 @@
+{
+  "number": 61,
+  "name": "failed create 60 d, real create 3 d",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 61 | failed create 60 d, real create 3 d | AL `write` Failed 60 d, `write` Succeeded 3 d | age(b,3) → tentative / [window.too-short-for-yes] |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "storage.metrics.user-transactions-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-18T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 3,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.metrics.count-delta-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-18T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 3,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.activitylog.control-plane-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-09-18T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 3,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "storage.lists.complete",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 0,
+      "confidence": "unknown",
+      "source": "none",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "window.too-short-for-yes"
+    ],
+    "effective": {
+      "start": "2026-09-18T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 3,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 3,
+      "confidence": "bounded",
+      "source": "activitylog.oldest-succeeded",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "ageInput": {
+    "resourceId": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture",
+    "cutoff": "2026-09-21T00:00:00Z",
+    "activityLog": [
+      {
+        "resourceId": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture",
+        "timestamp": "2026-07-23T00:00:00Z",
+        "operation": "Microsoft.Storage/storageAccounts/write",
+        "status": "Failed",
+        "statusCode": "Created"
+      },
+      {
+        "resourceId": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture",
+        "timestamp": "2026-09-18T00:00:00Z",
+        "operation": "Microsoft.Storage/storageAccounts/write",
+        "status": "Succeeded",
+        "statusCode": ""
+      }
+    ],
+    "resourceChanges": [],
+    "deployments": [],
+    "activityLogSucceeded": true,
+    "activityLogTruncated": false,
+    "activityLogDays": 90
+  }
+}

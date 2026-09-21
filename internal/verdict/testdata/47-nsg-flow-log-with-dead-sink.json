@@ -1,0 +1,70 @@
+{
+  "number": 47,
+  "name": "NSG flow log with dead sink",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 47 | NSG flow log with dead sink | DI `nsg.flowlog.configured` (storage GET 404), no associations, age(b,60) | tentative / design-intent |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/networkSecurityGroups",
+    "evidence": [
+      {
+        "id": "nsg.flowlog.configured",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "nsg.structural.no-associations",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 60,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "nsg.structural.no-associations",
+      "nsg.unassociated.ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "nsg.flowlog.configured"
+    ],
+    "effective": {
+      "start": "2026-07-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 60,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 60,
+      "confidence": "bounded",
+      "source": "deployments",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "storageGetStatus": 404,
+    "associations": []
+  }
+}

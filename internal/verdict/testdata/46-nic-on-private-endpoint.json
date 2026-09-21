@@ -1,0 +1,67 @@
+{
+  "number": 46,
+  "name": "NIC on private endpoint",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 46 | NIC on private endpoint | P1 `nic.attached.private-endpoint` | no / blocked; NextSteps = \"delete the private endpoint `<id>`; ARM refuses to delete a private-endpoint NIC directly\" |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/networkInterfaces",
+    "evidence": [
+      {
+        "id": "nic.attached.private-endpoint",
+        "tier": 1,
+        "tierName": "BLOCKER",
+        "status": "present",
+        "critical": true,
+        "nextSteps": [
+          "delete the private endpoint `<id>`; ARM refuses to delete a private-endpoint NIC directly"
+        ]
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "nic.structural.detached",
+      "nic.detached.ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "blocked",
+    "reasons": [
+      "nic.attached.private-endpoint"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0,
+    "nextSteps": {
+      "nic.attached.private-endpoint": [
+        "delete the private endpoint `<id>`; ARM refuses to delete a private-endpoint NIC directly"
+      ]
+    }
+  }
+}

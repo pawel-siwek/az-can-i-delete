@@ -1,0 +1,63 @@
+{
+  "number": 27,
+  "name": "DI + age unknown",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 27 | DI + age unknown | DI + age(?) | tentative / design-intent / [DI id] only; Coverage.Age.Confidence == unknown reported |"
+  },
+  "conventions": [
+    "Unspecified DI is the existing storage.sku.geo ID (not an invented DI signal)."
+  ],
+  "input": {
+    "type": "Microsoft.Storage/storageAccounts",
+    "evidence": [
+      {
+        "id": "storage.sku.geo",
+        "tier": 4,
+        "tierName": "DESIGN_INTENT",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 0,
+      "confidence": "unknown",
+      "source": "none",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "storage.metrics.user-transactions-silence",
+      "storage.metrics.count-delta-silence",
+      "storage.activitylog.control-plane-silence",
+      "storage.lists.complete"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "design-intent",
+    "reasons": [
+      "storage.sku.geo"
+    ],
+    "effective": {
+      "start": "2026-09-21T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 0,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 0,
+      "confidence": "unknown",
+      "source": "none",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

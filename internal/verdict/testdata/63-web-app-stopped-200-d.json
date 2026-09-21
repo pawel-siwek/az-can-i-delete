@@ -1,0 +1,108 @@
+{
+  "number": 63,
+  "name": "web app stopped 200 d",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 63 | web app stopped 200 d | `state == Stopped`, AL `stop/action` 200 d ago, no `start`, no slots, kind `app`, IDLE(all) via `site.state.stopped-ge-30d` | yes |"
+  },
+  "conventions": [
+    "Synthetic 200d stop observation retained exactly; native Activity Log's 90d retention cannot furnish it. No live response or stop collector is claimed. Age 400d is an explicit construction input."
+  ],
+  "input": {
+    "type": "Microsoft.Web/sites",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.silence.any",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.triggers.http-only-or-none",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "site.activitylog.no-deploy-events",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "site.state.stopped-ge-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "site.silence.any",
+      "site.triggers.http-only-or-none",
+      "site.activitylog.no-deploy-events"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "generic.arg.visible",
+      "site.activitylog.no-deploy-events",
+      "site.silence.any",
+      "site.triggers.http-only-or-none"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "state": "Stopped",
+    "stopEventDaysAgo": 200,
+    "operation": "Microsoft.Web/sites/stop/action",
+    "status": "Succeeded",
+    "starts": [],
+    "slots": [],
+    "kind": "app"
+  }
+}

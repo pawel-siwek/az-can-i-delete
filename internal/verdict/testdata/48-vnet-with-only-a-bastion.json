@@ -1,0 +1,69 @@
+{
+  "number": 48,
+  "name": "VNet with only a Bastion",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 48 | VNet with only a Bastion | P2 `vnet.gateways-and-services` (bastion); `vnet.structural.empty` absent | no / in-use |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Network/virtualNetworks",
+    "evidence": [
+      {
+        "id": "vnet.gateways-and-services",
+        "tier": 2,
+        "tierName": "HARD_DEPENDENCY",
+        "status": "present",
+        "critical": true
+      },
+      {
+        "id": "vnet.structural.empty",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vnet.structural.empty",
+      "vnet.activitylog.no-write-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "no",
+    "reasonClass": "in-use",
+    "reasons": [
+      "vnet.gateways-and-services"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  },
+  "rawStimuli": {
+    "service": "bastion"
+  }
+}

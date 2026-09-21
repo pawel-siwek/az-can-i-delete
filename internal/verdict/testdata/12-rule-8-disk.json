@@ -1,0 +1,75 @@
+{
+  "number": 12,
+  "name": "rule 8 disk",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 12 | rule 8 disk | disk IDLE(all), age(v,60), W=90 | yes; Effective.Days == 60 |"
+  },
+  "conventions": [],
+  "input": {
+    "type": "Microsoft.Compute/disks",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "disk.state.unattached",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "disk.ownership.age-ge-30d",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 60,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "disk.state.unattached",
+      "disk.ownership.age-ge-30d"
+    ]
+  },
+  "expect": {
+    "verdict": "yes",
+    "reasonClass": "no-evidence-of-use",
+    "reasons": [
+      "disk.ownership.age-ge-30d",
+      "disk.state.unattached",
+      "generic.arg.visible"
+    ],
+    "effective": {
+      "start": "2026-07-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 60,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 60,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}

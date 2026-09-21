@@ -1,0 +1,33 @@
+# Go build and test output
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+/vendor/
+go.work
+go.work.sum
+
+# All presentation assets stay local, including source files and slides
+/video/
+/video/out/
+*.wav
+*.mp4
+
+# Local credentials and editor state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/.azure/
+.DS_Store
+Thumbs.db
+
+# Local research and agent output
+/.siwek/

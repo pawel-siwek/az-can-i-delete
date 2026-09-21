@@ -1,0 +1,105 @@
+{
+  "number": 38,
+  "name": "VM metrics partial",
+  "source": {
+    "document": "docs/architect-3.md",
+    "section": "2.7",
+    "rawRow": "| 38 | VM metrics partial | U(partial) `vm.metrics.silence`, `vm.power.deallocated-silence` absent → `vm.silence.any` absent | tentative / inconclusive / [required.missing:vm.silence.any] |"
+  },
+  "conventions": [
+    "Explicit verified age 400d and other Required observations present are construction inputs omitted by the table, needed to reach rule 9 instead of age/window rules."
+  ],
+  "input": {
+    "type": "Microsoft.Compute/virtualMachines",
+    "evidence": [
+      {
+        "id": "generic.arg.visible",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false
+      },
+      {
+        "id": "vm.activitylog.no-start-events",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "present",
+        "critical": false,
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "vm.metrics.silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "unknown",
+        "critical": false,
+        "unknown": {
+          "code": "partial",
+          "message": "Synthetic normalized source-table observation"
+        },
+        "window": {
+          "start": "2026-06-23T00:00:00Z",
+          "end": "2026-09-21T00:00:00Z",
+          "days": 90,
+          "grain": "P1D"
+        }
+      },
+      {
+        "id": "vm.power.deallocated-silence",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      },
+      {
+        "id": "vm.silence.any",
+        "tier": 5,
+        "tierName": "OBSERVED_IDLE",
+        "status": "absent",
+        "critical": false
+      }
+    ],
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "requested": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "required": [
+      "generic.arg.visible",
+      "vm.silence.any",
+      "vm.activitylog.no-start-events"
+    ]
+  },
+  "expect": {
+    "verdict": "tentative",
+    "reasonClass": "inconclusive",
+    "reasons": [
+      "required.missing:vm.silence.any"
+    ],
+    "effective": {
+      "start": "2026-06-23T00:00:00Z",
+      "end": "2026-09-21T00:00:00Z",
+      "days": 90,
+      "grain": "P1D"
+    },
+    "age": {
+      "lowerBoundDays": 400,
+      "confidence": "verified",
+      "source": "rp.timestamp",
+      "caveats": []
+    },
+    "criticalUnknown": 0
+  }
+}
