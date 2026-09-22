@@ -36,8 +36,9 @@ fixture's raw row against it.
 | `internal/disk` — the managed disk analyzer | complete | attachment, export, references, ownership age, blindness, I/O contradiction |
 | `internal/network` — interface, public IP and security group analyzers | complete | owners, pools, associations incl. the scale set model, flow log sinks, platform ownership, detachment age, traffic contradiction |
 | `internal/storage` — the storage account analyzer | complete except the name knowledge base | operation classification, write and read thresholds, Defender carve-out, queue polling, count growth, listings, references, control-plane silence |
+| `internal/vm` — the virtual machine analyzer | complete | memberships, platform ownership, backup and replication, images, network references and pools, power state, start events, the three activity thresholds, deallocated silence |
+| `internal/site` — App Service sites, slots and plans | complete | hosting class, domains and fronting, triggers, the request ceiling and probe shape, stopped state, metric and deployment silence, plan site count and autoscale |
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
-| VM, sites/plans analyzers | **not started** | — |
 | `kb.yaml` storage knowledge base | **not started**; `storage.kb.match` is an honest not_evaluated stub | — |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
@@ -60,13 +61,12 @@ its tests and its honest `not_evaluated` strings all exist — not before.
    boundary implemented against the storage data plane.
 3. **Fixture replay and `demo`.** Recorded responses behind the same five
    interfaces, golden JSON per scenario, `recorded` in every replayed header.
-4. **VM, sites and plans analyzers**, in that order.
-5. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
+4. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
-6. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
+5. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
    only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
    the refusal wording for every other type.
-7. **CI action, goreleaser, installer**, then the day-1 empirical tests against
+6. **CI action, goreleaser, installer**, then the day-1 empirical tests against
    a real subscription, each with its documented rule flip. The README exists
    and repeats the approved limitations; a test enforces that.
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pawel-siwek/az-can-i-delete/internal/age"
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
@@ -400,6 +401,63 @@ func TestADeallocatedMachineKeptForItsBackupIsNotYes(t *testing.T) {
 	report := reportValue(t, outcome)
 	if report["verdict"] != "no" || report["reasonClass"] != "in-use" {
 		t.Fatalf("verdict = %v/%v, want no/in-use for a machine Azure Backup still protects",
+			report["verdict"], report["reasonClass"])
+	}
+}
+
+func TestAStoppedSiteCanReachYes(t *testing.T) {
+	appID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/sites/app1"
+	planID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/serverfarms/plan1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		switch id {
+		case appID:
+			return collect.Resource{ID: id, Name: "app1", Type: "Microsoft.Web/sites",
+				SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+				Properties: map[string]any{"provisioningState": "Succeeded", "state": "Stopped",
+					"serverFarmId": planID, "hostNames": []any{"app1.azurewebsites.net"}}}, nil
+		case planID:
+			return collect.Resource{ID: id, Properties: map[string]any{
+				"sku": map[string]any{"tier": "Basic", "capacity": float64(1)}}}, nil
+		default:
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound}
+		}
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": appID}}}}}}
+	// Stopped long ago, and nobody started it since.
+	log := &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90, Events: []collect.ActivityEvent{{
+		ActivityEvent: age.ActivityEvent{ResourceID: appID, Timestamp: cutoff.AddDate(0, 0, -80),
+			Operation: "Microsoft.Web/sites/stop/action", Status: "Succeeded"}}}}}
+	outcome, err := runner(arm, graph, log).Check(context.Background(), target(t, appID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "yes" {
+		t.Fatalf("verdict = %v with reasons %v, want yes for a site stopped 80 days ago",
+			report["verdict"], report["reasons"])
+	}
+}
+
+func TestAPlanWithSitesIsBlocked(t *testing.T) {
+	planID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/serverfarms/plan1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		if id != planID {
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound}
+		}
+		return collect.Resource{ID: id, Name: "plan1", Type: "Microsoft.Web/serverfarms",
+			Properties: map[string]any{"provisioningState": "Succeeded", "numberOfSites": float64(2)}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": planID}}}}}}
+	outcome, err := runner(arm, graph, &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}).
+		Check(context.Background(), target(t, planID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "no" || report["reasonClass"] != "blocked" {
+		t.Fatalf("verdict = %v/%v, want no/blocked for a plan with sites on it",
 			report["verdict"], report["reasonClass"])
 	}
 }
