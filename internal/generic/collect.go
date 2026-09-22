@@ -52,13 +52,14 @@ func Collect(ctx context.Context, in Input) Result {
 	tags := classifyTags(in.Resource.Tags, in.Cutoff)
 
 	var history historyGroup
+	var deployments deploymentGroup
 	outcomes := collect.Gather(ctx, []collect.Signal{
 		{ID: SignalLock, Run: lockSignal(in)},
 		{ID: SignalDenyAssignment, Run: denySignal(in)},
 		{ID: SignalRGManagedBy, Run: managedBySignal(in, probe)},
 		{ID: SignalHiddenLink, Run: hiddenLinkSignal(in, probe, tags)},
 		{ID: SignalAdvisor, Run: advisorSignal(in, probe)},
-		{ID: SignalDeployment, Run: deploymentSignal(in)},
+		{ID: SignalDeployment, Run: deployments.run(in)},
 		{ID: SignalRecentWrite, Run: history.run(in, probe)},
 	})
 
@@ -84,8 +85,9 @@ func Collect(ctx context.Context, in Input) Result {
 	}
 
 	result := Result{
-		ARGVisible: probe.visible, Age: history.age, ActivityLogDays: history.log.Days,
-		Metadata: Metadata{TagKeys: tagKeys(tags), Callers: history.callers},
+		ARGVisible: probe.visible, Age: resolveAge(in, history, deployments.deployments),
+		ActivityLogDays: history.log.Days,
+		Metadata:        Metadata{TagKeys: tagKeys(tags), Callers: history.callers},
 	}
 	for _, id := range Signals {
 		e, ok := collected[id]
@@ -399,8 +401,13 @@ func advisorSignal(in Input, probe graphProbe) func(context.Context) ([]verdict.
 	}
 }
 
-// deploymentSignal looks for the deployment that created the target.
-func deploymentSignal(in Input) func(context.Context) ([]verdict.Evidence, error) {
+// deploymentGroup looks for the deployment that created the target and keeps
+// the history, which is also one of the age chain's seven sources.
+type deploymentGroup struct {
+	deployments []collect.Deployment
+}
+
+func (g *deploymentGroup) run(in Input) func(context.Context) ([]verdict.Evidence, error) {
 	return func(ctx context.Context) ([]verdict.Evidence, error) {
 		if in.Target.ResourceGroup == "" {
 			return []verdict.Evidence{absent(SignalDeployment)}, nil
@@ -409,47 +416,62 @@ func deploymentSignal(in Input) func(context.Context) ([]verdict.Evidence, error
 		if err != nil {
 			return nil, err
 		}
+		g.deployments = deployments
 		return []verdict.Evidence{deploymentEvidence(deployments, in.Target.ID, len(deployments) >= collect.MaxDeployments)}, nil
 	}
 }
 
 // historyGroup collects the Activity Log and the Resource Changes history. It
-// produces both Activity Log signals and the age chain's inputs, so a failure
-// here leaves the age unknown rather than inventing a young or old resource.
+// produces both Activity Log signals and three of the age chain's sources, so a
+// failure here leaves the age unknown rather than inventing a young or old
+// resource.
 type historyGroup struct {
-	log     collect.ActivityLog
-	age     verdict.Age
-	callers []string
+	log       collect.ActivityLog
+	read      bool
+	changes   []age.ResourceChange
+	truncated bool
+	callers   []string
 }
 
 func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]verdict.Evidence, error) {
-	g.age = verdict.Age{Confidence: "unknown", Source: "none", Caveats: []string{}}
 	return func(ctx context.Context) ([]verdict.Evidence, error) {
 		window := verdict.Window{Start: in.Cutoff.AddDate(0, 0, -WritesDays), End: in.Cutoff, Days: WritesDays, Grain: "P1D"}
 		log, err := in.Clients.ActivityLog.Events(ctx, in.Target.ID, window)
 		if err != nil {
 			return nil, err
 		}
-		g.log = log
+		g.log, g.read = log, true
 		for _, event := range log.Events {
 			if event.Caller != "" && !slices.Contains(g.callers, event.Caller) {
 				g.callers = append(g.callers, event.Caller)
 			}
 		}
 		changes, changesErr := resourceChanges(ctx, in, probe)
-		g.age = age.ResolveAge(age.Input{
-			ResourceID:           in.Target.ID,
-			Cutoff:               in.Cutoff,
-			RPTimestamp:          rpTimestamp(in.Resource),
-			ActivityLog:          log.AgeEvents(),
-			ResourceChanges:      changes,
-			ActivityLogSucceeded: true,
-			ActivityLogTruncated: log.Truncated || changesErr != nil,
-			ActivityLogDays:      log.Days,
-		})
+		g.changes, g.truncated = changes, log.Truncated || changesErr != nil
 		recent, writes := activityEvidence(log, in.Cutoff)
 		return []verdict.Evidence{recent, writes}, nil
 	}
+}
+
+// resolveAge runs the age chain over everything the run actually read. An
+// unread Activity Log cannot infer an absence of events, so the chain is told
+// the log did not succeed and the age stays unknown.
+func resolveAge(in Input, history historyGroup, deployments []collect.Deployment) verdict.Age {
+	normalized := make([]age.Deployment, 0, len(deployments))
+	for _, deployment := range deployments {
+		normalized = append(normalized, deployment.Deployment)
+	}
+	return age.ResolveAge(age.Input{
+		ResourceID:           in.Target.ID,
+		Cutoff:               in.Cutoff,
+		RPTimestamp:          rpTimestamp(in.Resource),
+		ActivityLog:          history.log.AgeEvents(),
+		ResourceChanges:      history.changes,
+		Deployments:          normalized,
+		ActivityLogSucceeded: history.read,
+		ActivityLogTruncated: history.truncated,
+		ActivityLogDays:      history.log.Days,
+	})
 }
 
 // resourceChanges reads the 14-day change history. It is best effort: without
