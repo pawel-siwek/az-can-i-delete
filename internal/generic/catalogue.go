@@ -9,6 +9,7 @@ package generic
 import (
 	"time"
 
+	"github.com/pawel-siwek/az-can-i-delete/internal/signal"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
 
@@ -51,43 +52,29 @@ const (
 	WritesDays      = 90
 )
 
-// spec is the fixed catalogue row for one signal: what tier it carries, whether
-// an unreadable answer is a critical unknown, and where it is collected from.
-type spec struct {
-	tier       verdict.Tier
-	critical   bool
-	family     string
-	confidence string
-	api        string
-	apiVersion string
-	// argBacked signals cannot be trusted when the Resource Graph probe did not
-	// find the target: they become unknown rather than absent.
-	argBacked bool
-}
-
-// catalogue is SPEC section 5.0, in the order every report prints. A deny
+// Catalogue is SPEC section 5.0, in the order every report prints. A deny
 // assignment is deliberately non-critical: a 403 reading it must not by itself
 // block a verdict, while an unreadable lock must.
-var catalogue = map[string]spec{
-	SignalARMGet:          {tier: verdict.TierInfo, family: "structural", confidence: "verified", api: "ARM"},
-	SignalARGVisible:      {tier: verdict.TierObservedIdle, family: "structural", confidence: "verified", api: "ARG"},
-	SignalLock:            {tier: verdict.TierBlocker, critical: true, family: "structural", confidence: "verified", api: "ARM", apiVersion: LocksAPIVersion},
-	SignalDenyAssignment:  {tier: verdict.TierBlocker, family: "structural", confidence: "verified", api: "ARM", apiVersion: DenyAssignmentsAPIVersion},
-	SignalRGManagedBy:     {tier: verdict.TierHardDependency, critical: true, family: "structural", confidence: "verified", api: "ARG", argBacked: true},
-	SignalTagProtect:      {tier: verdict.TierHardDependency, family: "tags", confidence: "heuristic", api: "ARM"},
-	SignalTagExpired:      {tier: verdict.TierObservedIdle, family: "tags", confidence: "heuristic", api: "ARM"},
-	SignalTagIntent:       {tier: verdict.TierDesignIntent, family: "tags", confidence: "heuristic", api: "ARM"},
-	SignalHiddenLink:      {tier: verdict.TierHardDependency, family: "tags", confidence: "verified", api: "ARG", argBacked: true},
-	SignalHiddenLinkDead:  {tier: verdict.TierInfo, family: "tags", confidence: "verified", api: "ARG", argBacked: true},
-	SignalTagOwner:        {tier: verdict.TierInfo, family: "tags", confidence: "heuristic", api: "ARM"},
-	SignalDeployment:      {tier: verdict.TierDesignIntent, family: "activity-log", confidence: "verified", api: "ARM", apiVersion: DeploymentsAPIVersion},
-	SignalRecentWrite:     {tier: verdict.TierDesignIntent, family: "activity-log", confidence: "verified", api: "ActivityLog"},
-	SignalWrites:          {tier: verdict.TierInfo, family: "activity-log", confidence: "verified", api: "ActivityLog"},
-	SignalPEConnections:   {tier: verdict.TierHardDependency, critical: true, family: "structural", confidence: "verified", api: "ARM"},
-	SignalDNSRecords:      {tier: verdict.TierHardDependency, critical: true, family: "reverse-ref", confidence: "verified", api: "ARG", argBacked: true},
-	SignalAdvisor:         {tier: verdict.TierObservedIdle, family: "derived", confidence: "heuristic", api: "Advisor", argBacked: true},
-	SignalRoleAssignments: {tier: verdict.TierInfo, family: "structural", confidence: "unknown", api: "ARM"},
-	SignalPolicyState:     {tier: verdict.TierInfo, family: "structural", confidence: "unknown", api: "ARM"},
+var Catalogue = signal.Catalogue{
+	SignalARMGet:          {Tier: verdict.TierInfo, Family: "structural", Confidence: "verified", API: "ARM"},
+	SignalARGVisible:      {Tier: verdict.TierObservedIdle, Family: "structural", Confidence: "verified", API: "ARG"},
+	SignalLock:            {Tier: verdict.TierBlocker, Critical: true, Family: "structural", Confidence: "verified", API: "ARM", APIVersion: LocksAPIVersion},
+	SignalDenyAssignment:  {Tier: verdict.TierBlocker, Family: "structural", Confidence: "verified", API: "ARM", APIVersion: DenyAssignmentsAPIVersion},
+	SignalRGManagedBy:     {Tier: verdict.TierHardDependency, Critical: true, Family: "structural", Confidence: "verified", API: "ARG", ARGBacked: true},
+	SignalTagProtect:      {Tier: verdict.TierHardDependency, Family: "tags", Confidence: "heuristic", API: "ARM"},
+	SignalTagExpired:      {Tier: verdict.TierObservedIdle, Family: "tags", Confidence: "heuristic", API: "ARM"},
+	SignalTagIntent:       {Tier: verdict.TierDesignIntent, Family: "tags", Confidence: "heuristic", API: "ARM"},
+	SignalHiddenLink:      {Tier: verdict.TierHardDependency, Family: "tags", Confidence: "verified", API: "ARG", ARGBacked: true},
+	SignalHiddenLinkDead:  {Tier: verdict.TierInfo, Family: "tags", Confidence: "verified", API: "ARG", ARGBacked: true},
+	SignalTagOwner:        {Tier: verdict.TierInfo, Family: "tags", Confidence: "heuristic", API: "ARM"},
+	SignalDeployment:      {Tier: verdict.TierDesignIntent, Family: "activity-log", Confidence: "verified", API: "ARM", APIVersion: DeploymentsAPIVersion},
+	SignalRecentWrite:     {Tier: verdict.TierDesignIntent, Family: "activity-log", Confidence: "verified", API: "ActivityLog"},
+	SignalWrites:          {Tier: verdict.TierInfo, Family: "activity-log", Confidence: "verified", API: "ActivityLog"},
+	SignalPEConnections:   {Tier: verdict.TierHardDependency, Critical: true, Family: "structural", Confidence: "verified", API: "ARM"},
+	SignalDNSRecords:      {Tier: verdict.TierHardDependency, Critical: true, Family: "reverse-ref", Confidence: "verified", API: "ARG", ARGBacked: true},
+	SignalAdvisor:         {Tier: verdict.TierObservedIdle, Family: "derived", Confidence: "heuristic", API: "Advisor", ARGBacked: true},
+	SignalRoleAssignments: {Tier: verdict.TierInfo, Family: "structural", Confidence: "unknown", API: "ARM"},
+	SignalPolicyState:     {Tier: verdict.TierInfo, Family: "structural", Confidence: "unknown", API: "ARM"},
 }
 
 // Signals is the catalogue order. Every run emits exactly these IDs, so a
@@ -99,39 +86,18 @@ var Signals = []string{
 	SignalDNSRecords, SignalAdvisor, SignalRoleAssignments, SignalPolicyState,
 }
 
-// evidence builds one catalogue-consistent observation. Only the tier, status,
-// criticality and typed details come from here; every user-facing string is the
-// output policy's, so no Azure text can reach a summary through this layer.
-func evidence(id string, status verdict.Status, details map[string]any) verdict.Evidence {
-	s := catalogue[id]
-	return verdict.Evidence{
-		ID: id, Tier: s.tier, Family: s.family, Status: status,
-		Critical: s.critical && status != verdict.StatusNotEvaluated,
-		Details:  details, Confidence: s.confidence,
-		Source: verdict.Source{API: s.api, APIVersion: s.apiVersion},
-	}
-}
-
 func present(id string, details map[string]any) verdict.Evidence {
-	return evidence(id, verdict.StatusPresent, details)
+	return Catalogue.Present(id, details)
 }
 
-func absent(id string) verdict.Evidence { return evidence(id, verdict.StatusAbsent, nil) }
+func absent(id string) verdict.Evidence { return Catalogue.Absent(id) }
 
-func notEvaluated(id string) verdict.Evidence {
-	return evidence(id, verdict.StatusNotEvaluated, nil)
-}
+func notEvaluated(id string) verdict.Evidence { return Catalogue.NotEvaluated(id) }
 
-// unknownAs preserves why an observation is missing. A signal whose acquisition
-// failed keeps its catalogue criticality, which is what stops a `yes`.
-func unknownAs(id string, u *verdict.Unknown) verdict.Evidence {
-	e := evidence(id, verdict.StatusUnknown, nil)
-	e.Unknown = u
-	return e
+func unknownAs(id string, unknown *verdict.Unknown) verdict.Evidence {
+	return Catalogue.Unknown(id, unknown)
 }
 
 func windowed(e verdict.Evidence, end time.Time, days int) verdict.Evidence {
-	window := verdict.Window{Start: end.AddDate(0, 0, -days), End: end, Days: days, Grain: "P1D"}
-	e.Window = &window
-	return e
+	return signal.Windowed(e, end, days)
 }
