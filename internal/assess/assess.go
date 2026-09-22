@@ -20,6 +20,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/network"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
+	"github.com/pawel-siwek/az-can-i-delete/internal/site"
 	"github.com/pawel-siwek/az-can-i-delete/internal/storage"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 	"github.com/pawel-siwek/az-can-i-delete/internal/vm"
@@ -61,7 +62,7 @@ type Runner struct {
 // across every target so one run cannot exceed the call budget by fanning out.
 func New(clients collect.Clients, toolVersion string) *Runner {
 	policies := generic.Policies()
-	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies(), storage.Policies(), vm.Policies()} {
+	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies(), storage.Policies(), vm.Policies(), site.Policies()} {
 		for id, policy := range analyzer {
 			policies[id] = policy
 		}
@@ -93,6 +94,11 @@ func (r *Runner) analyze(ctx context.Context, target armid.Target, resource coll
 		})
 	case strings.EqualFold(target.ResourceType, storage.ResourceType):
 		return storage.Collect(ctx, storage.Input{
+			Target: target, Resource: resource, Requested: opts.Requested,
+			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
+		})
+	case site.Supports(target.ResourceType):
+		return site.Collect(ctx, site.Input{
 			Target: target, Resource: resource, Requested: opts.Requested,
 			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
 		})
@@ -205,8 +211,8 @@ func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opt
 func hostingClass(resourceType string) string {
 	switch strings.ToLower(resourceType) {
 	case "microsoft.web/sites", "microsoft.web/sites/slots":
-		// The site analyzer determines the real class; until it exists the
-		// class is honestly unknown rather than guessed.
+		// The site analyzer reports the real class as a signal of its own; the
+		// report header states it as unknown rather than duplicating the rule.
 		return "unknown"
 	default:
 		return "not-applicable"
