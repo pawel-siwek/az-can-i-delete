@@ -187,3 +187,23 @@ can be traced back to the build that produced it.
 `REQUIREMENTS.md` and `docs/SPEC.md` are the normative documents, in that
 order. The 66-case acceptance table of `docs/SPEC.md` appendix B is the test
 suite for the verdict rules and must stay green before any analyzer work.
+
+## How a change is reviewed
+
+The decisions a change is not free to reverse in passing are written down as
+architecture decision records in [`docs/adr/`](docs/adr/README.md): the purity
+of the verdict engine, that a failure is never an absence, that assessment is
+read-only, that no account key is ever acquired, and the rest. Each record
+names the test that makes it real.
+
+Every pull request is read against those records and against the specification
+by an automated reviewer, whose brief is
+[`.github/REVIEW.md`](.github/REVIEW.md). It comments and it can hold the
+check red so a human looks before merge; it never approves and never merges,
+and an author who disagrees says so in the thread. It needs an
+`ANTHROPIC_API_KEY` repository secret — without one the job records a notice
+and skips, so a fork's pull requests are unaffected.
+
+The structural half of that review is not left to judgement: `go test ./...`
+checks that every record is numbered, sectioned, indexed and cited in the
+reviewer's brief (`internal/adr`).
