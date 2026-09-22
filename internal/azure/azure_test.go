@@ -335,3 +335,21 @@ func TestTheAdapterDoesNotRetryOnItsOwn(t *testing.T) {
 		t.Fatalf("the adapter issued %d attempts, want exactly one", attempts)
 	}
 }
+
+func TestSubResourceBodyIsKept(t *testing.T) {
+	s, client := newServer(t)
+	// A virtual machine's instance view is its own payload rather than a
+	// resource wrapping one; losing it would report an unread check as absent.
+	s.answer("/instanceView", `{"statuses":[{"code":"PowerState/deallocated","displayStatus":"VM deallocated"}]}`)
+	resource, err := client.ARM().Get(context.Background(), resourceID+"/instanceView", "2026-04-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses, ok := resource.Properties["statuses"].([]any)
+	if !ok || len(statuses) != 1 {
+		t.Fatalf("instance view = %+v, want its statuses", resource.Properties)
+	}
+	if resource.ID != resourceID+"/instanceView" {
+		t.Errorf("id = %q, want the requested path", resource.ID)
+	}
+}
