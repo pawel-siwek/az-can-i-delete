@@ -3,7 +3,6 @@ package generic
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/age"
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/signal"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
 
@@ -26,13 +26,19 @@ type Input struct {
 	Graph     *collect.Limiter
 }
 
-// Result is the generic evidence in catalogue order, the resolved age and the
-// coverage an analyzer needs to describe what was actually reachable.
+// Result is the generic evidence in catalogue order, the resolved age, and the
+// observations an analyzer reuses rather than collecting a second time. An
+// analyzer that needs the Activity Log or the graph's visibility takes them
+// from here, so one run stays inside one call budget.
 type Result struct {
 	Evidence        []verdict.Evidence
 	Age             verdict.Age
 	ARGVisible      bool
+	ARGUnknown      *verdict.Unknown
+	ActivityLog     collect.ActivityLog
+	ActivityLogRead bool
 	ActivityLogDays int
+	ManagedBy       string
 	Metadata        Metadata
 }
 
@@ -53,10 +59,11 @@ func Collect(ctx context.Context, in Input) Result {
 
 	var history historyGroup
 	var deployments deploymentGroup
+	var managed managedGroup
 	outcomes := collect.Gather(ctx, []collect.Signal{
 		{ID: SignalLock, Run: lockSignal(in)},
 		{ID: SignalDenyAssignment, Run: denySignal(in)},
-		{ID: SignalRGManagedBy, Run: managedBySignal(in, probe)},
+		{ID: SignalRGManagedBy, Run: managed.run(in, probe)},
 		{ID: SignalHiddenLink, Run: hiddenLinkSignal(in, probe, tags)},
 		{ID: SignalAdvisor, Run: advisorSignal(in, probe)},
 		{ID: SignalDeployment, Run: deployments.run(in)},
@@ -85,8 +92,13 @@ func Collect(ctx context.Context, in Input) Result {
 	}
 
 	result := Result{
-		ARGVisible: probe.visible, Age: resolveAge(in, history, deployments.deployments),
+		Age:             resolveAge(in, history, deployments.deployments),
+		ARGVisible:      probe.visible,
+		ARGUnknown:      probe.unknown,
+		ActivityLog:     history.log,
+		ActivityLogRead: history.read,
 		ActivityLogDays: history.log.Days,
+		ManagedBy:       managed.managedBy,
 		Metadata:        Metadata{TagKeys: tagKeys(tags), Callers: history.callers},
 	}
 	for _, id := range Signals {
@@ -150,7 +162,7 @@ func tagEvidence(tags tagFindings, collected map[string]verdict.Evidence) map[st
 	}
 	if len(tags.Expired) > 0 {
 		out[SignalTagExpired] = present(SignalTagExpired, map[string]any{
-			"matchCount": len(tags.Expired), "expiredAt": timestamp(tags.Expired[0].Date)})
+			"matchCount": len(tags.Expired), "expiredAt": signal.Timestamp(tags.Expired[0].Date)})
 	}
 	if len(tags.Intent) > 0 {
 		out[SignalTagIntent] = present(SignalTagIntent, map[string]any{"matchCount": len(tags.Intent)})
@@ -165,10 +177,6 @@ func tagEvidence(tags tagFindings, collected map[string]verdict.Evidence) map[st
 	}
 	return out
 }
-
-// timestamp renders an observation time the way the output boundary's typed
-// timestamp detail expects it.
-func timestamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 
 func tagKeys(tags tagFindings) []string {
 	var keys []string
@@ -213,31 +221,13 @@ func probeGraph(ctx context.Context, in Input) graphProbe {
 	}
 }
 
-// query runs one Resource Graph call inside the shared token bucket, with the
-// bounded retries every collection shares.
+// graph is the shared bounded Resource Graph runner for this target.
+func graph(in Input) signal.Graph {
+	return signal.Graph{Client: in.Clients.Graph, Limiter: in.Graph, Subscription: in.Target.SubscriptionID}
+}
+
 func query(ctx context.Context, in Input, format string, args ...any) (collect.Rows, error) {
-	if in.Clients.Graph == nil {
-		return collect.Rows{}, &collect.Failure{ErrorCode: "NotSupported", Message: "no Resource Graph client"}
-	}
-	if in.Graph != nil {
-		if err := in.Graph.Wait(ctx); err != nil {
-			return collect.Rows{}, err
-		}
-	}
-	var rows collect.Rows
-	err := collect.Retry(ctx, collect.SystemClock(), func(ctx context.Context) error {
-		var err error
-		rows, err = in.Clients.Graph.Query(ctx, collect.Query{
-			Text:          fmt.Sprintf(format, args...),
-			Subscriptions: []string{in.Target.SubscriptionID},
-			Top:           collect.MaxGraphPage,
-		})
-		return err
-	})
-	if err == nil && (rows.Truncated || rows.SkipToken != "") {
-		return rows, collect.ErrTruncated
-	}
-	return rows, err
+	return graph(in).Query(ctx, format, args...)
 }
 
 // argUnavailable reports the unknown every graph-backed signal must carry when
@@ -292,9 +282,14 @@ func denySignal(in Input) func(context.Context) ([]verdict.Evidence, error) {
 	}
 }
 
-// managedBySignal reads the resource group's managedBy and confirms the owner
-// exists.
-func managedBySignal(in Input, probe graphProbe) func(context.Context) ([]verdict.Evidence, error) {
+// managedGroup reads the resource group's managedBy and confirms the owner
+// exists. The owner is kept because an analyzer may need to know what manages
+// the group, for example an AKS cluster that owns a persistent volume.
+type managedGroup struct {
+	managedBy string
+}
+
+func (g *managedGroup) run(in Input, probe graphProbe) func(context.Context) ([]verdict.Evidence, error) {
 	return func(ctx context.Context) ([]verdict.Evidence, error) {
 		if !probe.visible {
 			return []verdict.Evidence{unknownAs(SignalRGManagedBy, probe.argUnavailable())}, nil
@@ -317,6 +312,7 @@ func managedBySignal(in Input, probe graphProbe) func(context.Context) ([]verdic
 		if managedBy == "" {
 			return []verdict.Evidence{absent(SignalRGManagedBy)}, nil
 		}
+		g.managedBy = managedBy
 		exists, err := idsExist(ctx, in, []string{managedBy})
 		if err != nil {
 			return nil, err
@@ -368,11 +364,7 @@ func hiddenLinkSignal(in Input, probe graphProbe, tags tagFindings) func(context
 
 // idsExist answers the K3 existence question for a set of ARM ids.
 func idsExist(ctx context.Context, in Input, ids []string) (map[string]bool, error) {
-	quoted := make([]string, 0, len(ids))
-	for _, id := range ids {
-		quoted = append(quoted, "'"+strings.ReplaceAll(id, "'", "''")+"'")
-	}
-	rows, err := query(ctx, in, "resources | where id in~ (%s) | project id", strings.Join(quoted, ","))
+	rows, err := query(ctx, in, "resources | where id in~ (%s) | project id", signal.QuoteIDs(ids))
 	if err != nil {
 		return nil, err
 	}

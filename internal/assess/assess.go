@@ -15,6 +15,7 @@ import (
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/disk"
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
@@ -56,12 +57,36 @@ type Runner struct {
 // New builds a runner over ready clients. The Resource Graph limiter is shared
 // across every target so one run cannot exceed the call budget by fanning out.
 func New(clients collect.Clients, toolVersion string) *Runner {
+	policies := generic.Policies()
+	for id, policy := range disk.Policies() {
+		policies[id] = policy
+	}
 	return &Runner{
 		Clients:     clients,
 		Graph:       collect.NewGraphLimiter(collect.SystemClock()),
-		Policies:    generic.Policies(),
+		Policies:    policies,
 		ToolVersion: toolVersion,
 	}
+}
+
+// analyze runs the type's analyzer, if it has one. A type without an analyzer
+// is still assessed: its generic evidence is collected and its Required signals
+// are reported missing, which is why it cannot come out as `yes`. The analyzers
+// reuse the generic layer's observations rather than collecting the Activity
+// Log or the graph probe again, so one assessment stays inside one call budget.
+func (r *Runner) analyze(ctx context.Context, target armid.Target, resource collect.Resource, opts Options, collected generic.Result) []verdict.Evidence {
+	if !strings.EqualFold(target.ResourceType, disk.ResourceType) {
+		return nil
+	}
+	return disk.Collect(ctx, disk.Input{
+		Target:    target,
+		Resource:  resource,
+		Requested: opts.Requested,
+		Cutoff:    opts.Cutoff.UTC(),
+		Clients:   r.Clients,
+		Graph:     r.Graph,
+		Generic:   collected,
+	})
 }
 
 // ParseWindow turns the --window flag into an explicit observation window.
@@ -108,7 +133,8 @@ func (r *Runner) Check(ctx context.Context, target armid.Target, opts Options) (
 		Graph:     r.Graph,
 	})
 
-	report, err := output.Build(r.reportInput(target, resource, opts, collected), output.Config{
+	evidence := append(collected.Evidence, r.analyze(ctx, target, resource, opts, collected)...)
+	report, err := output.Build(r.reportInput(target, resource, opts, collected, evidence), output.Config{
 		ToolVersion: r.ToolVersion,
 		RulesDate:   rules.Date(),
 		RedactTags:  opts.RedactTags,
@@ -122,7 +148,7 @@ func (r *Runner) Check(ctx context.Context, target armid.Target, opts Options) (
 
 // reportInput assembles the report's observed context. Azure free-form text
 // travels only here, under the metadata the output boundary sanitizes.
-func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opts Options, collected generic.Result) output.Input {
+func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opts Options, collected generic.Result, evidence []verdict.Evidence) output.Input {
 	tags := make([]output.Tag, 0, len(resource.Tags))
 	for _, key := range collected.Metadata.TagKeys {
 		tags = append(tags, output.Tag{Key: key, Value: resource.Tags[key]})
@@ -137,7 +163,7 @@ func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opt
 		HostingClass: hostingClass(target.ResourceType),
 		Assessment: verdict.Input{
 			Type:      target.ResourceType,
-			Evidence:  collected.Evidence,
+			Evidence:  evidence,
 			Age:       collected.Age,
 			Requested: opts.Requested,
 			Required:  verdict.RequiredForType(target.ResourceType),
