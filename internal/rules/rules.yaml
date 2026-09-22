@@ -7,6 +7,10 @@
 #
 # A resource type that is not listed here has no analyzer and no GET version:
 # the CLI refuses it as an unsupported type rather than guessing a version.
+# The date this rule table was last reviewed; every report prints it so a
+# verdict can be traced back to the pins it was produced under.
+rulesDate: "2026-09-21"
+
 resourceTypes:
   microsoft.storage/storageaccounts: "2026-04-01"
   microsoft.compute/disks: "2026-03-02"

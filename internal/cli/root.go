@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
+	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
+	"github.com/pawel-siwek/az-can-i-delete/internal/azure"
+	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -20,7 +24,14 @@ type ExitError struct {
 	Err  error
 }
 
-func (e *ExitError) Error() string { return e.Err.Error() }
+// Error keeps a silent exit printable for callers that log it; a nil error
+// means the exit code carries the whole message, as with --exit-on-verdict.
+func (e *ExitError) Error() string {
+	if e.Err == nil {
+		return fmt.Sprintf("exit %d", e.Code)
+	}
+	return e.Err.Error()
+}
 func (e *ExitError) Unwrap() error { return e.Err }
 
 type outputOptions struct {
@@ -30,19 +41,59 @@ type outputOptions struct {
 	query          string
 }
 
+// Dependencies are the process-level effects the command tree needs. Tests
+// replace them so no test can reach Azure or read the real clock.
+type Dependencies struct {
+	// Now supplies the observation cutoff. Everything below the CLI takes the
+	// cutoff as an input; nothing reads a clock of its own.
+	Now func() time.Time
+	// Runner builds the assessment runner, which is where credentials and
+	// network access enter the process.
+	Runner func(version string) (*assess.Runner, error)
+}
+
+// DefaultDependencies talk to Azure with the credential chain.
+func DefaultDependencies() Dependencies {
+	return Dependencies{Now: time.Now, Runner: azureRunner}
+}
+
+func azureRunner(version string) (*assess.Runner, error) {
+	client, err := azure.New(azure.Options{ToolVersion: version})
+	if err != nil {
+		return nil, err
+	}
+	return assess.New(collect.Clients{
+		ARM:         client.ARM(),
+		Graph:       client.Graph(),
+		Metrics:     client.Metrics(),
+		ActivityLog: client.ActivityLog(),
+	}, version), nil
+}
+
 // Run executes an isolated command tree using the supplied streams.
 func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, version string) int {
-	root := NewRootCommand(version)
+	return RunWith(ctx, args, in, out, errOut, version, DefaultDependencies())
+}
+
+// RunWith executes the command tree over explicit dependencies. Tests use it
+// to run the real command paths without credentials or network access.
+func RunWith(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, version string, deps Dependencies) int {
+	root := NewRootCommandWith(version, deps)
 	root.SetArgs(args)
 	root.SetIn(in)
 	root.SetOut(out)
 	root.SetErr(errOut)
 	if err := root.ExecuteContext(ctx); err != nil {
-		_, _ = fmt.Fprintf(errOut, "error: %s\n", err)
 		var exit *ExitError
 		if errors.As(err, &exit) {
+			// A verdict the caller asked to exit on is not an error, so it
+			// carries a code without a message.
+			if exit.Err != nil {
+				_, _ = fmt.Fprintf(errOut, "error: %s\n", exit.Err)
+			}
 			return exit.Code
 		}
+		_, _ = fmt.Fprintf(errOut, "error: %s\n", err)
 		return 1
 	}
 	return 0
@@ -50,6 +101,11 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 
 // NewRootCommand creates a command tree without shared flag state.
 func NewRootCommand(version string) *cobra.Command {
+	return NewRootCommandWith(version, DefaultDependencies())
+}
+
+// NewRootCommandWith creates the command tree over explicit dependencies.
+func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	options := &outputOptions{}
 	root := &cobra.Command{
 		Use:           "az-can-i-delete",
@@ -83,8 +139,17 @@ func NewRootCommand(version string) *cobra.Command {
 	root.PersistentFlags().BoolVar(&options.debug, "debug", false, "Enable diagnostics without credentials or setting values")
 	root.PersistentFlags().StringVar(&options.query, "query", "", "JMESPath query (not implemented)")
 
-	check := unavailableCommand("check [id-or-portal-url ...]", "Assess resource evidence (not implemented)", cobra.ArbitraryArgs)
 	var ids []string
+	check := &cobra.Command{
+		Use:   "check [id-or-portal-url ...]",
+		Short: "Assess the evidence for one or more resources",
+		Long: "Collect the evidence for each target and print a verdict with the signals it rests on.\n" +
+			"A verdict is evidence, not permission: `yes` means no evidence of use was found by the\n" +
+			"signals this tool could evaluate, never that deleting is safe.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCheck(cmd, deps, version, options, append(append([]string(nil), ids...), args...))
+		},
+	}
 	check.Flags().StringArrayVar(&ids, "ids", nil, "Resource IDs or portal URLs (space-delimited or repeated --ids)")
 	check.Args = usageArgs(func(cmd *cobra.Command, args []string) error {
 		if len(ids)+len(args) == 0 {
@@ -141,6 +206,86 @@ func NewRootCommand(version string) *cobra.Command {
 	}
 	root.AddCommand(check, cordon, uncordon, status, history, demo, patterns, mcp, versionCommand)
 	return root
+}
+
+// runCheck assesses every target and reduces the outcomes to one exit code.
+// An error never becomes evidence: a target that could not be assessed is
+// reported on the error stream and as a failed outcome, and the completed
+// assessments are still printed.
+func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *outputOptions, inputs []string) error {
+	if fixture, err := cmd.Flags().GetString("fixture"); err == nil && fixture != "" {
+		return &ExitError{Code: 1, Err: errors.New("fixture replay is not implemented yet")}
+	}
+	if dataPlane, err := cmd.Flags().GetBool("data-plane"); err == nil && dataPlane {
+		return &ExitError{Code: 1, Err: errors.New("data-plane collection is not implemented yet")}
+	}
+	cutoff := deps.Now().UTC()
+	window, err := cmd.Flags().GetString("window")
+	if err != nil {
+		return err
+	}
+	requested, err := assess.ParseWindow(window, cutoff)
+	if err != nil {
+		return &ExitError{Code: 2, Err: err}
+	}
+	redactTags, err := cmd.Flags().GetBool("redact-tags")
+	if err != nil {
+		return err
+	}
+	exitOnVerdict, err := cmd.Flags().GetBool("exit-on-verdict")
+	if err != nil {
+		return err
+	}
+	targets := make([]armid.Target, 0, len(inputs))
+	for _, input := range inputs {
+		target, parseErr := armid.Parse(input)
+		if parseErr != nil {
+			return &ExitError{Code: 2, Err: parseErr}
+		}
+		targets = append(targets, target)
+	}
+	runner, err := deps.Runner(version)
+	if err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+
+	outcomes := make([]output.Outcome, 0, len(targets))
+	var failures []error
+	for _, target := range targets {
+		outcome, checkErr := runner.Check(cmd.Context(), target, assess.Options{
+			Requested: requested, Cutoff: cutoff, RedactTags: redactTags,
+		})
+		outcomes = append(outcomes, outcome)
+		if checkErr != nil {
+			failures = append(failures, checkErr)
+		}
+	}
+	if err := output.Render(cmd.OutOrStdout(), options.format, outcomes); err != nil && len(failures) == 0 {
+		return &ExitError{Code: 1, Err: err}
+	}
+	code := output.ExitCode(outcomes, exitOnVerdict)
+	if len(failures) > 0 {
+		return &ExitError{Code: code, Err: errors.Join(failures...)}
+	}
+	if code != 0 {
+		return &ExitError{Code: code, Err: exitReason(outcomes)}
+	}
+	return nil
+}
+
+// exitReason explains a non-zero exit that no error accompanied. A verdict the
+// caller asked to exit on is a result, not a failure, so it has no message.
+func exitReason(outcomes []output.Outcome) error {
+	switch output.ExitCode(outcomes, false) {
+	case 3:
+		return errors.New("the resource was not found")
+	case 4:
+		return errors.New("no signals were evaluable")
+	case 0:
+		return nil
+	default:
+		return errors.New("the assessment did not complete")
+	}
 }
 
 func defaultOutputFormat(out io.Writer) string {
