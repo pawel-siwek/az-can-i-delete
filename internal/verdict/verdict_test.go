@@ -27,7 +27,7 @@ type fixture struct {
 	RawStimuli  map[string]any `json:"rawStimuli"`
 	Retained    map[string]any `json:"retained"`
 	Input       verdict.Input  `json:"input"`
-	AgeInput    *age.AgeInput  `json:"ageInput"`
+	AgeInput    *age.Input     `json:"ageInput"`
 	Expect      struct {
 		Verdict         string              `json:"verdict"`
 		ReasonClass     string              `json:"reasonClass"`
@@ -57,7 +57,11 @@ func loadFixtures(t *testing.T) []fixture {
 			t.Error(err)
 		}
 	})
-	source, err := os.ReadFile(filepath.Join("..", "..", "docs", "architect-3.md"))
+	// Every fixture cites architect-3 section 2.7 as its origin. That review
+	// document is history and is not committed; docs/SPEC.md appendix B carries
+	// the same 66 rows verbatim, so the committed consolidated specification is
+	// what every raw row is checked against.
+	source, err := os.ReadFile(filepath.Join("..", "..", "docs", "SPEC.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,6 +80,9 @@ func loadFixtures(t *testing.T) []fixture {
 		}
 		if !strings.HasPrefix(f.Source.RawRow, fmt.Sprintf("| %d | %s |", f.Number, f.Name)) {
 			t.Fatalf("%s: original number/name mismatch", path)
+		}
+		if f.Source.Document != "docs/architect-3.md" || f.Source.Section != "2.7" {
+			t.Fatalf("%s: fixture must keep citing the original acceptance table", path)
 		}
 		fixtures = append(fixtures, f)
 	}

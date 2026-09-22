@@ -31,3 +31,5 @@ Thumbs.db
 
 # Local research and agent output
 /.siwek/
+
+review-verdict.json
