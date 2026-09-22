@@ -17,6 +17,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/disk"
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
+	"github.com/pawel-siwek/az-can-i-delete/internal/network"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
@@ -58,8 +59,10 @@ type Runner struct {
 // across every target so one run cannot exceed the call budget by fanning out.
 func New(clients collect.Clients, toolVersion string) *Runner {
 	policies := generic.Policies()
-	for id, policy := range disk.Policies() {
-		policies[id] = policy
+	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies()} {
+		for id, policy := range analyzer {
+			policies[id] = policy
+		}
 	}
 	return &Runner{
 		Clients:     clients,
@@ -75,18 +78,20 @@ func New(clients collect.Clients, toolVersion string) *Runner {
 // reuse the generic layer's observations rather than collecting the Activity
 // Log or the graph probe again, so one assessment stays inside one call budget.
 func (r *Runner) analyze(ctx context.Context, target armid.Target, resource collect.Resource, opts Options, collected generic.Result) []verdict.Evidence {
-	if !strings.EqualFold(target.ResourceType, disk.ResourceType) {
+	switch {
+	case strings.EqualFold(target.ResourceType, disk.ResourceType):
+		return disk.Collect(ctx, disk.Input{
+			Target: target, Resource: resource, Requested: opts.Requested,
+			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
+		})
+	case network.Supports(target.ResourceType):
+		return network.Collect(ctx, network.Input{
+			Target: target, Resource: resource, Requested: opts.Requested,
+			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
+		})
+	default:
 		return nil
 	}
-	return disk.Collect(ctx, disk.Input{
-		Target:    target,
-		Resource:  resource,
-		Requested: opts.Requested,
-		Cutoff:    opts.Cutoff.UTC(),
-		Clients:   r.Clients,
-		Graph:     r.Graph,
-		Generic:   collected,
-	})
 }
 
 // ParseWindow turns the --window flag into an explicit observation window.

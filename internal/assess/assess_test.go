@@ -15,6 +15,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect/collecttest"
 	"github.com/pawel-siwek/az-can-i-delete/internal/disk"
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
+	"github.com/pawel-siwek/az-can-i-delete/internal/network"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 )
 
@@ -251,5 +252,33 @@ func TestAnAttachedDiskIsBlocked(t *testing.T) {
 	}
 	if code := output.ExitCode([]output.Outcome{outcome}, true); code != 10 {
 		t.Errorf("exit code = %d, want 10 for no", code)
+	}
+}
+
+func TestADetachedInterfaceCanReachYes(t *testing.T) {
+	nicID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/nic1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, apiVersion string) (collect.Resource, error) {
+		if apiVersion != "2026-01-01" {
+			t.Errorf("api-version = %s, want the pinned network version", apiVersion)
+		}
+		return collect.Resource{ID: id, Name: "nic1", Type: "Microsoft.Network/networkInterfaces",
+			SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+			Properties: map[string]any{"provisioningState": "Succeeded",
+				"ipConfigurations": []any{map[string]any{"properties": map[string]any{"privateIPAllocationMethod": "Dynamic"}}}}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": nicID}}}}}}
+	log := &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}
+	outcome, err := runner(arm, graph, log).Check(context.Background(), target(t, nicID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "yes" {
+		t.Fatalf("verdict = %v with reasons %v, want yes", report["verdict"], report["reasons"])
+	}
+	evidence, _ := report["evidence"].([]any)
+	if want := len(generic.Signals) + len(network.NICSignals); len(evidence) != want {
+		t.Errorf("report carried %d signals, want %d", len(evidence), want)
 	}
 }
