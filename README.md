@@ -41,6 +41,55 @@ az-can-i-delete check <id> --exit-on-verdict     # no → 10, tentative → 11, 
 Useful flags: `--window` (7–93 days, default 30), `--subscription` (asserts the
 target's subscription), `-o/--output`, `--redact-tags`, `--exit-on-verdict`.
 
+## Trying it in Azure Cloud Shell
+
+Cloud Shell is the quickest place to try this: it is already signed in, its
+`$HOME` persists between sessions, and nothing has to be installed on your own
+machine.
+
+```sh
+git clone --branch claude/jolly-shannon-1p1iko https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
+~/src/az-can-i-delete/scripts/cloud-shell.sh
+```
+
+The script clones or updates the source, builds with the Go that Cloud Shell
+already has (from Go 1.21 the toolchain downloads the exact version the module
+pins, and the script installs one under `~/.local` only if it has to), puts the
+binary in `~/.local/bin` and adds that to your PATH. Everything it writes is
+under `$HOME`, so it survives a session restart and needs no elevation.
+
+Then point it at something. These queries find the kinds of leftovers the
+analyzers have the most to say about:
+
+```sh
+az extension add --name resource-graph --only-show-errors   # once per account
+
+# an unattached managed disk
+az graph query -o tsv --query "data[0].id"   -q "resources | where type =~ 'microsoft.compute/disks' and isnull(managedBy) | project id"   | xargs -r az-can-i-delete check
+
+# an App Service plan with nothing on it
+az graph query -o tsv --query "data[0].id"   -q "resources | where type =~ 'microsoft.web/serverfarms' and properties.numberOfSites == 0 | project id"   | xargs -r az-can-i-delete check
+
+# a stopped web app
+az graph query -o tsv --query "data[0].id"   -q "resources | where type =~ 'microsoft.web/sites' and properties.state =~ 'Stopped' | project id"   | xargs -r az-can-i-delete check
+
+# every network interface with no virtual machine attached, as JSON
+az graph query -o tsv --query "data[].id"   -q "resources | where type =~ 'microsoft.network/networkinterfaces' and isnull(properties.virtualMachine) | project id"   | xargs -r az-can-i-delete check -o json --ids
+```
+
+What to expect the first time:
+
+* Cloud Shell signs you in as yourself, so the tool sees exactly what you see
+  in the portal. If you have Reader only on a resource group rather than the
+  subscription, the report says so and the verdict cannot be `yes`.
+* Every call it makes is a read. It never writes, and `cordon` is not
+  implemented yet.
+* A resource younger than 30 days, or one whose age cannot be established,
+  cannot be `yes` however quiet it is. That is the rule, not a bug.
+* Piping to a file is fine: outside a terminal the default output is JSON.
+
+To update later, rerun `~/src/az-can-i-delete/scripts/cloud-shell.sh`.
+
 ## Authentication and permissions
 
 Credentials come from `DefaultAzureCredential`, falling back to the Azure CLI
