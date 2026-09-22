@@ -20,6 +20,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/network"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
+	"github.com/pawel-siwek/az-can-i-delete/internal/storage"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
 
@@ -59,7 +60,7 @@ type Runner struct {
 // across every target so one run cannot exceed the call budget by fanning out.
 func New(clients collect.Clients, toolVersion string) *Runner {
 	policies := generic.Policies()
-	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies()} {
+	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies(), storage.Policies()} {
 		for id, policy := range analyzer {
 			policies[id] = policy
 		}
@@ -86,6 +87,11 @@ func (r *Runner) analyze(ctx context.Context, target armid.Target, resource coll
 		})
 	case network.Supports(target.ResourceType):
 		return network.Collect(ctx, network.Input{
+			Target: target, Resource: resource, Requested: opts.Requested,
+			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
+		})
+	case strings.EqualFold(target.ResourceType, storage.ResourceType):
+		return storage.Collect(ctx, storage.Input{
 			Target: target, Resource: resource, Requested: opts.Requested,
 			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
 		})

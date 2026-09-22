@@ -17,6 +17,8 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
 	"github.com/pawel-siwek/az-can-i-delete/internal/network"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
+	"github.com/pawel-siwek/az-can-i-delete/internal/storage"
+	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
 
 const (
@@ -280,5 +282,92 @@ func TestADetachedInterfaceCanReachYes(t *testing.T) {
 	evidence, _ := report["evidence"].([]any)
 	if want := len(generic.Signals) + len(network.NICSignals); len(evidence) != want {
 		t.Errorf("report carried %d signals, want %d", len(evidence), want)
+	}
+}
+
+// Every signal's policy has to survive the output boundary, which refuses
+// anything that looks like a URL or an undeclared detail. A policy that cannot
+// be published would take the whole report down at runtime.
+func TestEverySignalPolicyIsPublishable(t *testing.T) {
+	base := output.Input{
+		ResourceID: diskID, GeneratedAt: cutoff, HostingClass: "not-applicable",
+		Assessment: verdict.Input{
+			Type:      "Microsoft.Compute/disks",
+			Age:       verdict.Age{Confidence: "unknown", Source: "none"},
+			Requested: verdict.Window{Start: cutoff.AddDate(0, 0, -30), End: cutoff, Days: 30, Grain: "P1D"},
+			Required:  verdict.RequiredForType("Microsoft.Compute/disks"),
+		},
+	}
+	policies := assess.New(collecttest.Clients(&collecttest.ARM{}, &collecttest.Graph{},
+		&collecttest.Metrics{}, &collecttest.ActivityLog{}, nil), "dev").Policies
+	if len(policies) < 80 {
+		t.Fatalf("the policy catalogue has %d entries, which is fewer than the signals that exist", len(policies))
+	}
+	for id, policy := range policies {
+		config := output.Config{ToolVersion: "dev", RulesDate: "2026-09-21",
+			Policies: map[string]output.SignalPolicy{id: policy}}
+		if _, err := output.Build(base, config); err != nil {
+			t.Errorf("the policy for %s cannot be published: %v", id, err)
+		}
+	}
+}
+
+func TestAQuietStorageAccountCanReachYes(t *testing.T) {
+	accountID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/store1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, apiVersion string) (collect.Resource, error) {
+		if id != accountID {
+			// The account's optional policies and its Defender settings: this
+			// account has none of them.
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound, ErrorCode: "NotFound"}
+		}
+		if apiVersion != "2026-04-01" {
+			t.Errorf("api-version = %s, want the pinned storage version", apiVersion)
+		}
+		return collect.Resource{ID: id, Name: "store1", Type: "Microsoft.Storage/storageAccounts",
+			SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+			Properties: map[string]any{"provisioningState": "Succeeded",
+				"privateEndpointConnections": []any{},
+				"sku":                        map[string]any{"name": "Standard_LRS"}}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": accountID}}}}}}
+	log := &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}
+	outcome, err := runner(arm, graph, log).Check(context.Background(), target(t, accountID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "yes" {
+		t.Fatalf("verdict = %v with reasons %v, want yes", report["verdict"], report["reasons"])
+	}
+	evidence, _ := report["evidence"].([]any)
+	if want := len(generic.Signals) + len(storage.Signals); len(evidence) != want {
+		t.Errorf("report carried %d signals, want %d", len(evidence), want)
+	}
+}
+
+func TestAStorageAccountWithADependencyIsNo(t *testing.T) {
+	accountID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/store1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		if id != accountID {
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound}
+		}
+		return collect.Resource{ID: id, Name: "store1", Type: "Microsoft.Storage/storageAccounts",
+			Properties: map[string]any{"provisioningState": "Succeeded"}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{
+		{Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": accountID}}}},
+		{Match: "bootDiagnostics", Rows: collect.Rows{Rows: []map[string]any{
+			{"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm1"}}}},
+	}}
+	outcome, err := runner(arm, graph, &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}).
+		Check(context.Background(), target(t, accountID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "no" || report["reasonClass"] != "in-use" {
+		t.Fatalf("verdict = %v/%v, want no/in-use for a virtual machine's boot diagnostics",
+			report["verdict"], report["reasonClass"])
 	}
 }

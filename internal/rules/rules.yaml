@@ -30,3 +30,5 @@ operations:
   resourceGraph: "2024-04-01"
   activityLog: "2015-04-01"
   metrics: "2024-02-01"
+  eventGrid: "2025-02-15"
+  defenderForStorage: "2025-06-01"

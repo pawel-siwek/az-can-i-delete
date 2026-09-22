@@ -41,6 +41,8 @@ type Result struct {
 	Changes         []age.ResourceChange
 	ChangesRead     bool
 	ManagedBy       string
+	Locks           []collect.Lock
+	LocksRead       bool
 	Metadata        Metadata
 }
 
@@ -62,8 +64,9 @@ func Collect(ctx context.Context, in Input) Result {
 	var history historyGroup
 	var deployments deploymentGroup
 	var managed managedGroup
+	var locks lockGroup
 	outcomes := collect.Gather(ctx, []collect.Signal{
-		{ID: SignalLock, Run: lockSignal(in)},
+		{ID: SignalLock, Run: locks.run(in)},
 		{ID: SignalDenyAssignment, Run: denySignal(in)},
 		{ID: SignalRGManagedBy, Run: managed.run(in, probe)},
 		{ID: SignalHiddenLink, Run: hiddenLinkSignal(in, probe, tags)},
@@ -103,6 +106,8 @@ func Collect(ctx context.Context, in Input) Result {
 		Changes:         history.changes,
 		ChangesRead:     history.changesRead,
 		ManagedBy:       managed.managedBy,
+		Locks:           locks.locks,
+		LocksRead:       locks.read,
 		Metadata:        Metadata{TagKeys: tagKeys(tags), Callers: history.callers},
 	}
 	for _, id := range Signals {
@@ -238,10 +243,16 @@ func query(ctx context.Context, in Input, format string, args ...any) (collect.R
 // the probe did not establish visibility.
 func (p graphProbe) argUnavailable() *verdict.Unknown { return p.unknown }
 
-// lockSignal collects management locks at all three scopes. A failure at any
+// lockGroup collects management locks at all three scopes. A failure at any
 // scope is the signal's unknown: a lock that could not be read must not read
-// as absent.
-func lockSignal(in Input) func(context.Context) ([]verdict.Evidence, error) {
+// as absent. The locks are kept because an analyzer may recognize one by name,
+// such as the lock Azure Backup puts on a protected account.
+type lockGroup struct {
+	locks []collect.Lock
+	read  bool
+}
+
+func (g *lockGroup) run(in Input) func(context.Context) ([]verdict.Evidence, error) {
 	return func(ctx context.Context) ([]verdict.Evidence, error) {
 		var all []collect.Lock
 		for _, scope := range lockScopes(in.Target) {
@@ -254,6 +265,7 @@ func lockSignal(in Input) func(context.Context) ([]verdict.Evidence, error) {
 				all = append(all, lock)
 			}
 		}
+		g.locks, g.read = all, true
 		return []verdict.Evidence{lockEvidence(all)}, nil
 	}
 }
