@@ -28,4 +28,5 @@ live run all exercise the same code path.
 
 `internal/verdict` imports neither `net/http` nor `time.Now`; the 66-case
 suite passes a cutoff explicitly. `TestEffectiveWindows` covers the window
-arithmetic.
+arithmetic, and `TestTheVerdictEngineReadsNoClockAndNoNetwork` in
+`internal/conformance` reads the source for a clock or a network import.

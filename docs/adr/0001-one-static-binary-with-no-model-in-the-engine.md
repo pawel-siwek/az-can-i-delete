@@ -37,3 +37,5 @@ An agent may drive this tool, but the tool never drives a model.
 The build in `.goreleaser.yaml` and CI pins `CGO_ENABLED=0`. No module in
 `go.mod` is a model client. `internal/verdict` takes evidence in and gives a
 verdict out with no I/O of any kind.
+`TestNoModelClientIsADependency` in `internal/conformance` reads the
+dependency list.

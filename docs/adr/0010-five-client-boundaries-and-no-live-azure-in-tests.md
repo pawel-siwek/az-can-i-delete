@@ -26,4 +26,5 @@ is friction in proportion to the risk. CI needs no Azure credentials at all.
 
 `internal/collect/collecttest` fakes every boundary; analyzer packages
 import `collect`, not `azure`. CI runs `go test -race ./...` with no Azure
-secrets configured.
+secrets configured, and `TestAnalyzersDependOnTheBoundariesNotTheSDK` in
+`internal/conformance` fails on an analyzer importing the SDK.

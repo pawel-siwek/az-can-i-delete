@@ -34,4 +34,6 @@ tier, which is a design decision reviewers can contest.
 
 `internal/verdict` (the 66-case acceptance suite, `TestOriginal66`) and
 `TestCoverageSurvivesEveryWinningRule`. The JSON schema carries no numeric
-confidence field; `internal/output` tests assert the emitted shape.
+confidence field; `internal/output` tests assert the emitted shape, and
+`TestNoNumericConfidenceReachesTheVerdict` in `internal/conformance` fails on
+a numeric score, weight or confidence field appearing in either package.

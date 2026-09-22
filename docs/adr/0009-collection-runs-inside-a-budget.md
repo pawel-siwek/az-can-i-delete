@@ -29,4 +29,6 @@ one place to reason about load on a subscription.
 ## Enforcement
 
 `internal/collect` (`Limiter`, `Retry`, `Gather`, `ErrBudgetExhausted`) and
-`internal/azure` configuring `policy.RetryOptions{MaxRetries: -1}`.
+`internal/azure` configuring `policy.RetryOptions{MaxRetries: -1}`, which
+`TestTheSDKDoesNotRetryBehindTheBudget` in `internal/conformance` requires to
+stay there.

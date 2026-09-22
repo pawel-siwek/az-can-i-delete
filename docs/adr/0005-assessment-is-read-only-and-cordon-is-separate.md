@@ -31,4 +31,5 @@ only place that writes.
 
 The `check` path uses read-only client methods; `internal/azure` adapters
 for assessment expose no write operation. The MCP server registers exactly
-two read-only tools.
+two read-only tools. `TestTheAssessmentPathPerformsNoWrites` in
+`internal/conformance` fails on a mutating method in any analyzer.
