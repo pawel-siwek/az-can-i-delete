@@ -13,6 +13,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect/collecttest"
+	"github.com/pawel-siwek/az-can-i-delete/internal/disk"
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 )
@@ -136,12 +137,14 @@ func TestReportCarriesTheGenericEvidenceAndCoverage(t *testing.T) {
 		t.Fatalf("exit code = %d, want 11: the disk analyzer does not exist yet, so the answer is tentative", code)
 	}
 	report := reportValue(t, outcome)
+	// A disk is assessed by the generic layer and the disk analyzer together.
+	want := len(generic.Signals) + len(disk.Signals)
 	evidence, _ := report["evidence"].([]any)
-	if len(evidence) != len(generic.Signals) {
-		t.Fatalf("report carried %d signals, want the %d generic ones", len(evidence), len(generic.Signals))
+	if len(evidence) != want {
+		t.Fatalf("report carried %d signals, want %d", len(evidence), want)
 	}
 	coverage, _ := report["coverage"].(map[string]any)
-	if coverage["total"] != float64(len(generic.Signals)) {
+	if coverage["total"] != float64(want) {
 		t.Errorf("coverage = %v, want every collected signal counted", coverage)
 	}
 	scope, _ := report["scope"].(map[string]any)
@@ -188,4 +191,65 @@ func reportValue(t *testing.T, outcome output.Outcome) map[string]any {
 		t.Fatalf("rendered output is not a report: %v\n%s", err, rendered.String())
 	}
 	return value
+}
+
+func TestALongDetachedDiskCanReachYes(t *testing.T) {
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		return collect.Resource{ID: id, Name: "disk1", Type: "Microsoft.Compute/disks",
+			SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+			Properties: map[string]any{
+				"provisioningState":       "Succeeded",
+				"diskState":               "Unattached",
+				"LastOwnershipUpdateTime": cutoff.AddDate(0, 0, -120).Format(time.RFC3339),
+			}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": diskID}}}}}}
+	log := &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}
+	outcome, err := runner(arm, graph, log).Check(context.Background(), target(t, diskID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "yes" || report["reasonClass"] != "no-evidence-of-use" {
+		t.Fatalf("verdict = %v/%v with reasons %v, want yes/no-evidence-of-use",
+			report["verdict"], report["reasonClass"], report["reasons"])
+	}
+	// Every `yes` carries the approved limitations verbatim and escalates
+	// nothing, because there is nothing left for a human to resolve.
+	if limitations, _ := report["limitations"].([]any); len(limitations) == 0 {
+		t.Error("a yes must print the approved limitations")
+	}
+	if report["humanEscalation"] != false {
+		t.Error("a yes does not escalate")
+	}
+	window, _ := report["window"].(map[string]any)
+	effective, _ := window["effective"].(map[string]any)
+	if effective["days"] != float64(30) {
+		t.Errorf("effective window = %v, want the full 30 days", window)
+	}
+	if code := output.ExitCode([]output.Outcome{outcome}, true); code != 0 {
+		t.Errorf("exit code = %d, want 0 for yes", code)
+	}
+}
+
+func TestAnAttachedDiskIsBlocked(t *testing.T) {
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		return collect.Resource{ID: id, Name: "disk1", Type: "Microsoft.Compute/disks",
+			Properties: map[string]any{"diskState": "Attached",
+				"managedBy": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm1"}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": diskID}}}}}}
+	outcome, err := runner(arm, graph, nil).Check(context.Background(), target(t, diskID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "no" || report["reasonClass"] != "blocked" {
+		t.Fatalf("verdict = %v/%v, want no/blocked", report["verdict"], report["reasonClass"])
+	}
+	if code := output.ExitCode([]output.Outcome{outcome}, true); code != 10 {
+		t.Errorf("exit code = %d, want 10 for no", code)
+	}
 }

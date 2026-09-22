@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/signal"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
 
@@ -183,7 +184,7 @@ func deploymentEvidence(deployments []collect.Deployment, resourceID string, cap
 		}
 		for _, output := range deployment.OutputResources {
 			if strings.EqualFold(output, resourceID) {
-				return present(SignalDeployment, map[string]any{"deployedAt": timestamp(deployment.Timestamp)})
+				return present(SignalDeployment, map[string]any{"deployedAt": signal.Timestamp(deployment.Timestamp)})
 			}
 		}
 	}
