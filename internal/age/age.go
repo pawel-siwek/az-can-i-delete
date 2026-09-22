@@ -39,11 +39,11 @@ type Deployment struct {
 	OutputResources []string  `json:"outputResources"`
 }
 
-// AgeInput contains observations and an explicit cutoff, with no client or clock.
+// Input contains observations and an explicit cutoff, with no client or clock.
 // RPTimestamp must refer to the CURRENT object. Positive normalized observations
 // may be synthetic or archived; this function makes no Azure-retention claim.
 // ActivityLogDays and completion flags are required only for no-event inference.
-type AgeInput struct {
+type Input struct {
 	ResourceID           string           `json:"resourceId"`
 	Cutoff               time.Time        `json:"cutoff"`
 	RPTimestamp          *time.Time       `json:"rpTimestamp,omitempty"`
@@ -58,7 +58,7 @@ type AgeInput struct {
 // ResolveAge implements the seven-source age chain without I/O or clock reads.
 // It discards sources 2-5 at or before the last same-ID successful delete; the
 // current RP timestamp is exempt. Missing/truncated logs cannot infer no events.
-func ResolveAge(in AgeInput) verdict.Age {
+func ResolveAge(in Input) verdict.Age {
 	unknown := verdict.Age{Confidence: "unknown", Source: "none", Caveats: []string{}}
 	if in.Cutoff.IsZero() || in.ResourceID == "" {
 		return unknown
