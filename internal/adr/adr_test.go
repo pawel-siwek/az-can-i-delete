@@ -129,11 +129,11 @@ func TestCheckCatchesMalformedRecords(t *testing.T) {
 	}
 }
 
-// The conformance reviewer works from .github/REVIEW.md. A record the brief
-// never cites is a decision that quietly left the review's scope, so the two
-// are kept in step here rather than by anybody remembering.
+// Copilot code review works from .github/copilot-instructions.md. A record
+// the brief never cites is a decision that quietly left the review's scope, so
+// the two are kept in step here rather than by anybody remembering.
 func TestTheReviewBriefCitesEveryRecord(t *testing.T) {
-	brief, err := os.ReadFile(filepath.Join("..", "..", ".github", "REVIEW.md"))
+	brief, err := os.ReadFile(filepath.Join("..", "..", ".github", "copilot-instructions.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestTheReviewBriefCitesEveryRecord(t *testing.T) {
 		}
 		cited := "ADR-" + name[:4]
 		if !strings.Contains(string(brief), cited) {
-			t.Errorf(".github/REVIEW.md does not cite %s (%s), so the reviewer will not check it", cited, name)
+			t.Errorf(".github/copilot-instructions.md does not cite %s (%s), so the reviewer will not check it", cited, name)
 		}
 	}
 }
