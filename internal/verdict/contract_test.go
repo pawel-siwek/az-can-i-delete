@@ -185,7 +185,7 @@ func TestCatalogueIntegrityDoesNotAddUsageGates(t *testing.T) {
 
 func TestSchemaJSONTags(t *testing.T) {
 	values := []any{verdict.Evidence{}, verdict.Age{}, verdict.Input{}, verdict.Coverage{}, verdict.Result{}, verdict.Window{}, verdict.Source{}, verdict.Unknown{}, verdict.NotEvaluated{},
-		age.AgeInput{}, age.ActivityEvent{}, age.ResourceChange{}, age.Deployment{}}
+		age.Input{}, age.ActivityEvent{}, age.ResourceChange{}, age.Deployment{}}
 	for _, value := range values {
 		typ := reflect.TypeOf(value)
 		for i := 0; i < typ.NumField(); i++ {

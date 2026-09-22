@@ -23,21 +23,21 @@ func TestAgeChainBoundaries(t *testing.T) {
 	}
 	tests := []struct {
 		name               string
-		modify             func(*AgeInput)
+		modify             func(*Input)
 		days               int
 		confidence, source string
 	}{
-		{"unknown", func(*AgeInput) {}, 0, "unknown", "none"},
-		{"complete-zero-events-90", func(in *AgeInput) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 90 }, 90, "inferred", "activitylog.no-events"},
-		{"complete-zero-events-93", func(in *AgeInput) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 93 }, 90, "inferred", "activitylog.no-events"},
-		{"short-log-not-inferred", func(in *AgeInput) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 89 }, 0, "unknown", "none"},
-		{"truncated-not-inferred", func(in *AgeInput) {
+		{"unknown", func(*Input) {}, 0, "unknown", "none"},
+		{"complete-zero-events-90", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 90 }, 90, "inferred", "activitylog.no-events"},
+		{"complete-zero-events-93", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 93 }, 90, "inferred", "activitylog.no-events"},
+		{"short-log-not-inferred", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 89 }, 0, "unknown", "none"},
+		{"truncated-not-inferred", func(in *Input) {
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = 90
 			in.ActivityLogTruncated = true
 		}, 0, "unknown", "none"},
-		{"failed-call-not-inferred", func(in *AgeInput) { in.ActivityLogDays = 90 }, 0, "unknown", "none"},
-		{"failed-started-accepted-never-date", func(in *AgeInput) {
+		{"failed-call-not-inferred", func(in *Input) { in.ActivityLogDays = 90 }, 0, "unknown", "none"},
+		{"failed-started-accepted-never-date", func(in *Input) {
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = 90
 			for _, status := range []string{"Failed", "Started", "Accepted"} {
@@ -47,85 +47,85 @@ func TestAgeChainBoundaries(t *testing.T) {
 				in.ActivityLog = append(in.ActivityLog, e)
 			}
 		}, 0, "unknown", "none"},
-		{"put-not-created", func(in *AgeInput) {
+		{"put-not-created", func(in *Input) {
 			e := event(3, "write", "Succeeded")
 			e.HTTPMethod = "PUT"
 			in.ActivityLog = []ActivityEvent{e}
 		}, 3, "bounded", "activitylog.oldest-succeeded"},
-		{"status-code-created", func(in *AgeInput) {
+		{"status-code-created", func(in *Input) {
 			e := event(40, "write", "Succeeded")
 			e.StatusCode = "Created"
 			in.ActivityLog = []ActivityEvent{e, event(80, "read", "Succeeded")}
 		}, 40, "verified", "activitylog.created"},
-		{"substatus-created", func(in *AgeInput) {
+		{"substatus-created", func(in *Input) {
 			e := event(40, "write", "Succeeded")
 			e.SubStatus = "Created"
 			in.ActivityLog = []ActivityEvent{e}
 		}, 40, "verified", "activitylog.created"},
-		{"created-on-read-not-create", func(in *AgeInput) {
+		{"created-on-read-not-create", func(in *Input) {
 			e := event(40, "read", "Succeeded")
 			e.StatusCode = "Created"
 			in.ActivityLog = []ActivityEvent{e}
 		}, 40, "bounded", "activitylog.oldest-succeeded"},
-		{"earliest-created", func(in *AgeInput) {
+		{"earliest-created", func(in *Input) {
 			for _, days := range []int{5, 40} {
 				e := event(days, "write", "Succeeded")
 				e.StatusCode = "Created"
 				in.ActivityLog = append(in.ActivityLog, e)
 			}
 		}, 40, "verified", "activitylog.created"},
-		{"rp-current-object-exempt-from-reset", func(in *AgeInput) {
+		{"rp-current-object-exempt-from-reset", func(in *Input) {
 			ts := at(80)
 			in.RPTimestamp = &ts
 			in.ActivityLog = []ActivityEvent{event(5, "delete", "Succeeded")}
 			in.ResourceChanges = []ResourceChange{change(2, "Create", "write")}
 		}, 80, "verified", "rp.timestamp"},
-		{"rc-before-al", func(in *AgeInput) {
+		{"rc-before-al", func(in *Input) {
 			in.ResourceChanges = []ResourceChange{change(10, "Create", "write")}
 			e := event(40, "write", "Succeeded")
 			e.SubStatus = "Created"
 			in.ActivityLog = []ActivityEvent{e}
 		}, 10, "verified", "resourcechanges.create"},
-		{"move-bounded", func(in *AgeInput) {
+		{"move-bounded", func(in *Input) {
 			in.ResourceChanges = []ResourceChange{change(45, "Create", "Microsoft.Resources/subscriptions/resourceGroups/moveResources/action")}
 		}, 45, "bounded", "resourcechanges.move"},
-		{"equal-create-move-is-bounded", func(in *AgeInput) {
+		{"equal-create-move-is-bounded", func(in *Input) {
 			in.ResourceChanges = []ResourceChange{change(45, "Create", "write"), change(45, "Create", "moveResources")}
 		}, 45, "bounded", "resourcechanges.move"},
-		{"oldest-deployment-before-oldest-event", func(in *AgeInput) {
+		{"oldest-deployment-before-oldest-event", func(in *Input) {
 			in.Deployments = []Deployment{deployment(35), deployment(60)}
 			in.ActivityLog = []ActivityEvent{event(80, "read", "Succeeded")}
 		}, 60, "bounded", "deployments"},
-		{"failed-deployment", func(in *AgeInput) {
+		{"failed-deployment", func(in *Input) {
 			d := deployment(60)
 			d.Status = "Failed"
 			in.Deployments = []Deployment{d}
 			in.ActivityLog = []ActivityEvent{event(2, "write", "Succeeded")}
 		}, 2, "bounded", "activitylog.oldest-succeeded"},
-		{"latest-delete-resets-all-sources", func(in *AgeInput) {
+		{"latest-delete-resets-all-sources", func(in *Input) {
 			e := event(50, "write", "Succeeded")
 			e.StatusCode = "Created"
 			in.ActivityLog = []ActivityEvent{event(70, "delete", "Succeeded"), e, event(2, "read", "Succeeded")}
 			in.ResourceChanges = []ResourceChange{change(40, "Create", "write"), change(10, "Delete", "delete")}
 			in.Deployments = []Deployment{deployment(60), deployment(10)}
 		}, 2, "bounded", "activitylog.oldest-succeeded"},
-		{"delete-at-boundary-excludes-create", func(in *AgeInput) {
+		{"delete-at-boundary-excludes-create", func(in *Input) {
 			in.ActivityLog = []ActivityEvent{event(10, "delete", "Succeeded")}
 			in.ResourceChanges = []ResourceChange{change(10, "Create", "write")}
 			in.Deployments = []Deployment{deployment(10)}
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = 90
 		}, 0, "unknown", "none"},
-		{"failed-delete-no-reset", func(in *AgeInput) {
+		{"failed-delete-no-reset", func(in *Input) {
 			in.ActivityLog = []ActivityEvent{event(2, "delete", "Failed")}
 			in.Deployments = []Deployment{deployment(60)}
 		}, 60, "bounded", "deployments"},
-		{"rc-delete-prevents-inference", func(in *AgeInput) {
+		{"rc-delete-prevents-inference", func(in *Input) {
 			in.ResourceChanges = []ResourceChange{change(5, "Delete", "delete")}
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = 90
 		}, 0, "unknown", "none"},
-		{"different-id-ignored", func(in *AgeInput) {
+		{"different-id-ignored", func(in *Input) {
 			e := event(90, "read", "Succeeded")
 			e.ResourceID += "-other"
 			in.ActivityLog = []ActivityEvent{e}
@@ -136,28 +136,28 @@ func TestAgeChainBoundaries(t *testing.T) {
 			r.ResourceID += "-other"
 			in.ResourceChanges = []ResourceChange{r}
 		}, 0, "unknown", "none"},
-		{"case-folded-id-delete", func(in *AgeInput) {
+		{"case-folded-id-delete", func(in *Input) {
 			e := event(5, "delete", "Succeeded")
 			e.ResourceID = strings.ToUpper(id)
 			in.ActivityLog = []ActivityEvent{e}
 			in.Deployments = []Deployment{deployment(60)}
 		}, 0, "unknown", "none"},
-		{"fractional-days-floor", func(in *AgeInput) { ts := at(30).Add(time.Hour); in.RPTimestamp = &ts }, 29, "verified", "rp.timestamp"},
-		{"future-timestamps-do-not-date", func(in *AgeInput) {
+		{"fractional-days-floor", func(in *Input) { ts := at(30).Add(time.Hour); in.RPTimestamp = &ts }, 29, "verified", "rp.timestamp"},
+		{"future-timestamps-do-not-date", func(in *Input) {
 			ts := at(-1)
 			in.RPTimestamp = &ts
 			in.ActivityLog = []ActivityEvent{event(-1, "read", "Succeeded")}
 			in.ResourceChanges = []ResourceChange{change(-1, "Create", "write")}
 			in.Deployments = []Deployment{deployment(-1)}
 		}, 0, "unknown", "none"},
-		{"truncated-positive-event-still-lower-bound", func(in *AgeInput) {
+		{"truncated-positive-event-still-lower-bound", func(in *Input) {
 			in.ActivityLogTruncated = true
 			in.ActivityLog = []ActivityEvent{event(40, "read", "Succeeded")}
 		}, 40, "bounded", "activitylog.oldest-succeeded"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			in := AgeInput{ResourceID: id, Cutoff: cutoff}
+			in := Input{ResourceID: id, Cutoff: cutoff}
 			tt.modify(&in)
 			got := ResolveAge(in)
 			if got.LowerBoundDays != tt.days || got.Confidence != tt.confidence || got.Source != tt.source {

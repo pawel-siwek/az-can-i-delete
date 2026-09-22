@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # The acceptance suite is the contract: the 66 verdict cases, the signal
+      # catalogues and the output boundary. No test reaches Azure.
+      - name: Test
+        run: go test -race ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The action's own version resolution installs golangci-lint v1, which
+      # refuses a module targeting Go 1.25. The repository's config is v2, so
+      # the linter is installed directly at a pinned version instead.
+      - name: Install golangci-lint
+        env:
+          GOLANGCI_LINT_VERSION: v2.5.0
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$GOLANGCI_LINT_VERSION/install.sh |
+            sh -s -- -b "$(go env GOPATH)/bin" "$GOLANGCI_LINT_VERSION"
+
+      - name: Lint
+        run: "$(go env GOPATH)/bin/golangci-lint run ./..."
+
+  release-build:
+    name: Release build (snapshot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Building the release archives on every push means a broken release
+      # configuration is found here rather than when a tag is pushed.
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --snapshot --clean --single-target
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: az-can-i-delete-snapshot-linux-amd64
+          path: dist/**/az-can-i-delete
+          if-no-files-found: error
+          retention-days: 7
