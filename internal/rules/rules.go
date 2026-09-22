@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +18,7 @@ import (
 var source []byte
 
 type table struct {
+	RulesDate     string            `yaml:"rulesDate"`
 	ResourceTypes map[string]string `yaml:"resourceTypes"`
 	Operations    map[string]string `yaml:"operations"`
 }
@@ -34,6 +36,10 @@ func load() (table, error) {
 			err = fmt.Errorf("embedded rules are unreadable: %w", unmarshalErr)
 			return
 		}
+		if _, dateErr := time.Parse(time.DateOnly, parsed.RulesDate); dateErr != nil {
+			err = fmt.Errorf("embedded rules carry no review date: %w", dateErr)
+			return
+		}
 		if len(parsed.ResourceTypes) == 0 || len(parsed.Operations) == 0 {
 			err = fmt.Errorf("embedded rules are incomplete")
 			return
@@ -41,6 +47,16 @@ func load() (table, error) {
 		loaded = parsed
 	})
 	return loaded, err
+}
+
+// Date is the day this rule table was last reviewed. Every report prints it,
+// so a verdict can be traced back to the pins it was produced under.
+func Date() string {
+	rules, loadErr := load()
+	if loadErr != nil {
+		return ""
+	}
+	return rules.RulesDate
 }
 
 // APIVersion returns the pinned GET api-version for a full ARM resource type.

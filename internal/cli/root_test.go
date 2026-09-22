@@ -3,20 +3,66 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
+	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/collect/collecttest"
 )
 
 const testTarget = "/subscriptions/01234567-89ab-cdef-0123-456789abcdef/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/store"
 
+var testCutoff = time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
+
+// testDeps runs the real command paths over fakes. No test may build a
+// credential or reach Azure, so every run goes through an injected runner.
+func testDeps(arm *collecttest.ARM, graph *collecttest.Graph) Dependencies {
+	if arm == nil {
+		arm = &collecttest.ARM{GetFunc: func(context.Context, string, string) (collect.Resource, error) {
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound, ErrorCode: "ResourceNotFound"}
+		}}
+	}
+	if graph == nil {
+		graph = &collecttest.Graph{}
+	}
+	return Dependencies{
+		Now: func() time.Time { return testCutoff },
+		Runner: func(version string) (*assess.Runner, error) {
+			clients := collecttest.Clients(arm, graph, &collecttest.Metrics{}, &collecttest.ActivityLog{}, nil)
+			return assess.New(clients, version), nil
+		},
+	}
+}
+
+// liveDeps answer as a readable, quiet storage account would.
+func liveDeps() Dependencies {
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		return collect.Resource{ID: id, Name: "store", Type: "Microsoft.Storage/storageAccounts",
+			Properties: map[string]any{"provisioningState": "Succeeded"}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+		Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": testTarget}}}}}}
+	return testDeps(arm, graph)
+}
+
+func run(t *testing.T, deps Dependencies, args ...string) (code int, stdout, stderr string) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	code = RunWith(context.Background(), args, strings.NewReader(""), &out, &errOut, "dev", deps)
+	return code, out.String(), errOut.String()
+}
+
 func TestVersion(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{{"version"}, {"--version"}} {
-		var out, errOut bytes.Buffer
-		code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut, "v0.1.0-test")
-		if code != 0 || out.String() != "az-can-i-delete v0.1.0-test\n" || errOut.Len() != 0 {
-			t.Fatalf("%v: code=%d stdout=%q stderr=%q", args, code, out.String(), errOut.String())
+		code, out, errOut := run(t, testDeps(nil, nil), args...)
+		if code != 0 || out != "az-can-i-delete dev\n" || errOut != "" {
+			t.Fatalf("%v: code=%d stdout=%q stderr=%q", args, code, out, errOut)
 		}
 	}
 }
@@ -28,11 +74,9 @@ func TestCommandHelp(t *testing.T) {
 		{"demo"}, {"patterns"}, {"patterns", "list"}, {"mcp"},
 	} {
 		t.Run(strings.Join(path, "/"), func(t *testing.T) {
-			var out, errOut bytes.Buffer
-			args := append(append([]string(nil), path...), "--help")
-			code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut, "dev")
-			if code != 0 || !strings.Contains(out.String(), "Usage:") || errOut.Len() != 0 {
-				t.Fatalf("code=%d stdout=%q stderr=%q", code, out.String(), errOut.String())
+			code, out, errOut := run(t, testDeps(nil, nil), append(append([]string(nil), path...), "--help")...)
+			if code != 0 || !strings.Contains(out, "Usage:") || errOut != "" {
+				t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 			}
 		})
 	}
@@ -44,10 +88,9 @@ func TestUsageErrors(t *testing.T) {
 		{"unknown-command"}, {"check"}, {"check", "--unknown-flag"},
 		{"version", "extra"}, {"cordon"}, {"uncordon"}, {"status"},
 	} {
-		var out, errOut bytes.Buffer
-		code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut, "dev")
-		if code != 2 || out.Len() != 0 || !strings.HasPrefix(errOut.String(), "error: ") {
-			t.Errorf("%v: code=%d stdout=%q stderr=%q", args, code, out.String(), errOut.String())
+		code, out, errOut := run(t, testDeps(nil, nil), args...)
+		if code != 2 || out != "" || !strings.HasPrefix(errOut, "error: ") {
+			t.Errorf("%v: code=%d stdout=%q stderr=%q", args, code, out, errOut)
 		}
 	}
 }
@@ -55,41 +98,65 @@ func TestUsageErrors(t *testing.T) {
 func TestUnimplementedCommandsFailExplicitly(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
-		{"check", testTarget}, {"check", "--ids", testTarget},
 		{"cordon", testTarget}, {"uncordon", testTarget},
 		{"status", testTarget}, {"history"}, {"demo", "recorded-example"},
 		{"patterns", "list"}, {"mcp"},
+		// check itself is implemented; these two paths of it are not.
+		{"check", testTarget, "--fixture", "recorded"},
+		{"check", testTarget, "--data-plane"},
 	} {
-		var out, errOut bytes.Buffer
-		code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut, "dev")
-		if code != 1 || out.Len() != 0 || !strings.Contains(errOut.String(), "not implemented") {
-			t.Errorf("%v: code=%d stdout=%q stderr=%q", args, code, out.String(), errOut.String())
+		code, out, errOut := run(t, testDeps(nil, nil), args...)
+		if code != 1 || out != "" || !strings.Contains(errOut, "not implemented") {
+			t.Errorf("%v: code=%d stdout=%q stderr=%q", args, code, out, errOut)
 		}
 	}
 }
 
 func TestTargetValidation(t *testing.T) {
 	t.Parallel()
+	// A parsed target reaches the runner, which answers 404 here, so exit 3
+	// distinguishes "parsed and assessed" from a usage error.
 	for _, command := range []string{"check", "cordon", "uncordon", "status"} {
+		parsed := 1
+		if command == "check" {
+			parsed = 3
+		}
 		for _, tc := range []struct {
 			name string
 			args []string
 			code int
 		}{
 			{"invalid", []string{"/placeholder"}, 2},
-			{"portal", []string{"https://portal.azure.com/#resource" + testTarget + "/overview"}, 1},
-			{"slot preserved", []string{strings.ReplaceAll(testTarget, "Microsoft.Storage/storageAccounts/store", "Microsoft.Web/sites/app/slots/staging")}, 1},
-			{"extension preserved", []string{testTarget + "/providers/Microsoft.Authorization/locks/L"}, 1},
-			{"subscription match", []string{testTarget, "--subscription", "01234567-89AB-CDEF-0123-456789ABCDEF"}, 1},
+			{"portal", []string{"https://portal.azure.com/#resource" + testTarget + "/overview"}, parsed},
+			{"slot preserved", []string{strings.ReplaceAll(testTarget, "Microsoft.Storage/storageAccounts/store", "Microsoft.Web/sites/app/slots/staging")}, parsed},
+			{"subscription match", []string{testTarget, "--subscription", "01234567-89AB-CDEF-0123-456789ABCDEF"}, parsed},
 			{"subscription mismatch", []string{testTarget, "--subscription", "fedcba98-7654-3210-fedc-ba9876543210"}, 2},
 			{"subscription invalid", []string{testTarget, "--subscription", "not-a-guid"}, 2},
 			{"subscription empty", []string{testTarget, "--subscription="}, 2},
 			{"URL credentials", []string{"https://secret:password@portal.azure.com/#resource" + testTarget}, 2},
 		} {
 			t.Run(command+"/"+tc.name, func(t *testing.T) {
-				assertTargetCommand(t, append([]string{command}, tc.args...), tc.code)
+				code, _, errOut := run(t, testDeps(nil, nil), append([]string{command}, tc.args...)...)
+				if code != tc.code {
+					t.Fatalf("%v: code=%d, want %d (stderr %q)", tc.args, code, tc.code, errOut)
+				}
+				if strings.Contains(errOut, "secret") || strings.Contains(errOut, "password") {
+					t.Fatalf("error echoed credentials: %s", errOut)
+				}
 			})
 		}
+	}
+}
+
+func TestUnsupportedTypeIsRefusedNotAssessed(t *testing.T) {
+	t.Parallel()
+	extension := testTarget + "/providers/Microsoft.Authorization/locks/L"
+	code, out, errOut := run(t, testDeps(nil, nil), "check", extension)
+	if code != 1 || !strings.Contains(errOut, "unsupported resource type") {
+		t.Fatalf("code=%d stderr=%q, want a refusal", code, errOut)
+	}
+	if strings.Contains(out, "\"verdict\"") {
+		t.Error("an unsupported type must not produce a verdict")
 	}
 }
 
@@ -101,36 +168,76 @@ func TestCheckMultipleTargets(t *testing.T) {
 		args []string
 		code int
 	}{
-		{"positional", []string{testTarget, other}, 1},
-		{"space delimited ids", []string{"--ids", testTarget, other}, 1},
-		{"repeated ids", []string{"--ids", testTarget, "--ids", other}, 1},
+		{"positional", []string{testTarget, other}, 3},
+		{"space delimited ids", []string{"--ids", testTarget, other}, 3},
+		{"repeated ids", []string{"--ids", testTarget, "--ids", other}, 3},
 		{"invalid second positional", []string{testTarget, "/placeholder"}, 2},
 		{"invalid second id", []string{"--ids", testTarget, "/placeholder"}, 2},
 		{"invalid repeated id", []string{"--ids", testTarget, "--ids", "/placeholder"}, 2},
 		{"empty id", []string{"--ids="}, 2},
 		{"invalid id with valid positional", []string{"--ids=", testTarget}, 2},
 		{"cross subscription mismatch", []string{"--ids", testTarget, other, "--subscription", "01234567-89ab-cdef-0123-456789abcdef"}, 2},
-		{"same subscription", []string{"--ids", testTarget, testTarget + "2", "--subscription", "01234567-89AB-CDEF-0123-456789ABCDEF"}, 1},
-		{"comma in name is not a list", []string{"--ids", testTarget + ",Another"}, 1},
+		{"same subscription", []string{"--ids", testTarget, testTarget + "2", "--subscription", "01234567-89AB-CDEF-0123-456789ABCDEF"}, 3},
+		{"comma in name is not a list", []string{"--ids", testTarget + ",Another"}, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			assertTargetCommand(t, append([]string{"check"}, tc.args...), tc.code)
+			code, _, errOut := run(t, testDeps(nil, nil), append([]string{"check"}, tc.args...)...)
+			if code != tc.code {
+				t.Fatalf("%v: code=%d, want %d (stderr %q)", tc.args, code, tc.code, errOut)
+			}
 		})
 	}
 }
 
-func assertTargetCommand(t *testing.T, args []string, wantCode int) {
-	t.Helper()
-	var out, errOut bytes.Buffer
-	code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut, "dev")
-	if code != wantCode || out.Len() != 0 || !strings.HasPrefix(errOut.String(), "error: ") {
-		t.Fatalf("%v: code=%d stdout=%q stderr=%q", args, code, out.String(), errOut.String())
+func TestCheckRendersAnAssessment(t *testing.T) {
+	t.Parallel()
+	code, out, errOut := run(t, liveDeps(), "check", testTarget, "-o", "json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
-	if (code == 1) != strings.Contains(errOut.String(), "not implemented") {
-		t.Fatalf("unexpected runtime/validation error: %s", errOut.String())
+	var report map[string]any
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("output is not a report: %v\n%s", err, out)
 	}
-	if strings.Contains(errOut.String(), "secret") || strings.Contains(errOut.String(), "password") {
-		t.Fatalf("error echoed credentials: %s", errOut.String())
+	// The storage analyzer does not exist yet, so its Required signals are
+	// missing and the honest answer is tentative, never yes.
+	if report["verdict"] != "tentative" || report["reasonClass"] != "inconclusive" {
+		t.Fatalf("verdict = %v/%v, want tentative/inconclusive", report["verdict"], report["reasonClass"])
+	}
+	if report["schemaVersion"] != "2" || report["resourceId"] == nil {
+		t.Fatalf("report shape = %v", report)
+	}
+	if report["humanEscalation"] != true || report["requiredHumanQuestion"] == "" {
+		t.Error("a tentative verdict must escalate to a human")
+	}
+}
+
+func TestExitOnVerdictIsAResultNotAnError(t *testing.T) {
+	t.Parallel()
+	code, out, errOut := run(t, liveDeps(), "check", testTarget, "--exit-on-verdict", "-o", "json")
+	if code != 11 {
+		t.Fatalf("code = %d, want 11 for tentative", code)
+	}
+	if errOut != "" {
+		t.Errorf("a verdict exit must not print an error: %q", errOut)
+	}
+	if !strings.Contains(out, "\"verdict\"") {
+		t.Error("the report must still be printed")
+	}
+}
+
+func TestWindowValidation(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		window string
+		code   int
+	}{{"30d", 0}, {"7d", 0}, {"93d", 0}, {"45", 0}, {"6d", 2}, {"94d", 2}, {"soon", 2}} {
+		t.Run(tc.window, func(t *testing.T) {
+			code, _, errOut := run(t, liveDeps(), "check", testTarget, "--window", tc.window, "-o", "none")
+			if code != tc.code {
+				t.Fatalf("--window %s: code=%d, want %d (%s)", tc.window, code, tc.code, errOut)
+			}
+		})
 	}
 }
 
@@ -159,23 +266,21 @@ func TestIndependentCommandDefaults(t *testing.T) {
 
 func TestOutputFormatValidation(t *testing.T) {
 	for _, format := range []string{"json", "jsonc", "table", "tsv", "yaml", "none", "invalid"} {
-		var out, errOut bytes.Buffer
-		code := Run(context.Background(), []string{"check", testTarget, "-o", format}, strings.NewReader(""), &out, &errOut, "dev")
-		want := 1
+		code, _, errOut := run(t, liveDeps(), "check", testTarget, "-o", format)
+		want := 0
 		if format == "invalid" {
 			want = 2
 		}
-		if code != want || out.Len() != 0 {
-			t.Fatalf("%s: %d %s", format, code, errOut.String())
+		if code != want {
+			t.Fatalf("%s: %d %s", format, code, errOut)
 		}
 	}
 }
 
 func TestUnsupportedQuery(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := Run(context.Background(), []string{"check", testTarget, "--query", "verdict"}, strings.NewReader(""), &out, &errOut, "dev")
-	if code != 2 || !strings.Contains(errOut.String(), "query is not implemented") {
-		t.Fatalf("%d %s", code, errOut.String())
+	code, _, errOut := run(t, testDeps(nil, nil), "check", testTarget, "--query", "verdict")
+	if code != 2 || !strings.Contains(errOut, "query is not implemented") {
+		t.Fatalf("%d %s", code, errOut)
 	}
 }
 
