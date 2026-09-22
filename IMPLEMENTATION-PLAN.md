@@ -42,7 +42,8 @@ fixture's raw row against it.
 | `kb.yaml` storage knowledge base | **not started**; `storage.kb.match` is an honest not_evaluated stub | — |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
-| MCP server, CI action, goreleaser, installer | **not started** | — |
+| Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
+| MCP server, the composite CI action for `terraform plan` and what-if | **not started** | — |
 
 `go test ./...`, `go vet ./...` and `golangci-lint run ./...` are clean at every
 commit on this branch, and no test reaches Azure.
@@ -66,9 +67,11 @@ its tests and its honest `not_evaluated` strings all exist — not before.
 5. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
    only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
    the refusal wording for every other type.
-6. **CI action, goreleaser, installer**, then the day-1 empirical tests against
-   a real subscription, each with its documented rule flip. The README exists
-   and repeats the approved limitations; a test enforces that.
+6. **The composite CI action** that extracts ids from `terraform show -json`
+   and `az stack group what-if`, with `fail-on: no|tentative`. The build and
+   release pipeline already exists.
+7. **The day-1 empirical tests** against a real subscription, each with its
+   documented rule flip.
 
 ## Deliberate gaps
 

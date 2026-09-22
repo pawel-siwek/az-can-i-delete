@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # The acceptance suite is the contract: the 66 verdict cases, the signal
+      # catalogues and the output boundary. No test reaches Azure.
+      - name: Test
+        run: go test -race ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  release-build:
+    name: Release build (snapshot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Building the release archives on every push means a broken release
+      # configuration is found here rather than when a tag is pushed.
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --snapshot --clean --single-target
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: az-can-i-delete-snapshot-linux-amd64
+          path: dist/**/az-can-i-delete
+          if-no-files-found: error
+          retention-days: 7
