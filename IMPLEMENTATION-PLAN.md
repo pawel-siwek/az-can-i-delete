@@ -25,13 +25,17 @@ fixture's raw row against it.
 | `internal/armid` — ARM ID and portal URL parser | complete | parser table, rejection cases, child/extension identity |
 | `internal/verdict` — `Decide()` v3, catalogue, validator | complete | the 66-case acceptance suite, contract, provenance, ordering |
 | `internal/age` — seven-source age chain | complete | boundary table incl. delete resets and truncation |
-| `internal/output` — schemaVersion 2 report, renderers, sanitization | complete | shape, policy boundary, Unicode corpus, redaction, exit codes |
+| `internal/output` — schemaVersion 2 report, renderers, sanitization | complete | shape, policy boundary, Unicode corpus, redaction, exit codes, table view |
 | `internal/collect` — five client boundaries, budgets, failure classification | complete | classification table, limiter, retry, gatherer |
-| `internal/collect/collecttest` — fakes for all five boundaries | complete | used by the generic layer's tests |
+| `internal/collect/collecttest` — fakes for all five boundaries | complete | used by every layer above it |
+| `internal/signal` — shared catalogue, evidence constructors, bounded graph runner | complete | exercised by the generic and disk layers |
+| `internal/rules` — embedded api-version pins and review date | complete | pins, operations, review date |
 | `internal/generic` — SPEC 5.0 generic signals and their output policy | complete | catalogue completeness, graph blindness, tags, locks, Activity Log, output boundary |
-| `internal/cli` — command tree, flags, exit codes | scaffold only; every command except `version` exits 1 as not implemented | flag validation, exit codes, target validation |
-| Azure SDK adapters for the five boundaries | **not started** | — |
-| Storage, disk, NIC, public IP, NSG, VM, sites/plans analyzers | **not started** | — |
+| `internal/azure` — ARM, Resource Graph, metrics and Activity Log adapters | complete | local TLS test server: pinned versions, paging, classification, no self-retry |
+| `internal/assess` — one target end to end | complete | window parsing, not-found, refusal, coverage, yes and no verdicts |
+| `internal/disk` — the managed disk analyzer | complete | attachment, export, references, ownership age, blindness, I/O contradiction |
+| `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
+| Storage, NIC, public IP, NSG, VM, sites/plans analyzers | **not started** | — |
 | `kb.yaml` storage knowledge base | **not started** | — |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
@@ -45,30 +49,23 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **SDK adapters.** Implement the five `internal/collect` interfaces against
-   the pinned Azure SDK modules, with `DefaultAzureCredential` then
-   `AzureCLICredential`, no account keys and no SAS. Every service error must
-   surface as a `collect.Failure` so classification keeps working. Adapters are
-   covered by transport-level tests only; no live tenant in CI.
-2. **`check` wiring.** ARM GET (404 → exit 3), window resolution, the generic
-   layer, `verdict.Evaluate` and `output.Build`, aggregation and exit codes for
-   multiple targets. Until an analyzer exists, a supported type reports the
-   generic layer's evidence and the analyzer's Required signals as missing.
-3. **Storage analyzer.** ARG reverse references, ARM lists, `kb.yaml` with the
+1. **Storage analyzer.** ARG reverse references, ARM lists, `kb.yaml` with the
    six regex corrections and the confirm ladder, metrics R1–R10 with the amended
    write and read classes and the Defender `scannerCouldRun` predicate.
-4. **Disk analyzer.** The cheapest live `yes`: disk state, `managedBy`,
-   ownership age, backup/image/ASR references.
-5. **Fixture replay and `demo`.** Recorded responses behind the same five
+2. **Data-plane collection.** The opt-in OAuth-only prefix walk behind
+   `--data-plane`, bounded as SPEC section 3.2 requires, with the fifth client
+   boundary implemented against the storage data plane.
+3. **Fixture replay and `demo`.** Recorded responses behind the same five
    interfaces, golden JSON per scenario, `recorded` in every replayed header.
-6. **NIC, public IP, NSG, VM, sites and plans analyzers**, in that order.
-7. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
+4. **NIC, public IP, NSG, VM, sites and plans analyzers**, in that order.
+5. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
-8. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
+6. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
    only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
    the refusal wording for every other type.
-9. **CI action, README, goreleaser, installer**, then the day-1 empirical tests
-   against a real subscription, each with its documented rule flip.
+7. **CI action, goreleaser, installer**, then the day-1 empirical tests against
+   a real subscription, each with its documented rule flip. The README exists
+   and repeats the approved limitations; a test enforces that.
 
 ## Deliberate gaps
 
@@ -79,4 +76,9 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   `not_evaluated` stubs of SPEC section 4.4, with its strings verbatim.
 - `generic.pe.connections` is `not_evaluated` for a resource body that does not
   carry the collection, rather than reported as having none.
-- `--query` (JMESPath) is rejected as not implemented, per the CLI contract.
+- `--query` (JMESPath), `--fixture` replay and `--data-plane` are rejected as
+  not implemented rather than silently ignored.
+- The disk I/O counters are read under the composite metric names of the
+  Azure Monitor disk namespace; the names have not been verified against a live
+  tenant, so an unsupported-metric answer surfaces as unknown rather than as an
+  absence of activity.

@@ -290,3 +290,17 @@ func TestTableDisplayWidth(t *testing.T) {
 		}
 	}
 }
+
+// The honesty rules require the README to repeat the limitations every `yes`
+// prints, so a reader who never runs the tool still sees them.
+func TestREADMERepeatsTheApprovedLimitations(t *testing.T) {
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, limitation := range approvedLimitations {
+		if !strings.Contains(string(readme), limitation) {
+			t.Errorf("README omits a limitation: %s", limitation[:60])
+		}
+	}
+}
