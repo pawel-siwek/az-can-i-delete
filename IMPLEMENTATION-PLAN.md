@@ -35,9 +35,10 @@ fixture's raw row against it.
 | `internal/assess` — one target end to end | complete | window parsing, not-found, refusal, coverage, yes and no verdicts |
 | `internal/disk` — the managed disk analyzer | complete | attachment, export, references, ownership age, blindness, I/O contradiction |
 | `internal/network` — interface, public IP and security group analyzers | complete | owners, pools, associations incl. the scale set model, flow log sinks, platform ownership, detachment age, traffic contradiction |
+| `internal/storage` — the storage account analyzer | complete except the name knowledge base | operation classification, write and read thresholds, Defender carve-out, queue polling, count growth, listings, references, control-plane silence |
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
-| Storage, VM, sites/plans analyzers | **not started** | — |
-| `kb.yaml` storage knowledge base | **not started** | — |
+| VM, sites/plans analyzers | **not started** | — |
+| `kb.yaml` storage knowledge base | **not started**; `storage.kb.match` is an honest not_evaluated stub | — |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
 | MCP server, CI action, goreleaser, installer | **not started** | — |
@@ -50,9 +51,10 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **Storage analyzer.** ARG reverse references, ARM lists, `kb.yaml` with the
-   six regex corrections and the confirm ladder, metrics R1–R10 with the amended
-   write and read classes and the Defender `scannerCouldRun` predicate.
+1. **The storage name knowledge base.** `kb.yaml` from the specification's
+   appendix with the six regex corrections and the confirm ladder, so a
+   container, share, queue or table whose name identifies its producer is
+   recognized. The analyzer around it already exists.
 2. **Data-plane collection.** The opt-in OAuth-only prefix walk behind
    `--data-plane`, bounded as SPEC section 3.2 requires, with the fifth client
    boundary implemented against the storage data plane.
@@ -83,3 +85,8 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   Azure Monitor disk namespace; the names have not been verified against a live
   tenant, so an unsupported-metric answer surfaces as unknown rather than as an
   absence of activity.
+- `storage.kb.match`, `storage.data-plane.freshness`, `storage.shares.usage`
+  and `storage.metrics.writes-inventory-shaped` are not_evaluated stubs with
+  the specification's strings, and a storage operation this version cannot
+  classify (NFS, for example) makes the silence signal unknown(unsupported)
+  rather than silent.

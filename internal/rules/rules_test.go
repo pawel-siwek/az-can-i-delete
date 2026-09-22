@@ -32,12 +32,14 @@ func TestPinnedVersions(t *testing.T) {
 
 func TestOperationVersions(t *testing.T) {
 	for name, want := range map[string]string{
-		"locks":           "2020-05-01",
-		"denyAssignments": "2022-04-01",
-		"deployments":     "2026-06-01",
-		"resourceGraph":   "2024-04-01",
-		"activityLog":     "2015-04-01",
-		"metrics":         "2024-02-01",
+		"locks":              "2020-05-01",
+		"denyAssignments":    "2022-04-01",
+		"deployments":        "2026-06-01",
+		"resourceGraph":      "2024-04-01",
+		"activityLog":        "2015-04-01",
+		"metrics":            "2024-02-01",
+		"eventGrid":          "2025-02-15",
+		"defenderForStorage": "2025-06-01",
 	} {
 		got, err := rules.Operation(name)
 		if err != nil || got != want {
