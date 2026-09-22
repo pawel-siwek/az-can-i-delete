@@ -3,6 +3,7 @@ package rules_test
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 )
@@ -58,5 +59,11 @@ func TestEveryPinIsAnAPIVersion(t *testing.T) {
 		if err != nil || !apiVersion.MatchString(version) {
 			t.Errorf("%s is pinned to %q, which is not an api-version", resourceType, version)
 		}
+	}
+}
+
+func TestRulesCarryAReviewDate(t *testing.T) {
+	if _, err := time.Parse(time.DateOnly, rules.Date()); err != nil {
+		t.Fatalf("Date() = %q, want the day the pins were last reviewed", rules.Date())
 	}
 }
