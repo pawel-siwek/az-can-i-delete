@@ -18,6 +18,11 @@ fixture provenance, but is not committed. Appendix B of `docs/SPEC.md` carries
 the 66-case acceptance table verbatim, so the acceptance suite checks every
 fixture's raw row against it.
 
+`docs/adr/` records why each binding constraint exists, below the two normative
+documents in precedence. It is what the pull request reviewer in
+`.github/workflows/pr-review.yml` reads a diff against, under the brief in
+`.github/REVIEW.md`.
+
 ## Status
 
 | Component | State | Tests |
@@ -44,6 +49,7 @@ fixture's raw row against it.
 | `cordon` / `uncordon` / `status` | **not started** | — |
 | Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
 | MCP server, the composite CI action for `terraform plan` and what-if | **not started** | — |
+| `docs/adr/` — the binding decisions, and the conformance reviewer | complete | record structure, index, enforcement sections and the reviewer's brief are checked in `internal/adr` |
 
 `go test ./...`, `go vet ./...` and `golangci-lint run ./...` are clean at every
 commit on this branch, and no test reaches Azure.
