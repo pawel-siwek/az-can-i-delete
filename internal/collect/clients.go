@@ -108,13 +108,38 @@ type MetricResult struct {
 	Truncated bool           `json:"truncated"`
 }
 
+// ActivityEvent is one Activity Log record: the age chain's normalized shape
+// plus the caller identity the generic layer reports. Caller is Azure free-form
+// text and may only be published under untrusted.
+type ActivityEvent struct {
+	age.ActivityEvent
+	Caller     string `json:"caller,omitempty"`
+	CallerType string `json:"callerType,omitempty"`
+}
+
 // ActivityLog is a normalized Activity Log page with the coverage it actually
 // achieved. Days and Truncated feed the age chain's no-event inference, which
 // refuses to infer anything from an incomplete log.
 type ActivityLog struct {
-	Events    []age.ActivityEvent `json:"events"`
-	Days      int                 `json:"days"`
-	Truncated bool                `json:"truncated"`
+	Events    []ActivityEvent `json:"events"`
+	Days      int             `json:"days"`
+	Truncated bool            `json:"truncated"`
+}
+
+// AgeEvents projects the log onto the age chain's input shape.
+func (l ActivityLog) AgeEvents() []age.ActivityEvent {
+	events := make([]age.ActivityEvent, 0, len(l.Events))
+	for _, e := range l.Events {
+		events = append(events, e.ActivityEvent)
+	}
+	return events
+}
+
+// Deployment is a normalized deployment with the name the report may show
+// under untrusted. Only successful deployments witness an age.
+type Deployment struct {
+	age.Deployment
+	Name string `json:"name,omitempty"`
 }
 
 // Container is a listed blob container or file share. A lease held on one is
@@ -147,7 +172,7 @@ type ARMClient interface {
 	List(ctx context.Context, path, apiVersion string) ([]Resource, error)
 	Locks(ctx context.Context, scope string) ([]Lock, error)
 	DenyAssignments(ctx context.Context, scope string) ([]DenyAssignment, error)
-	Deployments(ctx context.Context, resourceGroupID string, top int) ([]age.Deployment, error)
+	Deployments(ctx context.Context, resourceGroupID string, top int) ([]Deployment, error)
 }
 
 // GraphClient is the Azure Resource Graph boundary. Every ARG-backed signal
