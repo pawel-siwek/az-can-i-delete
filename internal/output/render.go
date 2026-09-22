@@ -148,7 +148,12 @@ func Render(w io.Writer, format string, outcomes []Outcome) error {
 		if err != nil {
 			return boundaryError()
 		}
-	case "table", "tsv":
+	case "table":
+		data, err = tableOutput(items)
+		if err != nil {
+			return err
+		}
+	case "tsv":
 		data, err = textOutput(items, format)
 		if err != nil {
 			return err
@@ -158,6 +163,8 @@ func Render(w io.Writer, format string, outcomes []Outcome) error {
 	return err
 }
 
+// textOutput is the flat machine view behind tsv: one path-and-value row per
+// field, so every field of the report is addressable by a script.
 func textOutput(items []json.RawMessage, format string) ([]byte, error) {
 	var out bytes.Buffer
 	for i, item := range items {
