@@ -47,6 +47,18 @@ Cloud Shell is the quickest place to try this: it is already signed in, its
 `$HOME` persists between sessions, and nothing has to be installed on your own
 machine.
 
+**From a release**, once one has been tagged — no Go toolchain needed:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pawel-siwek/az-can-i-delete/v0.1.0/scripts/install.sh | bash -s -- v0.1.0
+```
+
+The version is always explicit. The installer downloads the archive for this
+platform, verifies its SHA-256 against the release's `checksums.txt`, and only
+then installs into `~/.local/bin`; a mismatch installs nothing.
+
+**From source**, which works today on any branch:
+
 ```sh
 git clone --branch claude/jolly-shannon-1p1iko https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
 ~/src/az-can-i-delete/scripts/cloud-shell.sh
@@ -154,6 +166,23 @@ go test ./...        # no test reaches Azure
 go vet ./...
 golangci-lint run ./...
 ```
+
+Every push and pull request runs the same three checks in GitHub Actions, plus
+a snapshot release build so a broken release configuration is found before a
+tag is cut.
+
+## Cutting a release
+
+```sh
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
+
+Pushing a `v*` tag runs goreleaser: it runs the test suite again, builds static
+binaries (`CGO_ENABLED=0`) for linux, macOS (amd64 and arm64) and Windows
+amd64, writes SHA-256 checksums, and publishes the archives to a GitHub
+release. The version is compiled in and printed in every report, so a verdict
+can be traced back to the build that produced it.
 
 `REQUIREMENTS.md` and `docs/SPEC.md` are the normative documents, in that
 order. The 66-case acceptance table of `docs/SPEC.md` appendix B is the test
