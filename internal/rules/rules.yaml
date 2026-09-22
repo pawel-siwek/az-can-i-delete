@@ -1,0 +1,34 @@
+# API versions for every control-plane call the tool makes.
+#
+# These are the pins from the specification's SDK and API-version inventory
+# (docs/SPEC.md appendix L section 1). They are data, not code, so a pin can be
+# corrected without touching a collector, and every request states the version
+# it was answered under.
+#
+# A resource type that is not listed here has no analyzer and no GET version:
+# the CLI refuses it as an unsupported type rather than guessing a version.
+# The date this rule table was last reviewed; every report prints it so a
+# verdict can be traced back to the pins it was produced under.
+rulesDate: "2026-09-21"
+
+resourceTypes:
+  microsoft.storage/storageaccounts: "2026-04-01"
+  microsoft.compute/disks: "2026-03-02"
+  microsoft.compute/virtualmachines: "2026-04-01"
+  microsoft.network/networkinterfaces: "2026-01-01"
+  microsoft.network/publicipaddresses: "2026-01-01"
+  microsoft.network/networksecuritygroups: "2026-01-01"
+  microsoft.network/virtualnetworks: "2026-01-01"
+  microsoft.web/sites: "2025-05-01"
+  microsoft.web/sites/slots: "2025-05-01"
+  microsoft.web/serverfarms: "2025-05-01"
+
+operations:
+  locks: "2020-05-01"
+  denyAssignments: "2022-04-01"
+  deployments: "2026-06-01"
+  resourceGraph: "2024-04-01"
+  activityLog: "2015-04-01"
+  metrics: "2024-02-01"
+  eventGrid: "2025-02-15"
+  defenderForStorage: "2025-06-01"

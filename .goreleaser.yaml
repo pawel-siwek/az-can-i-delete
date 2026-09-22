@@ -1,0 +1,87 @@
+# Release build for az-can-i-delete.
+#
+# The binary is static (CGO_ENABLED=0) so the same file runs in Cloud Shell, in
+# a distroless container and on a developer's laptop. Linux amd64 is the
+# platform that matters first, because that is what Cloud Shell runs.
+#
+# Every archive is checksummed with SHA-256, and scripts/install.sh verifies
+# the checksum before it puts anything on a PATH.
+version: 2
+
+project_name: az-can-i-delete
+
+before:
+  hooks:
+    - go mod download
+    # A release that cannot pass its own acceptance suite must not be cut.
+    - go test ./...
+
+builds:
+  - id: az-can-i-delete
+    main: ./cmd/az-can-i-delete
+    binary: az-can-i-delete
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      # The version travels into every report, so a verdict can be traced back
+      # to the build that produced it.
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Windows on arm64 has no users for this tool yet.
+      - goos: windows
+        goarch: arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - REQUIREMENTS.md
+      - IMPLEMENTATION-PLAN.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - Merge branch
+
+release:
+  draft: false
+  prerelease: auto
+  footer: |
+    ## Installing
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/pawel-siwek/az-can-i-delete/{{ .Tag }}/scripts/install.sh | bash -s -- {{ .Tag }}
+    ```
+
+    The installer verifies the SHA-256 checksum of the archive before it puts
+    anything on your PATH, and installs into `~/.local/bin`.
+
+    A verdict from this tool is evidence, not permission. `yes` means no
+    evidence of use was found by the signals it could evaluate, never that
+    deleting is safe; every `yes` prints the limitations that go with it.

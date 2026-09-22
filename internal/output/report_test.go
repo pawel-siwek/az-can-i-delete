@@ -195,3 +195,42 @@ func TestReducer(t *testing.T) {
 		}
 	}
 }
+
+func TestTableViewShowsEverySignalAndTheVerdict(t *testing.T) {
+	in := sample()
+	report := build(t, in, config())
+	var out bytes.Buffer
+	if err := Render(&out, "table", []Outcome{Completed(report)}); err != nil {
+		t.Fatal(err)
+	}
+	rendered := out.String()
+	value, err := report.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"verdict", "resource", "window", "coverage", "Evidence", "Limitations"} {
+		if !strings.Contains(rendered, field) {
+			t.Errorf("table omitted %s", field)
+		}
+	}
+	evidence, _ := value["evidence"].([]any)
+	for _, item := range evidence {
+		row := item.(map[string]any)
+		if !strings.Contains(rendered, row["id"].(string)) {
+			t.Errorf("table omitted signal %s", row["id"])
+		}
+	}
+	if !strings.Contains(rendered, value["verdict"].(string)) {
+		t.Error("table omitted the verdict")
+	}
+}
+
+func TestTableViewReportsFailuresByCode(t *testing.T) {
+	var out bytes.Buffer
+	if err := Render(&out, "table", []Outcome{Failed(NotFound)}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "not-found") || !strings.Contains(out.String(), "exit") {
+		t.Fatalf("a failed target must name its code and exit: %q", out.String())
+	}
+}
