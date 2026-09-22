@@ -289,9 +289,14 @@ func TestDeploymentProvenance(t *testing.T) {
 			{Deployment: deployment(cutoff.AddDate(0, 0, -40), "Succeeded", diskID)},
 		}, nil
 	}
-	e := byID(t, h.run(t))[generic.SignalDeployment]
+	result := h.run(t)
+	e := byID(t, result)[generic.SignalDeployment]
 	if e.Status != verdict.StatusPresent || e.Details["deployedAt"] != cutoff.AddDate(0, 0, -40).Format(time.RFC3339Nano) {
 		t.Fatalf("deployment = %+v, want the succeeded deployment", e)
+	}
+	// The deployment history is also one of the age chain's seven sources.
+	if result.Age.Source != "deployments" || result.Age.Confidence != "bounded" || result.Age.LowerBoundDays != 40 {
+		t.Errorf("age = %+v, want a bounded 40-day lower bound from the deployment", result.Age)
 	}
 }
 
