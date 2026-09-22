@@ -30,5 +30,7 @@ instead of escalating itself. Data-plane freshness stays opt-in.
 
 ## Enforcement
 
-No `listKeys` call exists in `internal/`. `TestRedactionAndSettingValueSmuggling` in `internal/output`
+`TestNothingAcquiresAKeyOrASharedSecret` in `internal/conformance` fails on a
+key acquisition, a shared-key credential or a SAS being minted — while leaving
+the storage analyzer free to report somebody else's `listKeys` as evidence. `TestRedactionAndSettingValueSmuggling` in `internal/output`
 asserts that setting values cannot reach the report.

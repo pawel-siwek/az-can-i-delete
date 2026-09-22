@@ -25,4 +25,7 @@ The review date makes a stale rule set visible.
 ## Enforcement
 
 `internal/rules` tests `TestPinnedVersions`, `TestOperationVersions`,
-`TestEveryPinIsAnAPIVersion` and `TestRulesCarryAReviewDate`.
+`TestEveryPinIsAnAPIVersion` and `TestRulesCarryAReviewDate`;
+`TestApiVersionsLiveOnlyInTheRuleTable` in `internal/conformance` fails on a
+version literal anywhere else, which is how the generic layer's duplicate
+pins were found.

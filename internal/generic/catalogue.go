@@ -9,6 +9,7 @@ package generic
 import (
 	"time"
 
+	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 	"github.com/pawel-siwek/az-can-i-delete/internal/signal"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
@@ -37,11 +38,14 @@ const (
 	SignalPolicyState     = "generic.policy.state"
 )
 
-// The api-versions SPEC section 5.0 pins for the generic layer.
-const (
-	LocksAPIVersion           = "2020-05-01"
-	DenyAssignmentsAPIVersion = "2022-04-01"
-	DeploymentsAPIVersion     = "2026-06-01"
+// The api-versions SPEC section 5.0 pins for the generic layer. They are read
+// from the rule table rather than repeated here: two copies of a pin drift,
+// and a signal collected under one version while the report names another is
+// exactly the silent inconsistency docs/adr/0008 exists to prevent.
+var (
+	LocksAPIVersion           = rules.MustOperation("locks")
+	DenyAssignmentsAPIVersion = rules.MustOperation("denyAssignments")
+	DeploymentsAPIVersion     = rules.MustOperation("deployments")
 )
 
 // RecentWriteDays and WritesDays are the fixed lookbacks of the two Activity
