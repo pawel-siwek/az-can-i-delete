@@ -38,6 +38,8 @@ type Result struct {
 	ActivityLog     collect.ActivityLog
 	ActivityLogRead bool
 	ActivityLogDays int
+	Changes         []age.ResourceChange
+	ChangesRead     bool
 	ManagedBy       string
 	Metadata        Metadata
 }
@@ -98,6 +100,8 @@ func Collect(ctx context.Context, in Input) Result {
 		ActivityLog:     history.log,
 		ActivityLogRead: history.read,
 		ActivityLogDays: history.log.Days,
+		Changes:         history.changes,
+		ChangesRead:     history.changesRead,
 		ManagedBy:       managed.managedBy,
 		Metadata:        Metadata{TagKeys: tagKeys(tags), Callers: history.callers},
 	}
@@ -418,11 +422,12 @@ func (g *deploymentGroup) run(in Input) func(context.Context) ([]verdict.Evidenc
 // failure here leaves the age unknown rather than inventing a young or old
 // resource.
 type historyGroup struct {
-	log       collect.ActivityLog
-	read      bool
-	changes   []age.ResourceChange
-	truncated bool
-	callers   []string
+	log         collect.ActivityLog
+	read        bool
+	changes     []age.ResourceChange
+	changesRead bool
+	truncated   bool
+	callers     []string
 }
 
 func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]verdict.Evidence, error) {
@@ -439,7 +444,8 @@ func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]
 			}
 		}
 		changes, changesErr := resourceChanges(ctx, in, probe)
-		g.changes, g.truncated = changes, log.Truncated || changesErr != nil
+		g.changes, g.changesRead = changes, changesErr == nil
+		g.truncated = log.Truncated || changesErr != nil
 		recent, writes := activityEvidence(log, in.Cutoff)
 		return []verdict.Evidence{recent, writes}, nil
 	}

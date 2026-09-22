@@ -34,8 +34,9 @@ fixture's raw row against it.
 | `internal/azure` — ARM, Resource Graph, metrics and Activity Log adapters | complete | local TLS test server: pinned versions, paging, classification, no self-retry |
 | `internal/assess` — one target end to end | complete | window parsing, not-found, refusal, coverage, yes and no verdicts |
 | `internal/disk` — the managed disk analyzer | complete | attachment, export, references, ownership age, blindness, I/O contradiction |
+| `internal/network` — interface, public IP and security group analyzers | complete | owners, pools, associations incl. the scale set model, flow log sinks, platform ownership, detachment age, traffic contradiction |
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
-| Storage, NIC, public IP, NSG, VM, sites/plans analyzers | **not started** | — |
+| Storage, VM, sites/plans analyzers | **not started** | — |
 | `kb.yaml` storage knowledge base | **not started** | — |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
@@ -57,7 +58,7 @@ its tests and its honest `not_evaluated` strings all exist — not before.
    boundary implemented against the storage data plane.
 3. **Fixture replay and `demo`.** Recorded responses behind the same five
    interfaces, golden JSON per scenario, `recorded` in every replayed header.
-4. **NIC, public IP, NSG, VM, sites and plans analyzers**, in that order.
+4. **VM, sites and plans analyzers**, in that order.
 5. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
 6. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`

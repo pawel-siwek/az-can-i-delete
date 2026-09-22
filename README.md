@@ -14,7 +14,8 @@ tool, not a disclaimer.
 | Area | State |
 |---|---|
 | `check` for managed disks (`Microsoft.Compute/disks`) | full analyzer: attachment, owner, active export, backups, Kubernetes volumes, Site Recovery replicas, images, provenance, detachment age, Advisor, I/O counters |
-| `check` for the other pinned types | the generic layer only — locks, deny assignments, resource-group ownership, tags, deployments, Activity Log, private endpoints, Advisor. Their own Required signals are reported missing, so the answer is `tentative`, never `yes` |
+| `check` for network interfaces, public IP addresses and network security groups | full analyzers: owners and associations (including a zero-instance scale set's network model), backend pools, NAT gateways, flow logs and their storage sinks, platform-owned groups, static addresses and domain labels, traffic counters, and the 30-day detachment age |
+| `check` for storage accounts, virtual machines, sites, slots and plans | the generic layer only — locks, deny assignments, resource-group ownership, tags, deployments, Activity Log, private endpoints, Advisor. Their own Required signals are reported missing, so the answer is `tentative`, never `yes` |
 | Output | `table` (default at a terminal), `json`, `jsonc`, `yaml`, `tsv`, `none` |
 | `cordon`, `uncordon`, `status`, `demo`, `mcp`, `patterns list`, `--fixture`, `--data-plane`, `--query` | not implemented; they exit 1 and say so |
 
