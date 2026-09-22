@@ -22,6 +22,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 	"github.com/pawel-siwek/az-can-i-delete/internal/storage"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
+	"github.com/pawel-siwek/az-can-i-delete/internal/vm"
 )
 
 // Window bounds. The default is 30 days; below 30 a `yes` is unreachable by
@@ -60,7 +61,7 @@ type Runner struct {
 // across every target so one run cannot exceed the call budget by fanning out.
 func New(clients collect.Clients, toolVersion string) *Runner {
 	policies := generic.Policies()
-	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies(), storage.Policies()} {
+	for _, analyzer := range []map[string]output.SignalPolicy{disk.Policies(), network.Policies(), storage.Policies(), vm.Policies()} {
 		for id, policy := range analyzer {
 			policies[id] = policy
 		}
@@ -92,6 +93,11 @@ func (r *Runner) analyze(ctx context.Context, target armid.Target, resource coll
 		})
 	case strings.EqualFold(target.ResourceType, storage.ResourceType):
 		return storage.Collect(ctx, storage.Input{
+			Target: target, Resource: resource, Requested: opts.Requested,
+			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
+		})
+	case strings.EqualFold(target.ResourceType, vm.ResourceType):
+		return vm.Collect(ctx, vm.Input{
 			Target: target, Resource: resource, Requested: opts.Requested,
 			Cutoff: opts.Cutoff.UTC(), Clients: r.Clients, Graph: r.Graph, Generic: collected,
 		})

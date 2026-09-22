@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -368,6 +369,37 @@ func TestAStorageAccountWithADependencyIsNo(t *testing.T) {
 	report := reportValue(t, outcome)
 	if report["verdict"] != "no" || report["reasonClass"] != "in-use" {
 		t.Fatalf("verdict = %v/%v, want no/in-use for a virtual machine's boot diagnostics",
+			report["verdict"], report["reasonClass"])
+	}
+}
+
+func TestADeallocatedMachineKeptForItsBackupIsNotYes(t *testing.T) {
+	machineID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm1"
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		if strings.HasSuffix(id, "/instanceView") {
+			return collect.Resource{Properties: map[string]any{"statuses": []any{
+				map[string]any{"code": "PowerState/deallocated"}}}}, nil
+		}
+		if id != machineID {
+			return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound}
+		}
+		return collect.Resource{ID: id, Name: "vm1", Type: "Microsoft.Compute/virtualMachines",
+			SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+			Properties: map[string]any{"provisioningState": "Succeeded"}}, nil
+	}}
+	graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{
+		{Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": machineID}}}},
+		{Match: "protecteditems", Rows: collect.Rows{Rows: []map[string]any{
+			{"id": "/b1", "state": "ProtectionConfigured"}}}},
+	}}
+	outcome, err := runner(arm, graph, &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}).
+		Check(context.Background(), target(t, machineID), options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := reportValue(t, outcome)
+	if report["verdict"] != "no" || report["reasonClass"] != "in-use" {
+		t.Fatalf("verdict = %v/%v, want no/in-use for a machine Azure Backup still protects",
 			report["verdict"], report["reasonClass"])
 	}
 }

@@ -14,54 +14,73 @@ import (
 
 type armClient struct{ client *Client }
 
-// resourceBody is the shared envelope of an ARM resource. Properties stays
-// free-form: the analyzers read documented paths out of it and the output
-// boundary decides what may be printed.
-type resourceBody struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Type       string            `json:"type"`
-	Location   string            `json:"location"`
-	Kind       string            `json:"kind"`
-	Tags       map[string]string `json:"tags"`
-	Properties map[string]any    `json:"properties"`
-	SystemData map[string]any    `json:"systemData"`
-}
-
-func (b resourceBody) normalize() collect.Resource {
-	state, _ := b.Properties["provisioningState"].(string)
-	return collect.Resource{
-		ID: b.ID, Name: b.Name, Type: b.Type, Location: b.Location, Kind: b.Kind,
-		ProvisioningState: state, Tags: b.Tags, Properties: b.Properties, SystemData: b.SystemData,
-	}
-}
-
 // Get reads one resource at its pinned api-version. A 404 is reported as such
 // so the caller can end the run with "resource not found" rather than guessing.
+// A sub-resource whose body is the payload itself, such as a virtual machine's
+// instance view, keeps that payload under Properties.
 func (c *armClient) Get(ctx context.Context, resourceID, apiVersion string) (collect.Resource, error) {
 	if apiVersion == "" {
 		return collect.Resource{}, &collect.Failure{ErrorCode: "NoSupportedApiVersion",
 			Message: "no pinned api-version for this resource type"}
 	}
-	var body resourceBody
-	if err := c.client.get(ctx, resourceID, url.Values{"api-version": {apiVersion}}, &body); err != nil {
+	var raw map[string]any
+	if err := c.client.get(ctx, resourceID, url.Values{"api-version": {apiVersion}}, &raw); err != nil {
 		return collect.Resource{}, err
 	}
-	if body.ID == "" {
-		body.ID = resourceID
+	resource := fromBody(raw)
+	if resource.ID == "" {
+		resource.ID = resourceID
 	}
-	return body.normalize(), nil
+	return resource, nil
+}
+
+// fromBody normalizes an ARM payload. Most bodies wrap their payload in
+// properties; a few sub-resources are the payload, and losing those would mean
+// reporting a check as absent that was never read.
+func fromBody(raw map[string]any) collect.Resource {
+	properties, wrapped := raw["properties"].(map[string]any)
+	if !wrapped {
+		properties = map[string]any{}
+		for key, value := range raw {
+			properties[key] = value
+		}
+	}
+	text := func(key string) string {
+		value, _ := raw[key].(string)
+		return value
+	}
+	tags := map[string]string{}
+	if raw, ok := raw["tags"].(map[string]any); ok {
+		for key, value := range raw {
+			if text, ok := value.(string); ok {
+				tags[key] = text
+			}
+		}
+	}
+	state, _ := properties["provisioningState"].(string)
+	systemData, _ := raw["systemData"].(map[string]any)
+	resource := collect.Resource{
+		ID: text("id"), Name: text("name"), Type: text("type"), Location: text("location"),
+		Kind: text("kind"), ProvisioningState: state, Properties: properties, SystemData: systemData,
+	}
+	if len(tags) > 0 {
+		resource.Tags = tags
+	}
+	if sku, ok := raw["sku"].(map[string]any); ok {
+		resource.Properties["sku"] = sku
+	}
+	return resource
 }
 
 // List reads a child collection, for example a storage account's containers.
 func (c *armClient) List(ctx context.Context, path, apiVersion string) ([]collect.Resource, error) {
-	bodies, complete, err := list[resourceBody](ctx, c.client, path, url.Values{"api-version": {apiVersion}})
+	bodies, complete, err := list[map[string]any](ctx, c.client, path, url.Values{"api-version": {apiVersion}})
 	if err != nil {
 		return nil, err
 	}
 	resources := make([]collect.Resource, 0, len(bodies))
 	for _, body := range bodies {
-		resources = append(resources, body.normalize())
+		resources = append(resources, fromBody(body))
 	}
 	if !complete {
 		return resources, collect.ErrTruncated
