@@ -22,6 +22,9 @@ REPO_REF="${REPO_REF:-main}"
 GO_VERSION="${GO_VERSION:-1.25.0}"
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC_DIR="${SRC_DIR:-$HOME/src/az-can-i-delete}"
+# SRC_DIR_SET tells the script the caller chose the directory deliberately, so
+# it must not prefer its own clone over that choice.
+[ -n "${SRC_DIR:-}" ] && [ "${SRC_DIR}" != "$HOME/src/az-can-i-delete" ] && SRC_DIR_SET=1
 
 say() { printf '==> %s\n' "$*"; }
 
@@ -63,11 +66,28 @@ install_go() {
   export PATH="$target/bin:$PATH"
 }
 
-say "checking out the source"
-if [ -d "$SRC_DIR/.git" ]; then
+# here is the clone this script is running from, if it is running from one.
+# Somebody who already cloned the repository to run this should not have it
+# cloned again somewhere else: that builds a different checkout from the one
+# they read, which is the opposite of the point.
+here() {
+  local dir
+  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [ -d "$dir/.git" ] && [ -f "$dir/go.mod" ]; then
+    printf '%s\n' "$dir"
+  fi
+}
+
+own_clone="$(here || true)"
+if [ -n "$own_clone" ] && [ -z "${SRC_DIR_SET:-}" ]; then
+  SRC_DIR="$own_clone"
+  say "building the clone this script came from ($SRC_DIR)"
+elif [ -d "$SRC_DIR/.git" ]; then
+  say "updating the source in $SRC_DIR"
   git -C "$SRC_DIR" fetch --depth 1 origin "$REPO_REF"
   git -C "$SRC_DIR" checkout -q FETCH_HEAD
 else
+  say "checking out the source into $SRC_DIR"
   mkdir -p "$(dirname "$SRC_DIR")"
   git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$SRC_DIR"
 fi
