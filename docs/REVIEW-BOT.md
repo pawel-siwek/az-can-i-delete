@@ -102,15 +102,18 @@ gh variable set AZURE_AI_DEPLOYMENT   -R "$REPO" -b "<deployment-name>"
 ## 5. See it work
 
 Open any pull request. The `Judgement` job will sign in, read the diff against
-the records, and write what it found as a comment:
+the records, and submit a review — a review, not a comment, so the reviewer
+appears in the Reviewers list where a reader looks for a position:
 
 ```
 ### ✅ Conformance review — OK
 OK — the change keeps every record it touches.
 ```
 
-or, when it disagrees, `### ⛔ Conformance review — NOT OK` with a finding per
-paragraph and the check red.
+When it disagrees it posts `### ⛔ Conformance review — NOT OK`, a finding per
+paragraph, **requests changes** — which blocks the merge — and the check goes
+red. When a later run finds nothing to object to, it withdraws that refusal
+itself.
 
 Check it is configured at all:
 
@@ -120,8 +123,18 @@ gh variable list -R "$REPO"
 
 ## What it can and cannot do
 
-It comments and it fails its own check. It cannot approve a pull request,
-merge one, or push. Merging stays a human's click.
+It reviews, it requests changes, and it fails its own check. It cannot merge
+or push, and it deliberately never approves: an approving review from the
+workflow's own token can satisfy a ruleset that requires an approval, and this
+repository requires a human one. A reviewer able to stand in for that human
+quietly would be worse than no reviewer, so OK is a plain comment review —
+same place, no authority it was not given. Merging stays a human's click.
+
+Requesting changes blocks the merge, and GitHub lifts that only on an approval
+or a dismissal. Since this reviewer never approves, it dismisses its own
+earlier refusal when it next finds nothing to object to. It recognises its own
+by the heading it writes, so a human's "changes requested" is never cleared by
+a bot.
 
 It reviews conformance, not craft: whether the change still honours
 `REQUIREMENTS.md`, `docs/SPEC.md` and the records in `docs/adr/`. Style and
