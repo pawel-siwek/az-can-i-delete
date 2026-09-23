@@ -20,7 +20,8 @@ tool, not a disclaimer.
 | `check` for App Service sites, slots and plans | full analyzers: custom domains, fronting, hybrid connections, virtual network integration, source control and deployments, function triggers, the request-ceiling and probe-shape rules, hosting class, stopped state, metric silence, and for plans the site count, autoscale and Advisor |
 | Name knowledge base | 79 entries recognize a container, share, queue or table name as the work of a known producer — diagnostic settings, flow logs, Functions host storage, boot diagnostics, Terraform state and the rest. A name match is reported at the tier a name alone may claim, never the confirmed one |
 | Output | `table` (default at a terminal), `json`, `jsonc`, `yaml`, `tsv`, `none` |
-| `cordon`, `uncordon`, `status`, `demo`, `mcp`, `patterns list`, `--fixture`, `--data-plane`, `--query` | not implemented; they exit 1 and say so |
+| `--data-plane` | opt-in, OAuth only: samples up to five containers and walks their `y=/m=/d=/h=` partitions for the last write, at most twelve calls and three seconds each. No account key is ever acquired, and no data access means `unknown`, never "empty" |
+| `cordon`, `uncordon`, `status`, `demo`, `mcp`, `patterns list`, `--fixture`, `--query` | not implemented; they exit 1 and say so |
 
 `IMPLEMENTATION-PLAN.md` has the full status and the order the rest is built in.
 
