@@ -1,4 +1,4 @@
-# Deploying the pull request reviewer
+# Deploying Saruman, the pull request reviewer
 
 Every pull request is checked twice.
 
@@ -40,14 +40,37 @@ The subject is exact. A run that is not a pull request on this repository gets
 no token, which is the point: the trust is scoped to one event on one
 repository, not to anybody holding a secret.
 
+Exact also means the shape has to be the one GitHub actually sends, and there
+are two. The familiar `repo:OWNER/REPO:pull_request` is one; the other embeds
+the numeric owner and repository ids, `repo:OWNER@1234/REPO@5678:pull_request`,
+so that the trust survives a rename and does not follow the name to whoever
+claims it next. A credential for the wrong one fails with `AADSTS700213: No
+matching federated identity record found`, and that error quotes the subject
+the run presented — which is the authoritative answer for this repository.
+
+Both are cheap, so register both and stop caring which a runner sends:
+
 ```sh
-az ad app federated-credential create --id "$APP_ID" --parameters "{
-  \"name\": \"az-can-i-delete-pull-requests\",
-  \"issuer\": \"https://token.actions.githubusercontent.com\",
-  \"subject\": \"repo:$REPO:pull_request\",
-  \"audiences\": [\"api://AzureADTokenExchange\"]
-}"
+OWNER=${REPO%/*}
+NAME=${REPO#*/}
+OWNER_ID=$(gh api "users/$OWNER" --jq .id)
+REPO_ID=$(gh api "repos/$REPO" --jq .id)
+
+add() {
+  az ad app federated-credential create --id "$APP_ID" --parameters "{
+    \"name\": \"$1\",
+    \"issuer\": \"https://token.actions.githubusercontent.com\",
+    \"subject\": \"$2\",
+    \"audiences\": [\"api://AzureADTokenExchange\"]
+  }"
+}
+
+add az-can-i-delete-pull-requests    "repo:$REPO:pull_request"
+add az-can-i-delete-pull-requests-id "repo:$OWNER@$OWNER_ID/$NAME@$REPO_ID:pull_request"
 ```
+
+Neither widens anything: each names one event on this one repository, and the
+id-bearing one names it more precisely than the other.
 
 ## 3. Give it the one role it needs
 
@@ -79,15 +102,89 @@ gh variable set AZURE_AI_DEPLOYMENT   -R "$REPO" -b "<deployment-name>"
 ## 5. See it work
 
 Open any pull request. The `Judgement` job will sign in, read the diff against
-the records, and write what it found as a comment:
+the records, and submit a review — a review, not a comment, so the reviewer
+appears in the Reviewers list where a reader looks for a position:
 
 ```
 ### ✅ Conformance review — OK
 OK — the change keeps every record it touches.
 ```
 
-or, when it disagrees, `### ⛔ Conformance review — NOT OK` with a finding per
-paragraph and the check red.
+When it disagrees it posts `### ⛔ Conformance review — NOT OK`, a finding per
+paragraph, **requests changes** — which blocks the merge — and the check goes
+red. When a later run finds nothing to object to, it withdraws that refusal
+itself.
+
+## 6. Give it its own name
+
+Skip this and it still reviews — as `github-actions[bot]`, the identity of
+whatever workflow happened to run. That is accurate and anonymous: the same
+name signs every automated thing in the repository, so a reader cannot tell
+the reviewer from a release job.
+
+A GitHub App fixes that. An App is an identity, not a service: nothing is
+hosted, nothing runs between pull requests, and the token minted from it lasts
+an hour. Reviews are then signed `saruman[bot]`, and that is the name in the
+Reviewers list.
+
+1. **Settings → Developer settings → GitHub Apps → New GitHub App.** App names
+   are unique across all of GitHub, so `saruman` may be taken and
+   `saruman-bot` or similar is what you get; nothing here depends on the name.
+   Saruman finds its own earlier reviews by the heading it writes, not by the
+   login it posted under, so the account can be renamed without stranding a
+   blocking review. Homepage URL can be the repository — the field is required
+   and does nothing. Uncheck **Webhook → Active**: nothing listens, so nothing
+   should be sent.
+2. **Repository permissions:** `Pull requests: Read and write`,
+   `Contents: Read-only`. Nothing else. It writes reviews; it does not push.
+3. **Where can this GitHub App be installed:** only this account.
+4. Create it, then **Generate a private key** — a `.pem` downloads — and
+   **Install App** on this repository.
+5. Tell the workflows who it is. The app id is public; the key is not:
+
+```sh
+gh variable set SARUMAN_APP_ID      -R "$REPO" -b "<the app id from its settings page>"
+gh secret   set SARUMAN_PRIVATE_KEY -R "$REPO" < ~/Downloads/saruman.<...>.private-key.pem
+```
+
+The app id is what the workflows look for. Set neither and they review as
+`github-actions[bot]` — a missing identity is not a reason to say nothing.
+Set the id without the key and the token step fails loudly, which is right:
+that is a half-finished setup, not a decision to go without.
+
+Do not move that test into the step's `if:`. A step condition cannot read the
+`secrets` context, and writing one there makes GitHub reject the whole file —
+the workflow does not run, its checks stop existing, and a ruleset requiring
+them has nothing to require. `internal/conformance` fails on it now.
+
+Saruman still never approves, app or no app. An App *can* approve, where
+`github-actions[bot]` cannot, which is exactly why the rule is written in the
+code rather than left to what the token happens to permit.
+
+## 7. Ask it something
+
+It also answers. A comment containing `/review` on a pull request re-runs the
+review; `/review` followed by a question answers that question instead, in the
+thread where it was asked when it was asked in one.
+
+```
+/review does the new AST check in internal/conformance overlap with driftcheck?
+```
+
+An answer is an answer, not a verdict: it approves nothing, blocks nothing, and
+a question the reviewer could not settle from the documents gets told so rather
+than guessed at.
+
+Only people with write access can ask. A comment is the cheapest thing in the
+world to write and this one spends your model, so the trigger is gated on
+having write access already — and on the commenter not being a bot, which is
+what keeps two of them from answering each other forever.
+
+The `Reply` workflow builds Saruman from the base branch before any of the
+pull request's code is on disk. That matters here in a way it does not for
+`Review`: a comment trigger always runs with a writable token, where a pull
+request from a fork gets none. What runs is what the base branch says it is;
+the change itself is read as a diff, which is material, never something run.
 
 Check it is configured at all:
 
@@ -97,8 +194,18 @@ gh variable list -R "$REPO"
 
 ## What it can and cannot do
 
-It comments and it fails its own check. It cannot approve a pull request,
-merge one, or push. Merging stays a human's click.
+It reviews, it requests changes, and it fails its own check. It cannot merge
+or push, and it deliberately never approves: an approving review from the
+workflow's own token can satisfy a ruleset that requires an approval, and this
+repository requires a human one. A reviewer able to stand in for that human
+quietly would be worse than no reviewer, so OK is a plain comment review —
+same place, no authority it was not given. Merging stays a human's click.
+
+Requesting changes blocks the merge, and GitHub lifts that only on an approval
+or a dismissal. Since this reviewer never approves, it dismisses its own
+earlier refusal when it next finds nothing to object to. It recognises its own
+by the heading it writes, so a human's "changes requested" is never cleared by
+a bot.
 
 It reviews conformance, not craft: whether the change still honours
 `REQUIREMENTS.md`, `docs/SPEC.md` and the records in `docs/adr/`. Style and

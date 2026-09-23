@@ -158,6 +158,13 @@ func writeSignal(out *bytes.Buffer, row map[string]any) {
 		fmt.Fprintf(out, "    %s%s\n", text(row["id"]), mark)
 	}
 	writeWrappedAt(out, "      ", "      ", text(row["summary"]))
+	// The code is a category; the reason is the one thing that tells a reader
+	// whether this is theirs to fix. `transient` alone sends them nowhere.
+	if unknown, ok := row["unknown"].(map[string]any); ok {
+		if reason := text(unknown["reason"]); reason != "" {
+			writeWrappedAt(out, "      ↳ ", "        ", reason)
+		}
+	}
 	for _, step := range textList(row["nextSteps"]) {
 		writeWrappedAt(out, "      → ", "        ", step)
 	}
@@ -206,6 +213,11 @@ func writeEverySignal(out *bytes.Buffer, value map[string]any) {
 		}
 		fmt.Fprintf(out, "  %-16s %-22s %s\n", text(row["tierName"]), status, text(row["id"]))
 		writeIndented(out, text(row["summary"]))
+		if unknown, ok := row["unknown"].(map[string]any); ok {
+			if reason := text(unknown["reason"]); reason != "" {
+				writeIndented(out, "why: "+reason)
+			}
+		}
 		if notEvaluated, ok := row["notEvaluated"].(map[string]any); ok {
 			writeIndented(out, "not evaluated: "+text(notEvaluated["reason"]))
 			writeIndented(out, "consequence: "+text(notEvaluated["consequence"]))

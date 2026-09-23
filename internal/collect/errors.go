@@ -76,59 +76,74 @@ func transportRetryable(err error) bool {
 // Classify turns any collection failure into the unknown a signal must carry.
 // It never returns nil for a non-nil error and never reports absence: an
 // unreadable dependency stays unknown, which is what keeps `yes` unreachable.
-// Message is tool-owned; no Azure free-form text is copied into it.
+//
+// The message is tool-owned and written here as a literal. Azure's own error
+// text is never copied into it: it is free-form, it is attacker-influenceable
+// through resource names, and it is the one string in a failure that nobody
+// has read before it reaches a report. internal/conformance holds every
+// reason in the repository to being a literal so that stays true.
 func Classify(err error) *verdict.Unknown {
 	if err == nil {
 		return nil
 	}
-	unknown := &verdict.Unknown{Code: verdict.UnkTransient, Message: "collection failed"}
+	unknown := classify(err)
 	var failure *Failure
-	if !errors.As(err, &failure) {
-		unknown.Code, unknown.Message = classifyTransport(err)
-		return unknown
-	}
-	unknown.HTTPStatus, unknown.ErrorCode = failure.StatusCode, failure.ErrorCode
-	switch {
-	case failure.StatusCode == http.StatusUnauthorized:
-		unknown.Code, unknown.Message = verdict.UnkAuth, "the credential was rejected"
-	case failure.StatusCode == http.StatusForbidden:
-		unknown.Code, unknown.Message = verdict.UnkPermission, "the caller is not authorized to read this"
-	case failure.StatusCode == http.StatusNotFound:
-		unknown.Code, unknown.Message = verdict.UnkDependency, "the referenced resource could not be read"
-	case failure.StatusCode == http.StatusRequestTimeout,
-		failure.StatusCode == http.StatusGatewayTimeout:
-		unknown.Code, unknown.Message = verdict.UnkTimeout, "the service did not answer in time"
-	case failure.StatusCode == http.StatusTooManyRequests:
-		unknown.Code, unknown.Message = verdict.UnkThrottled, "the request budget was exhausted by throttling"
-	case failure.StatusCode >= 500 && failure.StatusCode <= 599:
-		unknown.Code, unknown.Message = verdict.UnkTransient, "the service failed to answer"
-	case unsupported(failure):
-		unknown.Code, unknown.Message = verdict.UnkUnsupported, "this check is not supported for this resource or api-version"
-	case failure.StatusCode >= 400 && failure.StatusCode <= 499:
-		unknown.Code, unknown.Message = verdict.UnkTransient, "the request was rejected"
-	case failure.Err != nil:
-		unknown.Code, unknown.Message = classifyTransport(failure.Err)
+	if errors.As(err, &failure) {
+		unknown.HTTPStatus, unknown.ErrorCode = failure.StatusCode, failure.ErrorCode
 	}
 	return unknown
 }
 
-func classifyTransport(err error) (verdict.UnknownCode, string) {
+// classify names the failure. Each arm returns its own reason rather than
+// deriving one, so the code says what kind of failure it was and the reason
+// says which one: "the request was rejected" and "the service failed to
+// answer" are both transient and point at different problems.
+func classify(err error) *verdict.Unknown {
+	var failure *Failure
+	if !errors.As(err, &failure) {
+		return classifyTransport(err)
+	}
+	switch {
+	case failure.StatusCode == http.StatusUnauthorized:
+		return &verdict.Unknown{Code: verdict.UnkAuth, Message: "the credential was rejected"}
+	case failure.StatusCode == http.StatusForbidden:
+		return &verdict.Unknown{Code: verdict.UnkPermission, Message: "the caller is not authorized to read this"}
+	case failure.StatusCode == http.StatusNotFound:
+		return &verdict.Unknown{Code: verdict.UnkDependency, Message: "the referenced resource could not be read"}
+	case failure.StatusCode == http.StatusRequestTimeout,
+		failure.StatusCode == http.StatusGatewayTimeout:
+		return &verdict.Unknown{Code: verdict.UnkTimeout, Message: "the service did not answer in time"}
+	case failure.StatusCode == http.StatusTooManyRequests:
+		return &verdict.Unknown{Code: verdict.UnkThrottled, Message: "the request budget was exhausted by throttling"}
+	case failure.StatusCode >= 500 && failure.StatusCode <= 599:
+		return &verdict.Unknown{Code: verdict.UnkTransient, Message: "the service failed to answer"}
+	case unsupported(failure):
+		return &verdict.Unknown{Code: verdict.UnkUnsupported, Message: "this check is not supported for this resource or api-version"}
+	case failure.StatusCode >= 400 && failure.StatusCode <= 499:
+		return &verdict.Unknown{Code: verdict.UnkTransient, Message: "the request was rejected"}
+	case failure.Err != nil:
+		return classifyTransport(failure.Err)
+	}
+	return &verdict.Unknown{Code: verdict.UnkTransient, Message: "collection failed"}
+}
+
+func classifyTransport(err error) *verdict.Unknown {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		return verdict.UnkTimeout, "the call exceeded its budget"
+		return &verdict.Unknown{Code: verdict.UnkTimeout, Message: "the call exceeded its budget"}
 	case errors.Is(err, ErrBudgetExhausted):
-		return verdict.UnkTimeout, "the run budget was exhausted before this call"
+		return &verdict.Unknown{Code: verdict.UnkTimeout, Message: "the run budget was exhausted before this call"}
 	case errors.Is(err, ErrTruncated):
-		return verdict.UnkPartial, "the answer was incomplete"
+		return &verdict.Unknown{Code: verdict.UnkPartial, Message: "the answer was incomplete"}
 	}
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
-			return verdict.UnkTimeout, "the call exceeded its budget"
+			return &verdict.Unknown{Code: verdict.UnkTimeout, Message: "the call exceeded its budget"}
 		}
-		return verdict.UnkNetwork, "the service could not be reached"
+		return &verdict.Unknown{Code: verdict.UnkNetwork, Message: "the service could not be reached"}
 	}
-	return verdict.UnkTransient, "collection failed"
+	return &verdict.Unknown{Code: verdict.UnkTransient, Message: "collection failed"}
 }
 
 // Azure reports an unsupported api-version, operation or feature as a 400 with
