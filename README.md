@@ -227,8 +227,10 @@ undone rather than left untraceable.
 ## In a pull request
 
 The action checks what a plan would delete before anybody applies it. It
-needs a prior `azure/login` with Reader at subscription scope, and it installs
-the release named by the tag you pin it to — there is no `latest`:
+needs a prior `azure/login` with Reader at subscription scope. Every action in
+a workflow runs code somebody else can change, so pin each one — this one
+included — to a commit you have read, and name the release it installs; there
+is no `latest` (ADR-0014):
 
 ```yaml
 permissions:
@@ -236,25 +238,28 @@ permissions:
   id-token: write
   pull-requests: write
 steps:
-  - uses: azure/login@v2
+  - uses: azure/login@<commit-sha>
     with:
       client-id: ${{ vars.AZURE_CLIENT_ID }}
       tenant-id: ${{ vars.AZURE_TENANT_ID }}
       subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   - run: terraform show -json tfplan > tfplan.json
   - id: preflight
-    uses: pawel-siwek/az-can-i-delete@v0.4.0
+    uses: pawel-siwek/az-can-i-delete@<commit-sha>
     with:
+      version: v0.4.0      # the release binary to install, checked against its checksums
       terraform-plan-json: tfplan.json
       fail-on: "no"        # or "tentative"
-  # Optional: keep the full results. Pin the upload action to a commit you
-  # have read; the pre-flight action runs no other action itself.
+  # Optional: keep the full results.
   - if: always()
     uses: actions/upload-artifact@<commit-sha>
     with:
       name: az-can-i-delete
       path: ${{ steps.preflight.outputs.results-json }}
 ```
+
+Pinned to a release tag instead of a commit, the action installs that tag's
+binary without `version`; a tag can be moved, a commit cannot.
 
 While this repository is private, a workflow in another repository can use
 the action only if the repository's Actions access setting allows it.
