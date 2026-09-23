@@ -7,20 +7,26 @@ credit the agent as co-author — the owner is accountable for what lands, the
 agent is not a second contributor with its own standing.
 
 ```sh
-git config user.name "Paweł Siwek"
-git config user.email "pawelsiwek@gmail.com"
+git config user.name "pawel-siwek"
+git config user.email "29552463+pawel-siwek@users.noreply.github.com"
 ```
 
-Every commit message an agent writes ends with:
+That is the owner's GitHub identity, so every commit links to their account.
+No other spelling of the name and no other address: one identity across the
+whole history is what makes `git log --author` and a blame worth reading.
+
+Every commit message an agent writes ends with exactly this trailer, and
+nothing else:
 
 ```
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 Set the identity before the first commit of a session; a fresh container does
-not carry it. Never put a model name or version anywhere else in a commit
-message, a pull request, a code comment or any other file — attribution is the
-trailer's job.
+not carry it. Never put a model name or version anywhere — not in the trailer,
+a commit message, a pull request, a code comment or any other file. "Claude"
+is the co-author; which model wrote it is not attribution, it is noise that
+ages badly.
 
 ## Branch and merge
 
