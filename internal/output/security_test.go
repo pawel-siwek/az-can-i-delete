@@ -304,3 +304,77 @@ func TestREADMERepeatsTheApprovedLimitations(t *testing.T) {
 		}
 	}
 }
+
+// ADR-0004: an unreadable signal says why it was unreadable.
+//
+// The code alone does not. Three different failures all read `transient` —
+// the request was rejected, the service failed to answer, the signal produced
+// no observation — and a reader told only `transient` has nowhere to go with
+// it. The reason is the sentence that tells them, and because every reason is
+// written in this repository (internal/conformance holds them to that), it is
+// safe to publish. The boundary still checks the shape rather than trusting
+// the invariant: anything that is not plain bounded text is dropped whole, not
+// trimmed, because a trimmed reason is a sentence nobody wrote.
+func TestTheReasonForAnUnknownReachesTheReport(t *testing.T) {
+	long := strings.Repeat("reason ", 40)
+	for _, tc := range []struct {
+		name    string
+		message string
+		want    string
+	}{
+		{"a written reason is published", "the signal produced no observation", "the signal produced no observation"},
+		{"surrounding space is not a difference", "  the answer was incomplete  ", "the answer was incomplete"},
+		{"no reason means no key", "", ""},
+		{"a URL is not a reason", "read https://evil.test for more", ""},
+		{"a control character is not text", "the answer was\u0007 incomplete", ""},
+		{"an unbounded reason is not a sentence", long, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, cfg := sample(), config()
+			e := &in.Assessment.Evidence[0]
+			e.Status = verdict.StatusUnknown
+			e.Unknown = &verdict.Unknown{Code: verdict.UnkTransient, Message: tc.message}
+			cfg.Policies = map[string]SignalPolicy{e.ID: {Summaries: map[verdict.Status]string{
+				verdict.StatusUnknown: "Transaction metrics could not be read.",
+			}}}
+			report := build(t, in, cfg)
+
+			unknown := firstUnknown(t, report)
+			reason, ok := unknown["reason"].(string)
+			if tc.want == "" {
+				if ok {
+					t.Fatalf("a reason nobody wrote was published: %q", reason)
+				}
+				return
+			}
+			if !ok || reason != tc.want {
+				t.Fatalf("reason = %q (present %v), want %q", reason, ok, tc.want)
+			}
+
+			// It is only useful if a reader sees it, so the table shows it too.
+			var out bytes.Buffer
+			if err := Render(&out, "table", []Outcome{Completed(report)}); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), tc.want) {
+				t.Fatalf("the table hides the reason:\n%s", out.String())
+			}
+		})
+	}
+}
+
+func firstUnknown(t *testing.T, report Report) map[string]any {
+	t.Helper()
+	var value map[string]any
+	if err := json.Unmarshal([]byte(encoded(t, report)), &value); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range value["evidence"].([]any) {
+		row := item.(map[string]any)
+		if unknown, ok := row["unknown"].(map[string]any); ok {
+			return unknown
+		}
+	}
+	t.Fatal("the sample carried no unknown signal, so this checked nothing")
+	return nil
+}

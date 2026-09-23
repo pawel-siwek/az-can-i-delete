@@ -3,6 +3,7 @@ package output
 import (
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
@@ -192,6 +193,16 @@ func unknownValue(u *verdict.Unknown) (map[string]any, error) {
 		return nil, boundaryError()
 	}
 	out := map[string]any{"code": string(u.Code), "message": message}
+	// The code says what kind of failure it was; the reason says which one.
+	// "A transient failure prevented collection" leaves a reader with nothing
+	// to do, while "the signal produced no observation" and "the request was
+	// rejected" point at different problems. Every reason is a literal written
+	// in this repository — internal/conformance holds them to that — so the
+	// only thing left to check here is that one has not grown into something
+	// the boundary would not publish.
+	if reason := strings.TrimSpace(u.Message); reason != "" && fixedText(reason) && utf8.RuneCountInString(reason) <= 160 {
+		out["reason"] = reason
+	}
 	if u.HTTPStatus != 0 {
 		out["httpStatus"] = u.HTTPStatus
 	}

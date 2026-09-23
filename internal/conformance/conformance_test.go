@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -456,4 +457,164 @@ func otherLanguages(t *testing.T) []sourceFile {
 		t.Fatal(err)
 	}
 	return found
+}
+
+// unknownLiteral is the type whose Message field carries a reason to a report.
+const unknownLiteral = "Unknown"
+
+// reasonSites walks one file for every place a reason is written into a
+// verdict.Unknown, and returns the ones that are not a quoted string. Two
+// shapes reach the field: the composite literal, which is how nearly every
+// analyzer builds an unknown, and an assignment to the field of a variable
+// holding one, which is how a classifier used to fill it in afterwards.
+func reasonSites(file sourceFile) []string {
+	var composed []string
+	holders := map[string]bool{}
+	report := func(node ast.Node, what string) {
+		composed = append(composed, file.path+":"+
+			strconv.Itoa(file.fset.Position(node.Pos()).Line)+": "+what)
+	}
+	ast.Inspect(file.file, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.CompositeLit:
+			if !isUnknownType(n.Type) {
+				return true
+			}
+			for _, element := range n.Elts {
+				pair, ok := element.(*ast.KeyValueExpr)
+				if !ok {
+					continue
+				}
+				if key, ok := pair.Key.(*ast.Ident); !ok || key.Name != "Message" {
+					continue
+				}
+				if !quotedString(pair.Value) {
+					report(pair, "Message in a "+unknownLiteral+" literal is not a quoted string")
+				}
+			}
+		case *ast.AssignStmt:
+			// `unknown := &verdict.Unknown{…}` makes `unknown` a holder, so a
+			// later `unknown.Message = …` is a reason site too.
+			for i, right := range n.Rhs {
+				if !buildsUnknown(right) || i >= len(n.Lhs) {
+					continue
+				}
+				if name, ok := n.Lhs[i].(*ast.Ident); ok {
+					holders[name.Name] = true
+				}
+			}
+			for i, left := range n.Lhs {
+				selector, ok := left.(*ast.SelectorExpr)
+				if !ok || selector.Sel.Name != "Message" {
+					continue
+				}
+				owner, ok := selector.X.(*ast.Ident)
+				if !ok || !holders[owner.Name] {
+					continue
+				}
+				// A tuple assignment has one value for every target, so the
+				// value is either at the same index or not a literal at all.
+				if len(n.Rhs) != len(n.Lhs) || !quotedString(n.Rhs[i]) {
+					report(left, "Message is assigned something other than a quoted string")
+				}
+			}
+		}
+		return true
+	})
+	return composed
+}
+
+// isUnknownType reports whether a composite literal builds a verdict.Unknown,
+// spelled either qualified or bare inside the verdict package itself.
+func isUnknownType(expr ast.Expr) bool {
+	switch t := expr.(type) {
+	case *ast.SelectorExpr:
+		owner, ok := t.X.(*ast.Ident)
+		return ok && owner.Name == "verdict" && t.Sel.Name == unknownLiteral
+	case *ast.Ident:
+		return t.Name == unknownLiteral
+	}
+	return false
+}
+
+func buildsUnknown(expr ast.Expr) bool {
+	if unary, ok := expr.(*ast.UnaryExpr); ok && unary.Op == token.AND {
+		expr = unary.X
+	}
+	literal, ok := expr.(*ast.CompositeLit)
+	return ok && isUnknownType(literal.Type)
+}
+
+func quotedString(expr ast.Expr) bool {
+	literal, ok := expr.(*ast.BasicLit)
+	return ok && literal.Kind == token.STRING
+}
+
+// ADR-0004 and ADR-0007: an unreadable signal says why it was unreadable, and
+// what it says is this tool's own words.
+//
+// The reason is the one string in a failure that is worth printing and the one
+// that is easiest to get wrong. Azure's error text is free-form, carries
+// resource names a stranger may have chosen, and is not reviewed by anybody
+// before it would reach a report. So the rule is not "sanitize the reason" —
+// sanitizing is a filter somebody has to keep correct — it is that no reason
+// is ever built from collected data in the first place. Every one is written
+// here, in quotes, where it is read in review like any other sentence the
+// tool says.
+//
+// The rule is about the code that runs. Tests are excluded deliberately: a
+// boundary test proves it drops a reason nobody wrote by handing it one, so a
+// composed reason in a fixture is the check working, not the rule breaking.
+func TestEveryUnknownReasonIsWrittenHere(t *testing.T) {
+	var composed []string
+	for _, file := range sources(t, false) {
+		composed = append(composed, reasonSites(file)...)
+	}
+	for _, site := range composed {
+		t.Errorf("a reason is composed rather than written: %s", site)
+	}
+}
+
+// The check above is only worth having if it fires, so here is the mistake it
+// exists to stop: the Azure error text copied straight through.
+func TestTheReasonCheckCatchesCollectedText(t *testing.T) {
+	cases := []struct {
+		name   string
+		body   string
+		caught bool
+	}{
+		{"a literal is the point", `package p
+func f() { _ = &verdict.Unknown{Code: verdict.UnkTransient, Message: "the request was rejected"} }`, false},
+		{"Azure's own text in a literal", `package p
+func f(failure *Failure) { _ = &verdict.Unknown{Code: verdict.UnkTransient, Message: failure.Message} }`, true},
+		{"Azure's own text formatted in", `package p
+func f(failure *Failure) { _ = &verdict.Unknown{Message: fmt.Sprintf("rejected: %s", failure.Message)} }`, true},
+		{"Azure's own text appended", `package p
+func f(failure *Failure) { _ = &verdict.Unknown{Message: "rejected: " + failure.Message} }`, true},
+		{"assigned to a holder afterwards", `package p
+func f(failure *Failure) {
+	unknown := &verdict.Unknown{Message: "collection failed"}
+	unknown.Code, unknown.Message = verdict.UnkTransient, failure.Message
+}`, true},
+		{"a holder assigned a literal afterwards", `package p
+func f() {
+	unknown := &verdict.Unknown{Message: "collection failed"}
+	unknown.Message = "the request was rejected"
+}`, false},
+		{"some other type's Message is not ours", `package p
+func f(response *body) { _ = &Failure{Message: response.Error.Message} }`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fset := token.NewFileSet()
+			parsed, err := parser.ParseFile(fset, "sample.go", c.body, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := reasonSites(sourceFile{path: "sample.go", body: c.body, file: parsed, fset: fset})
+			if caught := len(found) > 0; caught != c.caught {
+				t.Errorf("caught = %v, want %v (%v)", caught, c.caught, found)
+			}
+		})
+	}
 }
