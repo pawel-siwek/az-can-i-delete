@@ -21,6 +21,7 @@ tool, not a disclaimer.
 | Name knowledge base | 79 entries recognize a container, share, queue or table name as the work of a known producer — diagnostic settings, flow logs, Functions host storage, boot diagnostics, Terraform state and the rest. A name match is reported at the tier a name alone may claim, never the confirmed one |
 | Output | `table` (default at a terminal), `json`, `jsonc`, `yaml`, `tsv`, `none` |
 | `--data-plane` | opt-in, OAuth only: samples up to five containers and walks their `y=/m=/d=/h=` partitions for the last write, at most twelve calls and three seconds each. No account key is ever acquired, and no data access means `unknown`, never "empty" |
+| `AZCID_RECORD=<dir> check <id>` | record a real assessment as a fixture: the ordinary check path, keeping every answer, with tag values, callers and claims removed and every string held to the report boundary's sanitizer |
 | `demo`, `check --fixture` | replay a recording through the real collectors, analyzers and rules, with no credential and no connection. Three scenarios are shipped in the binary; `demo` with no argument lists them. A replayed report says it is one, in every format |
 | `cordon`, `uncordon`, `status`, `mcp`, `patterns list`, `--query` | not implemented; they exit 1 and say so |
 

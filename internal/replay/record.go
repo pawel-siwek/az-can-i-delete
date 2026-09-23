@@ -144,11 +144,15 @@ func redact(value any) any {
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key, inner := range typed {
+			// A key is text on the page too, and a tag's key is one a
+			// stranger chose. Redacting the value and copying the name it
+			// was filed under would leave half the sentence.
+			clean := sanitize(key)
 			if redactedKeys[lower(key)] {
-				out[key] = blank(inner)
+				out[clean] = blank(inner)
 				continue
 			}
-			out[key] = redact(inner)
+			out[clean] = redact(inner)
 		}
 		return out
 	case []any:
@@ -171,7 +175,7 @@ func blank(value any) any {
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key := range typed {
-			out[key] = Redacted
+			out[sanitize(key)] = Redacted
 		}
 		return out
 	case []any:

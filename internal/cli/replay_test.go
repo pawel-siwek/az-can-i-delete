@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -163,5 +165,34 @@ func TestAReplayHonoursThePinnedSubscription(t *testing.T) {
 	if code, _, errOut := run(t, failIfItReachesAzure(t), "check", "--fixture", dir,
 		"--subscription", fixture.Manifest.SubscriptionID, "-o", "json"); code != 0 {
 		t.Fatalf("the fixture's own subscription was rejected: code=%d stderr=%q", code, errOut)
+	}
+}
+
+// SPEC 7.5 names AZCID_RECORD as the path that produces a fixture. It used to
+// be absent while the plan said the machinery was finished, which is the
+// claim CLAUDE.md forbids. These hold the shape of the command rather than
+// its network half: a recording talks to Azure, and no test here may.
+func TestRecordingRefusesMoreThanOneTarget(t *testing.T) {
+	t.Setenv(RecordEnv, t.TempDir())
+	code, _, errOut := run(t, failIfItReachesAzure(t), "check", testTarget, testTarget)
+	if code != 2 {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
+	}
+	if !strings.Contains(errOut, "recording takes one target") {
+		t.Errorf("the error does not say what was wrong: %q", errOut)
+	}
+}
+
+// A recording directory that cannot be made is a refusal, not a run that
+// quietly records nothing.
+func TestRecordingRefusesADirectoryItCannotMake(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "a-file")
+	if err := os.WriteFile(file, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(RecordEnv, filepath.Join(file, "under-a-file"))
+	code, _, errOut := run(t, failIfItReachesAzure(t), "check", testTarget)
+	if code == 0 {
+		t.Fatalf("a recording that could not be kept reported success: %q", errOut)
 	}
 }

@@ -448,3 +448,25 @@ func TestANonJSONBodyIsTextToo(t *testing.T) {
 		}
 	}
 }
+
+// A tag's key is a name a stranger chose, exactly as its value is. Redacting
+// the value and copying the name it was filed under leaves half the sentence.
+func TestARecordedKeyIsTextToo(t *testing.T) {
+	const override = "\u202e" // an escape; a literal one here is the hazard
+	dir := t.TempDir()
+	recorder, err := replay.Record(dir, answering(
+		`{"tags": {"own`+override+`er": "someone"}, "properties": {"no`+override+`te": "value"}}`, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse("https://management.azure.com/subscriptions/x/keys")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.RoundTrip(&http.Request{Method: http.MethodGet, URL: address}); err != nil {
+		t.Fatal(err)
+	}
+	if written := onlyFile(t, filepath.Join(dir, "responses")); strings.Contains(written, `\u202e`) {
+		t.Errorf("an override survived in a key:\n%s", written)
+	}
+}

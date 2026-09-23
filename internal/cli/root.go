@@ -296,6 +296,12 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 		return err
 	}
 
+	// SPEC 7.5: the recording path is the ordinary check with a directory to
+	// keep the answers in.
+	if dir := os.Getenv(RecordEnv); dir != "" {
+		return runRecord(cmd, version, options, dir, targets, cutoff, requested, redactTags)
+	}
+
 	runner, err := deps.Runner(version, dataPlane)
 	if err != nil {
 		return &ExitError{Code: 1, Err: err}

@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
@@ -12,6 +15,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/replay"
+	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 	"github.com/spf13/cobra"
 )
 
@@ -126,6 +130,89 @@ func subscriptionFlag(cmd *cobra.Command) string {
 		return ""
 	}
 	return value
+}
+
+// RecordEnv is the variable SPEC 7.5 names as the recording path.
+const RecordEnv = "AZCID_RECORD"
+
+// runRecord performs a real assessment and keeps every answer as a fixture.
+//
+// This is the only way a recording is made, and it is deliberately the
+// ordinary `check` path with one thing added: the same credential, the same
+// collectors, the same rules. A fixture recorded through a special code path
+// would be a recording of that path rather than of the tool.
+func runRecord(cmd *cobra.Command, version string, options *outputOptions, dir string, targets []armid.Target, cutoff time.Time, requested verdict.Window, redactTags bool) error {
+	if len(targets) != 1 {
+		return &ExitError{Code: 2, Err: errors.New("recording takes one target: a fixture is a recording of one resource")}
+	}
+	recorder, err := replay.Record(dir, http.DefaultTransport)
+	if err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+	// No credential is supplied, so the ordinary chain is used: recording
+	// talks to Azure, which is the whole point of it.
+	client, err := azure.New(azure.Options{ToolVersion: version, Transport: azure.Transport(recorder)})
+	if err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+	runner := assess.New(collect.Clients{
+		ARM: client.ARM(), Graph: client.Graph(),
+		Metrics: client.Metrics(), ActivityLog: client.ActivityLog(),
+	}, version)
+
+	target := targets[0]
+	outcome, checkErr := runner.Check(cmd.Context(), target, assess.Options{
+		Requested: requested, Cutoff: cutoff, RedactTags: redactTags,
+	})
+	if checkErr != nil {
+		// A recording of a run that did not finish would replay as a verdict
+		// nobody reached. The responses stay on disk for a person to look at;
+		// the manifest, which is what makes them a fixture, does not.
+		return &ExitError{Code: 1, Err: fmt.Errorf("the run did not complete, so no manifest was written: %w", checkErr)}
+	}
+	if err := output.Render(cmd.OutOrStdout(), options.format, []output.Outcome{outcome}); err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+
+	// The expected verdict is written from the run that produced it, so a
+	// fixture starts out agreeing with itself and the replay test is what
+	// notices when the code stops agreeing.
+	value, err := outcome.Value()
+	if err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+	if err := recorder.WriteManifest(replay.Manifest{
+		ResourceID: target.ID, Now: cutoff, SubscriptionID: target.SubscriptionID,
+		Window: windowOf(requested),
+		Expect: replay.Expect{
+			Verdict: text(value["verdict"]), ReasonClass: text(value["reasonClass"]),
+			Reasons: textList(value["reasons"]),
+		},
+	}); err != nil {
+		return &ExitError{Code: 1, Err: err}
+	}
+	if !options.onlyShowErrors {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "recorded to %s\n", dir)
+	}
+	return nil
+}
+
+func windowOf(w verdict.Window) string { return strconv.Itoa(w.Days) + "d" }
+
+func text(value any) string {
+	s, _ := value.(string)
+	return s
+}
+
+func textList(value any) []string {
+	list, _ := value.([]any)
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // listScenarios prints what `demo` can show.
