@@ -59,10 +59,10 @@ The version is always explicit. The installer downloads the archive for this
 platform, verifies its SHA-256 against the release's `checksums.txt`, and only
 then installs into `~/.local/bin`; a mismatch installs nothing.
 
-**From source**, which works today on any branch:
+**From source**, which works today:
 
 ```sh
-git clone --branch claude/jolly-shannon-1p1iko https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
+git clone https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
 ~/src/az-can-i-delete/scripts/cloud-shell.sh
 ```
 
