@@ -31,7 +31,9 @@ tool, not a disclaimer.
 | `mcp` | a stdio MCP server with exactly two read-only tools, `can_i_delete` (the `check` report) and `cordon_status` (the `status` document), described in the specification's words verbatim. Tag values are redacted unless the person starting it passes `--redact-tags=false`; 30 calls per five minutes; identical questions are answered from a one-minute cache. `--fixture` serves a recording |
 | `patterns list` | the 79 knowledge-base entries in the order they are matched, with the tier a name alone may claim and what would confirm it |
 | `check` on a cordoned resource | the report's `cordon` field says so; the verdict is unchanged |
-| `cordon`, `uncordon` | not implemented; they exit 1 and say so. `--query` is rejected as not implemented |
+| `cordon <id>`, `uncordon <id>` | the scream test, for storage accounts (`publicNetworkAccess` → `Disabled`) and App Service sites (production and up to four slots stopped). `cordon` runs `check` first and refuses a `no` unless `--force`, then the pre-flight in the specification's order — type, already isolated, Cloud Shell account, NFS or premium files, ReadOnly locks, an existing `azcid` tag, automation writers, and Azure Policy asked about the *uncordon* — prints the plan, and changes nothing without `--yes` (`--dry-run` only prints). It changes the state, verifies it, writes the tag, verifies both, and undoes only what it did itself when a step fails. `uncordon --yes` restores from the tag (or with `--from-history`, or `--prior <state>`), verifies, and only then removes the tag; without `--yes` it says what it would restore and writes nothing. Neither deletes anything. **Not yet exercised against a live tenant** |
+| GitHub Action (`action.yml`) | a composite action that reads a `terraform show -json` plan, a deployment stack what-if or a complete-mode ARM what-if, checks every resource it would delete or detach, and fails the job on a `no` (or, with `fail-on: tentative`, a `tentative`). A check that did not complete always fails. One pull request comment, edited in place, naming each resource by the id the tool parsed. The action runs no other action; `results-json` is the path of the tool's report, yours to upload with an action you pin. **Not yet exercised in a live workflow** |
+| `--query` | rejected as not implemented |
 
 `IMPLEMENTATION-PLAN.md` has the full status and the order the rest is built in.
 
@@ -197,8 +199,8 @@ What to expect the first time:
 * Cloud Shell signs you in as yourself, so the tool sees exactly what you see
   in the portal. If you have Reader only on a resource group rather than the
   subscription, the report says so and the verdict cannot be `yes`.
-* Every call it makes is a read. It never writes, and `cordon` is not
-  implemented yet.
+* Every call `check` makes is a read. `cordon` and `uncordon` are the only
+  commands that write, and `cordon` writes nothing without `--yes`.
 * A resource younger than 30 days, or one whose age cannot be established,
   cannot be `yes` however quiet it is. That is the rule, not a bug.
 * Piping to a file is fine: outside a terminal the default output is JSON.
@@ -216,6 +218,51 @@ a shared access signature.
 alone is not enough: without subscription-scope Reader the target is invisible
 in Resource Graph, every graph-backed signal becomes `unknown(permission)`, and
 the verdict cannot be `yes`. The report says so rather than reporting silence.
+
+`cordon` and `uncordon` need more, and only for the resource they change:
+Storage Account Contributor or Website Contributor for the state change, and
+Tag Contributor for the `azcid` tag. A cordon whose tag cannot be written is
+undone rather than left untraceable.
+
+## In a pull request
+
+The action checks what a plan would delete before anybody applies it. It
+needs a prior `azure/login` with Reader at subscription scope. Every action in
+a workflow runs code somebody else can change, so pin each one — this one
+included — to a commit you have read, and name the release it installs; there
+is no `latest` (ADR-0014):
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+steps:
+  - uses: azure/login@<commit-sha>
+    with:
+      client-id: ${{ vars.AZURE_CLIENT_ID }}
+      tenant-id: ${{ vars.AZURE_TENANT_ID }}
+      subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  - run: terraform show -json tfplan > tfplan.json
+  - id: preflight
+    uses: pawel-siwek/az-can-i-delete@<commit-sha>
+    with:
+      version: v0.4.0      # the release binary to install, checked against its checksums
+      terraform-plan-json: tfplan.json
+      fail-on: "no"        # or "tentative"
+  # Optional: keep the full results.
+  - if: always()
+    uses: actions/upload-artifact@<commit-sha>
+    with:
+      name: az-can-i-delete
+      path: ${{ steps.preflight.outputs.results-json }}
+```
+
+Pinned to a release tag instead of a commit, the action installs that tag's
+binary without `version`; a tag can be moved, a commit cannot.
+
+While this repository is private, a workflow in another repository can use
+the action only if the repository's Actions access setting allows it.
 
 ## Exit codes
 
@@ -277,7 +324,7 @@ json` carries all of it always, for a machine or an agent.
 11. Cordon (scream test) is available for storage accounts (public network access) and App Service sites (stop) only. It does not block private endpoints, resource-instance rules or trusted Azure services, and denied requests may not appear in metrics. Infrastructure-as-code applies can revert it.
 12. The MCP server cannot change Azure state; it exposes `can_i_delete` and `cordon_status` only.
 
-Limitations 4 to 7 and 11 describe parts of the specification that are not
+Limitations 4 to 7 describe parts of the specification that are not
 implemented yet; they are printed because the rules they belong to are part of
 the verdict model, and `IMPLEMENTATION-PLAN.md` says what exists today.
 

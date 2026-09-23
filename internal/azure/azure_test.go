@@ -290,11 +290,14 @@ func TestActivityLogNormalization(t *testing.T) {
 		 "subStatus":{"value":"Created"},"httpRequest":{"method":"PUT"},"properties":{"statusCode":"Created"}},
 		{"eventTimestamp":"2026-09-10T08:00:00Z","resourceId":"`+resourceID+`","caller":"11111111-1111-1111-1111-111111111111",
 		 "operationName":{"value":"Microsoft.Compute/disks/write"},"status":{"value":"Succeeded"},
-		 "claims":{"idtyp":"app"}}]}`)
+		 "claims":{"idtyp":"app","appid":"AAAAAAAA-0000-0000-0000-00000000000A"}},
+		{"eventTimestamp":"2026-09-09T08:00:00Z","resourceId":"`+resourceID+`","caller":"x",
+		 "operationName":{"value":"Microsoft.Compute/disks/write"},"status":{"value":"Succeeded"},
+		 "claims":{"appid":"not a guid"}}]}`)
 	end := time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
 	log, err := client.ActivityLog().Events(context.Background(), resourceID,
 		verdict.Window{Start: end.AddDate(0, 0, -90), End: end, Days: 90, Grain: "P1D"})
-	if err != nil || len(log.Events) != 2 {
+	if err != nil || len(log.Events) != 3 {
 		t.Fatalf("log = %+v, %v", log, err)
 	}
 	if log.Days != 90 || log.Truncated {
@@ -307,6 +310,11 @@ func TestActivityLogNormalization(t *testing.T) {
 	}
 	if log.Events[1].CallerType != "servicePrincipal" {
 		t.Errorf("an application claim must classify as a service principal, got %q", log.Events[1].CallerType)
+	}
+	// The application id is kept only when it is one, and lower-cased so
+	// two spellings of the same writer compare equal.
+	if log.Events[1].AppID != "aaaaaaaa-0000-0000-0000-00000000000a" || log.Events[2].AppID != "" {
+		t.Errorf("app ids = %q, %q", log.Events[1].AppID, log.Events[2].AppID)
 	}
 	if filter := s.last().Query["$filter"][0]; !strings.Contains(filter, "resourceUri eq '"+resourceID+"'") ||
 		!strings.Contains(filter, "eventTimestamp ge '2026-06-23T00:00:00Z'") {

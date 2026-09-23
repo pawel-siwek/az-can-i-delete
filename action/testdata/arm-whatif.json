@@ -1,0 +1,8 @@
+{
+  "status": "Succeeded",
+  "changes": [
+    {"resourceId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/disk-old", "changeType": "Delete"},
+    {"resourceId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/disk-new", "changeType": "Create"},
+    {"resourceId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/disk-same", "changeType": "NoChange"}
+  ]
+}

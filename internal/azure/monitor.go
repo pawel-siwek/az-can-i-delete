@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -176,6 +177,7 @@ func (c *activityLogClient) Events(ctx context.Context, resourceID string, windo
 			},
 			Caller:     body.Caller,
 			CallerType: callerType(body),
+			AppID:      appID(body.Claims["appid"]),
 		})
 	}
 	return log, nil
@@ -198,6 +200,20 @@ func callerType(body activityEventBody) string {
 	default:
 		return "unknown"
 	}
+}
+
+// guid is the shape an application id must have to be kept.
+var guid = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// appID keeps a claim only when it is an application id. The claims are the
+// caller's token, echoed back by Azure; anything else in that slot is not
+// something to compare identities with.
+func appID(claim string) string {
+	claim = strings.ToLower(strings.TrimSpace(claim))
+	if !guid.MatchString(claim) {
+		return ""
+	}
+	return claim
 }
 
 // subscriptionOf pulls the subscription out of an ARM id. The Activity Log is

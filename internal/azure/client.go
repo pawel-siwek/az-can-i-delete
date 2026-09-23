@@ -51,8 +51,10 @@ type Options struct {
 
 // Client is the shared transport for every Azure boundary.
 type Client struct {
-	pipeline runtime.Pipeline
-	endpoint string
+	pipeline   runtime.Pipeline
+	endpoint   string
+	credential azcore.TokenCredential
+	scope      string
 }
 
 // Credential is the chain REQUIREMENTS section 7 pins: DefaultAzureCredential
@@ -99,7 +101,8 @@ func New(opts Options) (*Client, error) {
 			Transport: opts.Transport,
 			Retry:     policy.RetryOptions{MaxRetries: -1},
 		})
-	return &Client{pipeline: pipeline, endpoint: strings.TrimSuffix(opts.Endpoint, "/")}, nil
+	return &Client{pipeline: pipeline, endpoint: strings.TrimSuffix(opts.Endpoint, "/"),
+		credential: opts.Credential, scope: opts.Scope}, nil
 }
 
 // ARM exposes the control-plane boundary.
