@@ -301,14 +301,14 @@ the records themselves: numbered, sectioned, indexed, and cited in the
 reviewer's brief. Both run in `go test ./...`, need no credential, and go red
 like any other failing test.
 
-The rest is judgement, and that is GitHub Copilot code review. Its brief is
-[`.github/copilot-instructions.md`](.github/copilot-instructions.md), with
-path-scoped rules in [`.github/instructions/`](.github/instructions). It reads
-a diff against the specification and the records and comments on it. It is
-advisory: it does not approve, does not merge, and nothing red depends on it.
+The rest is judgement: `tools/ReviewBot` asks a model in your own Azure AI
+Foundry to read the diff against the same documents, writes what it found on
+the pull request, and fails its check when it disagrees. It is reached with a
+federated token, so no key is stored in GitHub and nothing bills per pull
+request. [`docs/REVIEW-BOT.md`](docs/REVIEW-BOT.md) is the setup; until it is
+configured the job reports that it did not run, rather than claiming an
+approval it never gave.
 
-To have Copilot review every pull request rather than being asked each time:
-Settings → Rules → Rulesets → New ruleset → Branch rules → **Automatically
-request Copilot code review** (and optionally *Review new pushes*). That needs
-a Copilot Pro, Pro+ or Max plan, or Copilot Business/Enterprise on the
-organization.
+Its brief is [`.github/copilot-instructions.md`](.github/copilot-instructions.md),
+with path-scoped rules in [`.github/instructions/`](.github/instructions) — the
+same brief a human doing that job should read.
