@@ -49,6 +49,7 @@ archives:
         format: zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
+      - LICENSE
       - README.md
       - REQUIREMENTS.md
       - IMPLEMENTATION-PLAN.md

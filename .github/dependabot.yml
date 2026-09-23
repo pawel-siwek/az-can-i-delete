@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Go modules. The SDK versions are pinned deliberately (REQUIREMENTS.md), so
+  # an update arrives as a pull request that has to pass the acceptance suite
+  # like any other change, never silently.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      azure-sdk:
+        patterns: ["github.com/Azure/*", "github.com/AzureAD/*"]
+      golang-x:
+        patterns: ["golang.org/x/*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,45 @@
+name: Bug report
+description: A verdict, signal or command that behaves differently from the specification.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove subscription ids, resource names, tags and anything else you
+        would not publish. Never paste a key, a SAS token or a credential.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `az-can-i-delete version`.
+    validations:
+      required: true
+  - type: input
+    id: type
+    attributes:
+      label: Resource type
+      placeholder: Microsoft.Compute/disks
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and which rule says so
+      description: A REQUIREMENTS.md item, a SPEC section or an acceptance case, if you know it.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The relevant part of `-o json` output, redacted.
+      render: json
+    validations:
+      required: true
