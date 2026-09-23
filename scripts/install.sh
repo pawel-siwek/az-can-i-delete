@@ -6,7 +6,14 @@
 # is verified against the release's SHA-256 checksums before anything is put on
 # a PATH.
 #
-#   curl -fsSL .../scripts/install.sh | bash -s -- v0.1.0
+# This script ships as a release asset and is listed in the release's
+# checksums.txt, so fetch it, verify it, read it, and then run it:
+#
+#   curl -fsSLO <release>/install.sh
+#   curl -fsSLO <release>/checksums.txt
+#   grep ' install.sh$' checksums.txt | sha256sum -c -
+#   bash install.sh v0.1.0
+#
 #   ./scripts/install.sh v0.1.0
 #   VERSION=v0.1.0 PREFIX=/opt/azcid ./scripts/install.sh
 set -euo pipefail

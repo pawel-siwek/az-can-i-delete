@@ -6,9 +6,15 @@
 # already there is too old to build this module. Nothing here needs sudo, and
 # nothing is written outside $HOME.
 #
-#   curl -fsSL <raw url>/scripts/cloud-shell.sh | bash
-# or, from a clone:
-#   ./scripts/cloud-shell.sh
+# Run it from a clone you have checked out at the tag or commit you mean, so
+# what you build is what you reviewed:
+#
+#   git clone --branch <tag> <repo url> ~/src/az-can-i-delete
+#   less ~/src/az-can-i-delete/scripts/cloud-shell.sh
+#   ~/src/az-can-i-delete/scripts/cloud-shell.sh
+#
+# Deliberately not documented as `curl … | bash`: a command you cannot read
+# before it runs is one you are trusting rather than checking.
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/pawel-siwek/az-can-i-delete.git}"
