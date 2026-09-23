@@ -89,8 +89,11 @@ release:
     One line, and still verified:
 
     ```sh
-    V={{ .Tag }}; R=pawel-siwek/az-can-i-delete; curl -fsSLO https://github.com/$R/releases/download/$V/{install.sh,checksums.txt} && sha256sum --ignore-missing -c checksums.txt && bash install.sh $V
+    gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt --clobber && sha256sum --ignore-missing -c checksums.txt && bash install.sh {{ .Tag }}
     ```
+
+    Azure Cloud Shell ships the GitHub CLI; `gh auth login` once and this works
+    there too, on a private repository, with no token to paste.
 
     The installer and the checksums arrive as files, the installer is checked
     against the release's own checksums, and only then does it run — after
