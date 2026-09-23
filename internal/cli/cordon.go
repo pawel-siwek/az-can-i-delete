@@ -49,12 +49,12 @@ func cordonCommand(deps Dependencies, version string, options *outputOptions) *c
 func uncordonCommand(deps Dependencies, version string, options *outputOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "uncordon <id>",
-		Short: "Restore the state a cordon recorded, verify it, then remove the tag",
+		Short: "Restore the state a cordon recorded, verify it, then remove the tag (needs --yes)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUncordon(cmd, deps, version, options, args[0])
 		},
 	}
-	command.Flags().Bool("yes", false, "Confirm a restore from --from-history or --prior")
+	command.Flags().Bool("yes", false, "Confirm the restore; without it nothing is written")
 	command.Flags().Bool("from-history", false, "Restore from the local history file when the tag is gone")
 	command.Flags().String("prior", "", "Restore an explicit prior state (Enabled, SecuredByPerimeter or Running)")
 	return command

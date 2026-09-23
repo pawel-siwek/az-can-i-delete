@@ -108,7 +108,11 @@ func TestCordonThenStatusThenUncordon(t *testing.T) {
 	if code != 0 || !strings.Contains(out, `"cordoned":true`) {
 		t.Fatalf("status: code=%d stdout=%q", code, out)
 	}
-	code, out, errOut = run(t, deps, "uncordon", testTarget, "-o", "json")
+	// Without --yes an uncordon only says what it would do.
+	if code, _, errOut := run(t, deps, "uncordon", testTarget, "-o", "json"); code != 1 || !strings.Contains(errOut, "pass --yes") || a.access != "Disabled" {
+		t.Fatalf("uncordon without --yes: code=%d stderr=%q access=%s", code, errOut, a.access)
+	}
+	code, out, errOut = run(t, deps, "uncordon", testTarget, "--yes", "-o", "json")
 	if code != 0 || errOut != "" || a.access != "Enabled" || a.tags["azcid"] != "" {
 		t.Fatalf("uncordon: code=%d stdout=%q stderr=%q access=%s tags=%v", code, out, errOut, a.access, a.tags)
 	}

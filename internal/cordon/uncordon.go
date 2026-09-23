@@ -109,6 +109,14 @@ func (c Cordoner) Uncordon(ctx context.Context, target armid.Target, opts Uncord
 	}
 	restored.State = state
 
+	// A restore is a state change like the cordon was, and is confirmed the
+	// same way (ADR-0005): without --yes it says what it would do and does
+	// nothing.
+	if !opts.Yes {
+		return restored, &Refusal{Code: CodeConfirmation, Exit: 1, Message: fmt.Sprintf(
+			"uncordon: would restore %s (mode %s, from the %s); pass --yes to apply it", state.Prior, state.Mode, restored.Source)}
+	}
+
 	// 3. Restore.
 	if err := c.restore(ctx, target, state, version); err != nil {
 		if errors.Is(err, ErrStillRunning) {

@@ -492,7 +492,7 @@ func cordoned(t *testing.T, c *cloud, id string) *fixture {
 
 func TestUncordonRestoresVerifiesAndThenRemovesTheTag(t *testing.T) {
 	f := cordoned(t, storageCloud(), accountID)
-	restored, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{})
+	restored, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{Yes: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,7 +507,7 @@ func TestUncordonRestoresVerifiesAndThenRemovesTheTag(t *testing.T) {
 
 func TestUncordonStartsRunningSlotsBeforeProduction(t *testing.T) {
 	f := cordoned(t, siteCloud(map[string]string{"alpha": Running, "beta": Stopped}), siteID)
-	if _, err := f.cordoner.Uncordon(context.Background(), target(t, siteID), UncordonOptions{}); err != nil {
+	if _, err := f.cordoner.Uncordon(context.Background(), target(t, siteID), UncordonOptions{Yes: true}); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"POST /slots/alpha/start", "POST /start", "TAGS Delete"}
@@ -521,7 +521,7 @@ func TestUncordonKeepsTheTagWhenTheRestoreDidNotTake(t *testing.T) {
 	// Accepted and silently not applied: a Modify policy holding the account
 	// closed. The tag is the only record of the prior, so it stays.
 	f.cloud.ignorePatch = true
-	_, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{})
+	_, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{Yes: true})
 	if refusalCode(err) != CodeRestoreNotApplied || strings.Contains(strings.Join(f.cloud.calls, "|"), "TAGS Delete") {
 		t.Fatalf("err %v calls %v", err, f.cloud.calls)
 	}
@@ -530,10 +530,21 @@ func TestUncordonKeepsTheTagWhenTheRestoreDidNotTake(t *testing.T) {
 	}
 }
 
+func TestUncordonWritesNothingWithoutYes(t *testing.T) {
+	f := cordoned(t, storageCloud(), accountID)
+	restored, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{})
+	if refusalCode(err) != CodeConfirmation || len(f.cloud.calls) != 0 || restored.State.Prior != "Enabled" {
+		t.Fatalf("err %v calls %v restored %+v", err, f.cloud.calls, restored)
+	}
+	if !strings.Contains(err.Error(), "would restore Enabled") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestUncordonWithoutAnyStateSaysHowToRestoreByHand(t *testing.T) {
 	f := setup(t, storageCloud())
 	f.cloud.value = "Disabled"
-	_, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{})
+	_, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{Yes: true})
 	if refusalCode(err) != CodeNoState || !strings.Contains(err.Error(), "az storage account update") {
 		t.Fatalf("err = %v", err)
 	}
@@ -559,7 +570,7 @@ func TestUncordonFromHistoryAndPriorNeedYes(t *testing.T) {
 func TestUncordonLeavesSomebodyElsesTag(t *testing.T) {
 	f := cordoned(t, storageCloud(), accountID)
 	f.cloud.principal = Principal{ObjectID: "ffffffff-4e5f-6071-8293-a4b5c6d7e8f9"}
-	restored, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{})
+	restored, err := f.cordoner.Uncordon(context.Background(), target(t, accountID), UncordonOptions{Yes: true})
 	if err != nil || !restored.TagKept || f.cloud.tags[TagKey] == "" {
 		t.Fatalf("restored %+v err %v tags %v", restored, err, f.cloud.tags)
 	}
