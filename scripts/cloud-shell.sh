@@ -12,7 +12,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/pawel-siwek/az-can-i-delete.git}"
-REPO_REF="${REPO_REF:-claude/jolly-shannon-1p1iko}"
+REPO_REF="${REPO_REF:-main}"
 GO_VERSION="${GO_VERSION:-1.25.0}"
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC_DIR="${SRC_DIR:-$HOME/src/az-can-i-delete}"
