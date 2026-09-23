@@ -26,7 +26,7 @@ func Policies() map[string]output.SignalPolicy {
 			Details: number("referenceCount"), Summaries: say(present, absent, unknown), NextSteps: next,
 		}
 	}
-	return map[string]output.SignalPolicy{
+	policies := map[string]output.SignalPolicy{
 		SignalImmutability: {
 			Family: "structural", Confidence: "verified", Details: number("holdCount"),
 			Summaries: say(
@@ -125,13 +125,13 @@ func Policies() map[string]output.SignalPolicy {
 		},
 		SignalKB: {
 			Family: "kb", Confidence: "unknown",
-			Summaries: map[verdict.Status]string{
-				verdict.StatusNotEvaluated: "The container, share, queue and table name knowledge base is not applied in this version.",
-			},
-			NotEvaluated: &verdict.NotEvaluated{
-				Reason:      "the name knowledge base is not applied in this version, so a container, share, queue or table whose name identifies its producer is not recognized",
-				Consequence: "a producer that can only be recognized by the names it creates is not reported, and the account may read as quieter than it is",
-				HowToCheck:  "list the containers, shares, queues and tables and look for names that identify a service, for example insights-logs, azure-webjobs-hosts or bootdiagnostics",
+			Details: number("matchCount"),
+			Summaries: say(
+				"Names in this account follow the conventions of known Azure producers; each match is reported as its own signal.",
+				"No container, share, queue or table name matches a known producer's naming convention.",
+				"The child listings could not be read, so no name could be matched."),
+			Caveats: []string{
+				"A name match is a naming convention, not the producer itself. It is reported at the tier a name alone may claim, and only finding the producer in configuration would raise it.",
 			},
 		},
 		SignalLists: {
@@ -326,4 +326,8 @@ func Policies() map[string]output.SignalPolicy {
 			},
 		},
 	}
+	for id, policy := range kbPolicies() {
+		policies[id] = policy
+	}
+	return policies
 }

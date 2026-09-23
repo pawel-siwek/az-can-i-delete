@@ -1,0 +1,1370 @@
+# The storage name knowledge base.
+#
+# A container, share, queue, table, account, resource group, tag or lock name
+# often identifies what produced it. That is a weak signal and it is treated as
+# one: a name match alone never rises above the entry's unconfirmedTier, and it
+# becomes the confirmed tier only when the producer is found in configuration.
+# The confirm field says what would confirm it, in prose, for a human — it is
+# not a query this tool runs.
+#
+# Provenance: the 79 entries of research-3 section G, carried verbatim in
+# docs/SPEC.md appendix L section 10.1, with the architect-3 section 3.6
+# corrections that docs/SPEC.md section 9.3 selects applied:
+#
+#   container.insights-logs   regex admits hyphens, so insights-logs-kube-audit
+#                             matches, as its own example always claimed
+#   accountName.aks           f plus 23 hex digits, not 22
+#   container.tfstate         a suffix needs its hyphen, so tfstatefiles-backup
+#                             stays a counterexample
+#   container.wad             wad- plus a segment, not an alternation ending .*
+#   share.functions-content-by-site  becomes a mechanism: the old regex matched
+#                             almost any share name
+#   the six mechanism entries  regex .* with mechanism true; they are matched by
+#                             a confirming query, never by name
+#   three blobPrefix entries  the mandated example GUID
+#   tag.cloudshell            unconfirmedTier INFO; the value-based Cloud Shell
+#                             signal is separate
+#   the three LAD entries     confirm records that Reader cannot see it
+#   the eight WebJobs entries tier DESIGN_INTENT with the site-analyzer confirm
+#
+# Order is significant: the first entry matching a (kind, name) wins, so a
+# specific entry precedes its generic one. tier is the confirmed tier;
+# unconfirmedTier is what a name alone may claim.
+schemaVersion: 1
+rulesDate: '2026-09-21'
+entries:
+- id: container.insights-logs
+  kind: container
+  regex: (?i)^insights-logs-[a-z0-9-]+$
+  mechanism: false
+  producer: Azure Monitor diagnostic settings (resource logs), one container per log category
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: diagnosticSettings.storageAccountId == this account on the source resource (source id is embedded
+    in blob path `resourceId=/SUBSCRIPTIONS/...`)
+  freshness: walk `resourceId=/…/y=YYYY/m=MM/d=DD/h=HH/m=00/PT1H.json` — time-ordered level 2..5
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/platform/resource-logs.md
+  examples:
+  - insights-logs-auditevent
+  - insights-logs-storageread
+  - insights-logs-operationallogs
+  - insights-logs-kube-audit
+  counterexamples:
+  - insights-logs
+  - insights-metrics-pt1m
+  - myinsights-logs-x
+- id: container.insights-metrics
+  kind: container
+  regex: (?i)^insights-metrics-pt1m$
+  mechanism: false
+  producer: Azure Monitor platform-metrics export via diagnostic settings
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: as container.insights-logs (metrics category `AllMetrics`)
+  freshness: same path layout
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/event-hubs/monitor-event-hubs.md
+  examples:
+  - insights-metrics-pt1m
+  counterexamples:
+  - insights-metrics-pt5m
+- id: container.insights-activity-logs
+  kind: container
+  regex: (?i)^insights-activity-logs$
+  mechanism: false
+  producer: Activity Log export (subscription-level diagnostic setting)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: subscription diagnostic setting (`GET /subscriptions/{sub}/providers/Microsoft.Insights/diagnosticSettings`)
+    storageAccountId == this account
+  freshness: '`resourceId=/SUBSCRIPTIONS/{sub}/y=…/PT1H.json`'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/platform/activity-log.md
+  examples:
+  - insights-activity-logs
+  counterexamples: []
+- id: container.flowlog-nsg
+  kind: container
+  regex: (?i)^insights-logs-networksecuritygroupflowevent$
+  mechanism: false
+  producer: NSG flow logs (Network Watcher)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K7b (`networkwatchers/flowlogs` with storageId == account, enabled)
+  freshness: '`resourceId=/SUBSCRIPTIONS/…/NETWORKSECURITYGROUPS/{nsg}/y=…/h=HH/m=00/macAddress=…/PT1H.json`'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/network-watcher/nsg-flow-logs-overview.md
+  examples:
+  - insights-logs-networksecuritygroupflowevent
+  counterexamples:
+  - insights-logs-networksecuritygroupevent
+- id: container.flowlog-vnet
+  kind: container
+  regex: (?i)^insights-logs-flowlogflowevent$
+  mechanism: false
+  producer: VNet flow logs (Network Watcher)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K7b
+  freshness: '`flowLogResourceID=/{SUB}_NETWORKWATCHERRG/NETWORKWATCHER_{REGION}_{FLOWLOG}/y=…/m=00/macAddress=…/PT1H.json`'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/network-watcher/flow-logs-read.md
+  examples:
+  - insights-logs-flowlogflowevent
+  counterexamples: []
+- id: container.la-export
+  kind: container
+  regex: (?i)^am-[a-z0-9_]+$
+  mechanism: false
+  producer: Log Analytics data export ("One container per table, named am- followed by the table name")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: '`GET {workspace}/dataExports` destination.resourceId == account (workspace id is in the blob
+    path `WorkspaceResourceId=/…`)'
+  freshness: '`WorkspaceResourceId=/…/y=…/m=…/d=…/h=…/m=…/PT05M.json` (5-minute files, `PT05M_#.json`
+    after 50,000 appends)'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/logs/logs-data-export.md
+  examples:
+  - am-SecurityEvent
+  - am-heartbeat
+  counterexamples:
+  - amazon
+  - am
+- id: container.webjobs-hosts
+  kind: container
+  regex: (?i)^azure-webjobs-hosts$
+  mechanism: false
+  producer: Azure Functions / WebJobs host (locks, timers, blob receipts, blobscaninfo, host metadata)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: '`locks/*/host` blob lastModified (renewed every few seconds while the host runs); `timers/<hostId>/<fn>/status`
+    lastModified = last timer execution'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure/azure-functions-host/blob/dev/src/WebJobs.Script/ScriptConstants.cs
+  examples:
+  - azure-webjobs-hosts
+  counterexamples:
+  - azure-webjobs-host
+- id: container.webjobs-secrets
+  kind: container
+  regex: (?i)^azure-webjobs-secrets$
+  mechanism: false
+  producer: Functions key store (`AzureWebJobsSecretStorageType=blob`, default)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: '`host.json`/`<function>.json` lastModified (changes only on key rotation → not a usage signal)'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure/azure-functions-host/blob/dev/src/WebJobs.Script.WebHost/Security/KeyManagement/BlobStorageSecretsRepository.cs
+  examples:
+  - azure-webjobs-secrets
+  counterexamples: []
+- id: container.webjobs-eventhub
+  kind: container
+  regex: (?i)^azure-webjobs-eventhub$
+  mechanism: false
+  producer: Functions Event Hubs trigger checkpoints/ownership
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: path `{namespace}/{eventhub}/{consumergroup}/` → the Event Hub exists (ARM GET); the consuming
+    site is not derivable → DESIGN_INTENT unless a site's app settings name this account
+  freshness: '`…/checkpoint/{partition}` blob metadata lastModified = last checkpoint'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/eventhub/Microsoft.Azure.WebJobs.Extensions.EventHubs/src/Config/EventHubOptions.cs
+  examples:
+  - azure-webjobs-eventhub
+  counterexamples: []
+- id: container.scm-releases
+  kind: container
+  regex: (?i)^scm-releases$
+  mechanism: false
+  producer: Kudu run-from-package on Linux Consumption (`rfp-latest-<sitename>.squashfs`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: blob lastModified = last deployment
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure-App-Service/KuduLite/blob/master/Common/Constants.cs
+  examples:
+  - scm-releases
+  counterexamples: []
+- id: container.function-releases
+  kind: container
+  regex: (?i)^function-releases$
+  mechanism: false
+  producer: az functionapp deployment source config-zip (Consumption)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: none (blob name `{yyyyMMddHHmmss}-{uuid}.zip` has no site reference); WEBSITE_RUN_FROM_PACKAGE
+    of a site pointing at this container → HARD_DEPENDENCY (site analyzer only)
+  freshness: newest blob name timestamp
+  confidence: medium
+  status: VERIFIED
+  source_url: https://github.com/Azure/azure-cli/blob/dev/src/azure-cli/azure/cli/command_modules/appservice/custom.py
+  examples:
+  - function-releases
+  counterexamples: []
+- id: container.flex-app-package
+  kind: container
+  regex: (?i)^app-package-[a-z0-9-]{1,32}-[0-9]{7}$
+  mechanism: false
+  producer: Functions Flex Consumption deployment container (`app-package-<name[:32]>-<7 digits>`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: newest blob lastModified = last deploy
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure-Samples/function-app-arm-templates/blob/main/function-app-linux-flex-consumption/azuredeploy.json
+  examples:
+  - app-package-myfunc-1234567
+  - app-package-contoso-orders-api-0000042
+  counterexamples:
+  - app-package-myfunc
+  - app-package--1234567
+- id: container.durable-leases
+  kind: container
+  regex: (?i)^[a-z0-9-]+-(leases|largemessages|applease)$
+  mechanism: false
+  producer: Durable Functions task hub (Azure Storage provider)
+  tier: DESIGN_INTENT
+  unconfirmedTier: INFO
+  confirm: pair — a `<hub>-workitems` queue or `<hub>Instances`+`<hub>History` tables exist for the same
+    hub (§1-Q13(a))
+  freshness: lease blobs lastModified (renewed while workers run)
+  confidence: medium
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/azure/durable-task/durable-functions/durable-functions-azure-storage-provider
+  examples:
+  - testhubname-leases
+  - orders-largemessages
+  - orders-applease
+  counterexamples:
+  - leases
+  - my-releases
+- id: container.static-web
+  kind: container
+  regex: ^\$web$
+  mechanism: false
+  producer: Static website hosting
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: '`GET {sa}/blobServices/default` … static website is a data-plane property (`Get Blob Service
+    Properties`); with --data-plane read `StaticWebsite.Enabled`; custom domain / CDN origin → HARD_DEPENDENCY
+    via K6'
+  freshness: blob lastModified
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website
+  examples:
+  - $web
+  counterexamples:
+  - web
+- id: container.analytics-logs
+  kind: container
+  regex: ^\$logs$
+  mechanism: false
+  producer: Storage Analytics logging (classic)
+  tier: INFO
+  unconfirmedTier: INFO
+  confirm: n/a (self-produced)
+  freshness: '`blob/YYYY/MM/DD/hhmm/000000.log` newest path'
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/rest/api/storageservices/about-storage-analytics-logging
+  examples:
+  - $logs
+  counterexamples:
+  - logs
+- id: container.changefeed
+  kind: container
+  regex: ^\$blobchangefeed$
+  mechanism: false
+  producer: Blob change feed
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: '`blobServices/default` `changeFeed.enabled`; consumers (ORS, Backup vaulted, custom readers)
+    via K6/ORS policies'
+  freshness: '`log/…/segments/YYYY/MM/DD/hhmm/meta.json` newest'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/storage/blobs/storage-blob-change-feed.md
+  examples:
+  - $blobchangefeed
+  counterexamples: []
+- id: container.root
+  kind: container
+  regex: ^\$root$
+  mechanism: false
+  producer: Root container (blobs addressable at the account root URL)
+  tier: INFO
+  unconfirmedTier: INFO
+  confirm: n/a
+  freshness: blob lastModified
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/rest/api/storageservices/working-with-the-root-container
+  examples:
+  - $root
+  counterexamples: []
+- id: container.tfstate
+  kind: container
+  regex: (?i)^(tfstate|terraform(-state)?|tf-?state(-[a-z0-9-]+)?)$
+  mechanism: false
+  producer: Terraform azurerm backend (Microsoft tutorial uses `tfstate`; blob `terraform.tfstate`; state
+    blob is leased during writes)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: a `*.tfstate` blob exists (--data-plane) → DESIGN_INTENT "IaC state; consumers are pipelines
+    (not enumerable)"; lease held → LIVE via R7
+  freshness: '`*.tfstate` lastModified = last apply'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-dev-docs/blob/main/articles/terraform/store-state-in-azure-storage.md
+  examples:
+  - tfstate
+  - terraform-state
+  - tf-state-prod
+  counterexamples:
+  - state
+  - tfstatefiles-backup
+- id: container.azureml
+  kind: container
+  regex: (?i)^(azureml|azureml-blobstore-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$
+  mechanism: false
+  producer: Azure ML workspace datastores (`workspaceblobstore` → `azureml-blobstore-{workspace-id}`;
+    `workspaceartifactstore` → `azureml`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.machinelearningservices/workspaces' and tolower(tostring(properties.storageAccount))
+    == '{id}'`
+  freshness: blob lastModified under `ExperimentRun/`, `azureml/`
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/machine-learning/concept-data.md
+  examples:
+  - azureml
+  - azureml-blobstore-2f3a1b0c-1111-2222-3333-444455556666
+  counterexamples:
+  - azureml-blobstore
+  - azuremlx
+- id: container.aks-backup
+  kind: container
+  regex: .*
+  mechanism: true
+  producer: AKS Backup (Backup vault) stores cluster resources in a user-chosen container
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG K5b (`backupinstances` whose `dataSourceInfo`/`policyInfo` reference this account) — match
+    by mechanism, not name
+  freshness: backup instance `lastBackup` (not in ARG; INFO only)
+  confidence: medium
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/backup/azure-kubernetes-service-cluster-backup.md
+  examples:
+  - aksbackup
+  counterexamples: []
+- id: container.synapse-fs
+  kind: container
+  regex: .*
+  mechanism: true
+  producer: Synapse workspace primary storage filesystem (user-chosen name)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG `resources | where type =~ 'microsoft.synapse/workspaces' | where tolower(tostring(properties.defaultDataLakeStorage.accountUrl))
+    has '{name}.dfs.core.windows.net'` → filesystem == container name
+  freshness: dfs path lastModified
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/synapse-analytics/get-started-create-workspace.md
+  examples:
+  - users
+  counterexamples: []
+- id: container.lad-jsonblob
+  kind: container
+  regex: .*
+  mechanism: true
+  producer: LAD 3/4 `JsonBlob` sink ("Blobs are stored in a container that has the same name as the sink")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: 'not possible under Reader: LAD stores storageAccountName in protectedSettings'
+  freshness: newest blob lastModified
+  confidence: medium
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-linux.md
+  examples:
+  - syslogjson
+  counterexamples: []
+- id: container.bootdiagnostics
+  kind: container
+  regex: (?i)^bootdiagnostics-[a-z0-9]{1,9}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  mechanism: false
+  producer: VM boot diagnostics with a customer storage account (legacy layout)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K8 (VM `diagnosticsProfile.bootDiagnostics.storageUri` startswith `https://{name}.`); the
+    GUID is the vmId
+  freshness: '`*.screenshot.bmp` / serial log lastModified'
+  confidence: medium
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/boot-diagnostics.md
+  examples:
+  - bootdiagnostics-vmweb01-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+  counterexamples:
+  - bootdiagnostics
+- id: container.wad
+  kind: container
+  regex: (?i)^wad-[a-z0-9-]+$
+  mechanism: false
+  producer: Windows Azure Diagnostics extension (IIS logs, crash dumps, custom directories)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG K9 (extension `IaaSDiagnostics`/`Microsoft.Insights.VMDiagnosticsSettings` with `StorageAccount`
+    == name)
+  freshness: newest blob lastModified
+  confidence: low
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-windows.md
+  examples:
+  - wad-iis-logfiles
+  - wad-crash-dumps
+  counterexamples:
+  - wadlogs
+- id: container.velero
+  kind: container
+  regex: (?i)^velero(-.*)?$
+  mechanism: false
+  producer: Velero (user-installed backup tool)
+  tier: DESIGN_INTENT
+  unconfirmedTier: INFO
+  confirm: none (Kubernetes-side config) — generic word
+  freshness: '`backups/*/velero-backup.json` lastModified'
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - velero
+  - velero-backups
+  counterexamples: []
+- id: container.sql-audit
+  kind: container
+  regex: (?i)^sqldbauditlogs$
+  mechanism: false
+  producer: Azure SQL auditing to storage (folder `master` for server audit)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.sql/servers' | where properties has '{name}.blob.core.windows.net'`
+    or `microsoft.sql/servers/auditingsettings` (not in ARG → ARM GET per server; stretch)
+  freshness: '`<server>/master/SqlDbAuditing_ServerAudit/YYYY-MM-DD/*.xel` newest'
+  confidence: medium
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/sql-docs/blob/live/azure-sql/database/auditing-overview.md
+  examples:
+  - sqldbauditlogs
+  counterexamples: []
+- id: container.sql-va
+  kind: container
+  regex: (?i)^vulnerability-assessment$
+  mechanism: false
+  producer: SQL vulnerability assessment (classic configuration) scan results
+  tier: DESIGN_INTENT
+  unconfirmedTier: INFO
+  confirm: SQL server `vulnerabilityAssessments/default` storageContainerPath (ARM GET per server; stretch)
+  freshness: newest blob lastModified
+  confidence: low
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/sql-docs/blob/live/azure-sql/database/sql-vulnerability-assessment.md
+  examples:
+  - vulnerability-assessment
+  counterexamples: []
+- id: container.databricks-root
+  kind: container
+  regex: (?i)^(root|jobs|logs|meta|ephemeral|unity-catalog-storage)$
+  mechanism: false
+  producer: Databricks DBFS root (only meaningful inside a `dbstorage*` account in a `databricks-rg-*`
+    RG)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: account matches accountName.databricks AND RG `managedBy` points at an existing `microsoft.databricks/workspaces`
+  freshness: none (do not walk)
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - root
+  - jobs
+  counterexamples: []
+- id: container.fabric
+  kind: container
+  regex: (?i)^fabric(logs|crashdumps|counters)-[0-9a-f-]{36}$
+  mechanism: false
+  producer: Service Fabric cluster diagnostics (WAD)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.servicefabric/clusters' | where properties has '{name}'`
+  freshness: newest blob lastModified
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - fabriclogs-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+  counterexamples:
+  - fabriclogs
+- id: container.appservice-backup
+  kind: container
+  regex: (?i)^(backups?|appbackups?|webappbackups?|sitebackups?)$
+  mechanism: false
+  producer: App Service backup (user-chosen container; generic word)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: site analyzer only — `GET {site}/config/backup/list` storageAccountUrl names this account
+  freshness: '`*.zip` + `*.xml` lastModified'
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - backups
+  - appbackups
+  counterexamples:
+  - backup-2021
+- id: container.vhds
+  kind: container
+  regex: (?i)^vhds$
+  mechanism: false
+  producer: unmanaged VM disks (classic default container)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.compute/virtualmachines' | where properties.storageProfile.osDisk.vhd.uri
+    has '{name}.blob.core.windows.net' or properties.storageProfile.dataDisks has '{name}.blob.core.windows.net'`;
+    page blob with an active lease → LIVE (R7)
+  freshness: page blob lastModified (changes on VM writes); lease state
+  confidence: medium
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/unmanaged-disks-deprecation.md
+  examples:
+  - vhds
+  counterexamples: []
+- id: blobPrefix.insights-resourceid
+  kind: blobPrefix
+  regex: ^resourceId=/SUBSCRIPTIONS/[0-9A-F-]{36}/
+  mechanism: false
+  producer: diagnostic-setting exports (logs and metrics)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: parse the embedded source id; ARM GET it; then its diagnosticSettings.storageAccountId == this
+    account
+  freshness: '`y=/m=/d=/h=/m=00/PT1H.json` time-ordered walk'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/platform/resource-logs.md
+  examples:
+  - resourceId=/SUBSCRIPTIONS/AAAAAAAA-0000-4000-8000-000000000001/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.KEYVAULT/VAULTS/KV1/y=2026/m=09/d=20/h=13/m=00/PT1H.json
+  counterexamples: []
+- id: blobPrefix.flowlog
+  kind: blobPrefix
+  regex: ^flowLogResourceID=/[0-9A-F-]{36}_NETWORKWATCHERRG/NETWORKWATCHER_[A-Z0-9]+_
+  mechanism: false
+  producer: VNet flow logs
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: flow log resource `NetworkWatcherRG/networkWatchers/NetworkWatcher_<region>/flowLogs/<name>`
+    exists (ARM GET)
+  freshness: '`y=/m=/d=/h=/m=00/macAddress=…/PT1H.json`'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/network-watcher/flow-logs-read.md
+  examples:
+  - flowLogResourceID=/AAAAAAAA-0000-4000-8000-000000000001_NETWORKWATCHERRG/NETWORKWATCHER_EASTUS_MYFLOWLOG/y=2026/m=09/d=20/h=13/m=00/macAddress=000D3AF8/PT1H.json
+  counterexamples: []
+- id: blobPrefix.la-export
+  kind: blobPrefix
+  regex: ^WorkspaceResourceId=/subscriptions/[0-9a-f-]{36}/resourcegroups/
+  mechanism: false
+  producer: Log Analytics data export
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: workspace `dataExports` destination == account
+  freshness: '`/y=/m=/d=/h=/m=/PT05M.json`'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/logs/logs-data-export.md
+  examples:
+  - WorkspaceResourceId=/subscriptions/aaaaaaaa-0000-4000-8000-000000000001/resourcegroups/rg/providers/microsoft.operationalinsights/workspaces/ws/y=2026/m=09/d=20/h=13/m=05/PT05M.json
+  counterexamples: []
+- id: blobPrefix.inventory-report
+  kind: blobPrefix
+  regex: ^[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{2}-[0-9]{2}-[0-9]{2}/[^/]+/(?:[^/]+-manifest\.json|[^/]+\.(?:csv|parquet))$
+  mechanism: false
+  producer: Blob inventory reports (`<container>/YYYY/MM/DD/HH-MM-SS/<ruleName>/<ruleName>-manifest.json`)
+  tier: INFO
+  unconfirmedTier: INFO
+  confirm: '`inventoryPolicies/default` rule.destination == container (self-produced; never a consumer)'
+  freshness: newest `YYYY/MM/DD/HH-MM-SS` folder = last inventory run (exclude from "last user write")
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/storage/blobs/blob-inventory.md
+  examples:
+  - 2021/05/26/13-25-36/Rule_1/Rule_1-manifest.json
+  counterexamples:
+  - 2021/05/26/report.csv
+  new: true
+- id: blobPrefix.eventhubs-capture
+  kind: blobPrefix
+  regex: ^[^/]+/[^/]+/[0-9]+/[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{2}/[0-9]{2}/[0-9]{2}\.avro$
+  mechanism: false
+  producer: Event Hubs Capture (`{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}.avro`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.eventhub/namespaces/eventhubs' | where properties.captureDescription.destination.properties.storageAccountResourceId
+    =~ '{id}'` (child types in ARG unverified → fallback K6)
+  freshness: path is time-ordered (level 4..9)
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/event-hubs/event-hubs-capture-overview.md
+  examples:
+  - mynamespace/myeventhub/0/2017/12/08/03/03/17.avro
+  counterexamples: []
+- id: blobPrefix.iothub-routing
+  kind: blobPrefix
+  regex: ^[^/]+/[0-9]+/[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{2}/[0-9]{2}$
+  mechanism: false
+  producer: IoT Hub storage endpoint default naming `{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}`
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG `resources | where type =~ 'microsoft.devices/iothubs' | where properties.routing.endpoints.storageContainers
+    has '{name}'`
+  freshness: time-ordered path
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/iot-hub/iot-hub-devguide-endpoints.md
+  examples:
+  - myhub/0/2026/09/20/13/05
+  counterexamples: []
+- id: blobPrefix.tfstate-blob
+  kind: blobPrefix
+  regex: (?i)(^|/)[a-z0-9._-]*\.tfstate$
+  mechanism: false
+  producer: Terraform state blob (tutorial key `terraform.tfstate`; leased during writes)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: lease state Leased → LIVE via R7
+  freshness: blob lastModified = last apply
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-dev-docs/blob/main/articles/terraform/store-state-in-azure-storage.md
+  examples:
+  - terraform.tfstate
+  - prod/network.tfstate
+  counterexamples:
+  - terraform.tfstate.backup
+- id: blobPrefix.webjobs-hosts-layout
+  kind: blobPrefix
+  regex: ^(locks|timers|blobreceipts|blobscaninfo|ids|output-logs|functions)/
+  mechanism: false
+  producer: Functions host layout inside `azure-webjobs-hosts` (`locks/<hostId>/…`, `timers/<hostId>/<fn>/status`,
+    `blobreceipts/<hostId>/…`, `blobscaninfo/<hostId>`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: '`timers/<hostId>/<fn>/status` and `locks/<hostId>/host` lastModified'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/azure-functions/functions-bindings-storage-blob-trigger.md
+  examples:
+  - locks/myfunc/host
+  - timers/myfunc/TimerTrigger1/status
+  - blobreceipts/myfunc/…
+  counterexamples: []
+- id: share.cloudshell
+  kind: share
+  regex: (?i)^cs-[a-z0-9-]+-[a-z0-9-]+-[0-9a-z]+$
+  mechanism: false
+  producer: Cloud Shell $HOME (`cs-<user>-<domain>-<hash>`, file `.cloudconsole/acc_<user>.img`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: account tag `ms-resource-usage == azure-cloud-shell` or RG `cloud-shell-storage-*`; the owner
+    is a user (not resolvable without Graph) → cordon refusal `cloudshell-account`
+  freshness: '`.cloudconsole/acc_<user>.img` lastModified = last shell session'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/cloud-shell/persisting-shell-storage.md
+  examples:
+  - cs-user-microsoft-com-10032000a1b2c3d4
+  counterexamples:
+  - cs
+  - csharp-share
+- id: share.aks-pvc
+  kind: share
+  regex: (?i)^(pvc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|kubernetes-dynamic-pvc-[0-9a-f-]{36})$
+  mechanism: false
+  producer: AKS azurefile CSI dynamic PV (`lower(volumeName)`), legacy in-tree prefix
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: account tag `k8s-azure-created-by` / share metadata `kubernetes.io-created-for-pvc-name`; RG
+    `MC_*` managedBy cluster exists (ARM GET)
+  freshness: share `lastModifiedTime` (ARM) is share-level only; file walk not attempted
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/pkg/azurefile/controllerserver.go
+  examples:
+  - pvc-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+  - kubernetes-dynamic-pvc-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+  counterexamples:
+  - pvc
+  - pvc-data
+- id: share.functions-content-by-site
+  kind: share
+  regex: .*
+  mechanism: true
+  producer: Functions content share (`WEBSITE_CONTENTSHARE` "begins with the function app name")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: share name starts with the lower-cased name of an ARG K6b function app → DESIGN_INTENT; that
+    site's `WEBSITE_CONTENTSHARE` == share (site analyzer) → HARD_DEPENDENCY
+  freshness: '`site/wwwroot/` files lastModified = last deployment (not usage)'
+  confidence: medium
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/azure-functions/functions-app-settings.md
+  examples: []
+  counterexamples: []
+- id: share.azureml
+  kind: share
+  regex: (?i)^(azureml-filestore-[0-9a-f-]{36}|code-[0-9a-f-]{36})$
+  mechanism: false
+  producer: Azure ML `workspacefilestore` / `workspaceworkingdirectory`
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: as container.azureml
+  freshness: share lastModifiedTime
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/machine-learning/concept-data.md
+  examples:
+  - azureml-filestore-2f3a1b0c-1111-2222-3333-444455556666
+  - code-2f3a1b0c-1111-2222-3333-444455556666
+  counterexamples: []
+- id: share.aca
+  kind: share
+  regex: .*
+  mechanism: true
+  producer: Container Apps environment storage (`storages[].azureFile.shareName`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG env list (K16 reverse) + `GET {env}/storages` accountName == this account and shareName
+    == share
+  freshness: share lastModifiedTime
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/rest/api/resource-manager/containerapps/managed-environments-storages/list
+  examples:
+  - appdata
+  counterexamples: []
+- id: share.fslogix
+  kind: share
+  regex: (?i)^(profiles?|fslogix[a-z0-9-]*|msix[a-z0-9-]*|appattach[a-z0-9-]*|odfc)$
+  mechanism: false
+  producer: Azure Virtual Desktop FSLogix profile / app-attach shares (generic words)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG `resources | where type =~ 'microsoft.desktopvirtualization/hostpools'` exists in the subscription
+    AND share `enabledProtocols == SMB` with identity-based auth (`azureFilesIdentityBasedAuthentication.directoryServiceOptions
+    != None`) → DESIGN_INTENT; SMB `SessionSetup` transactions in W → LIVE via R3′/R2′ (SMB verbs, §F)
+  freshness: '`*.vhdx` lastModified'
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - profiles
+  - fslogix-profiles
+  - msixappattach
+  counterexamples:
+  - profilesbackup2020
+- id: queue.durable
+  kind: queue
+  regex: (?i)^[a-z0-9-]+-(control-(0[0-9]|1[0-5])|workitems)$
+  mechanism: false
+  producer: Durable Functions task hub (1–16 control queues, default 4)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: '`<hub>Instances` table exists → pair confirmed; Functions site naming the account in `AzureWebJobsStorage`
+    → HARD_DEPENDENCY (site analyzer)'
+  freshness: '`approximateMessageCount` > 0 or `GetMessages` polling (R4 low-volume) — a poller proves
+    a running host'
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/azure/durable-task/durable-functions/durable-functions-azure-storage-provider
+  examples:
+  - testhubname-workitems
+  - testhubname-control-00
+  - testhubname-control-15
+  counterexamples:
+  - testhubname-control-16
+  - workitems
+- id: queue.blobtrigger-poison
+  kind: queue
+  regex: (?i)^webjobs-blobtrigger-poison$
+  mechanism: false
+  producer: Functions blob trigger poison queue
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: co-existence with `azure-webjobs-hosts`; host id via container.webjobs-hosts
+  freshness: approximateMessageCount, queue metadata
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/azure-functions/functions-bindings-storage-blob-trigger.md
+  examples:
+  - webjobs-blobtrigger-poison
+  counterexamples: []
+- id: queue.webjobs-blobtrigger
+  kind: queue
+  regex: (?i)^azure-webjobs-blobtrigger-[a-z0-9-]{1,32}$
+  mechanism: false
+  producer: WebJobs SDK host blob-trigger queue (`"azure-webjobs-" + "blobtrigger-" + hostId`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: '`GetMessages` polling in W = running host'
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/Azure/azure-webjobs-sdk/blob/dev/src/Microsoft.Azure.WebJobs.Host/HostQueueNames.cs
+  examples:
+  - azure-webjobs-blobtrigger-myfuncapp
+  counterexamples:
+  - azure-webjobs-blobtrigger
+- id: queue.webjobs-host
+  kind: queue
+  regex: (?i)^azure-webjobs-host-[a-z0-9-]{1,32}$
+  mechanism: false
+  producer: WebJobs SDK host instance queue (`"azure-webjobs-host-" + hostId`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: polling in W
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/Azure/azure-webjobs-sdk/blob/dev/src/Microsoft.Azure.WebJobs.Host/HostQueueNames.cs
+  examples:
+  - azure-webjobs-host-myfuncapp
+  counterexamples: []
+  new: true
+- id: queue.webjobs-shared
+  kind: queue
+  regex: (?i)^azure-webjobs-shared-[a-z0-9-]{1,32}$
+  mechanism: false
+  producer: WebJobs SDK shared host queue (`"azure-webjobs-shared-" + hostId`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: site analyzer (target is the site) or a locks/<hostId>/host blob modified within 24 h (--data-plane)
+  freshness: polling in W
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/Azure/azure-webjobs-sdk/blob/dev/src/Microsoft.Azure.WebJobs.Host/HostQueueNames.cs
+  examples:
+  - azure-webjobs-shared-myfuncapp
+  counterexamples: []
+  new: true
+- id: queue.webjobs-poison
+  kind: queue
+  regex: (?i)^azure-webjobs-poison-[a-z0-9-]{1,32}$
+  mechanism: false
+  producer: WebJobs SDK shared poison queue (`"azure-webjobs-poison-" + hostId`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: as queue.webjobs-blobtrigger
+  freshness: approximateMessageCount
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/Azure/azure-webjobs-sdk/blob/dev/src/Microsoft.Azure.WebJobs.Host/HostQueueNames.cs
+  examples:
+  - azure-webjobs-poison-myfuncapp
+  counterexamples: []
+  new: true
+- id: queue.logicapps
+  kind: queue
+  regex: (?i)^flow[a-z0-9]{6,}jobtriggers[a-z0-9]*$
+  mechanism: false
+  producer: Logic Apps Standard runtime (job triggers)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: ARG `resources | where type =~ 'microsoft.web/sites' and kind has 'workflowapp'` whose app
+    settings (site analyzer) name this account
+  freshness: polling in W
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - flow1a2b3c4d5ejobtriggers00
+  counterexamples:
+  - flowjobtriggers
+- id: table.wadmetrics
+  kind: table
+  regex: ^WADMetricsPT1[HM]P10DV2S[0-9]{8}$
+  mechanism: false
+  producer: WAD/LAD guest metrics (`WADMetricsPT1HP10DV2S<yyyymmdd>`, new table every 10 days)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K9 (diagnostics extension naming this account)
+  freshness: newest `<yyyymmdd>` suffix ≥ now−10 d ⇒ still being written
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-template.md
+  examples:
+  - WADMetricsPT1HP10DV2S20151108
+  - WADMetricsPT1MP10DV2S20260911
+  counterexamples:
+  - WADMetrics
+  - WADMetricsPT5MP10DV2S20260911
+- id: table.wad
+  kind: table
+  regex: ^WAD[A-Za-z0-9]+$
+  mechanism: false
+  producer: WAD (`WADLogsTable`, `WADPerformanceCountersTable`, `WADWindowsEventLogsTable`, `WADDiagnosticInfrastructureLogsTable`,
+    `WADETWEventTable`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K9
+  freshness: '`TableEntityCount` growth (R6) only'
+  confidence: medium
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-windows.md
+  examples:
+  - WADLogsTable
+  - WADPerformanceCountersTable
+  counterexamples:
+  - WADMetricsPT1HP10DV2S20151108
+  - wadlogs
+- id: table.lad-syslog
+  kind: table
+  regex: ^LinuxSyslogVer2v0$
+  mechanism: false
+  producer: LAD ("LAD always writes data to a table named LinuxSyslogVer2v0")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: 'not possible under Reader: LAD stores storageAccountName in protectedSettings'
+  freshness: TableEntityCount growth
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-linux.md
+  examples:
+  - LinuxSyslogVer2v0
+  counterexamples:
+  - LinuxSyslog
+- id: table.lad
+  kind: table
+  regex: ^Linux[A-Za-z]+Ver2v0$
+  mechanism: false
+  producer: LAD other tables (`LinuxCpuVer2v0`, `LinuxMemoryVer2v0`, …)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: 'not possible under Reader: LAD stores storageAccountName in protectedSettings'
+  freshness: TableEntityCount growth
+  confidence: medium
+  status: OBSERVED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/extensions/diagnostics-linux.md
+  examples:
+  - LinuxCpuVer2v0
+  counterexamples:
+  - LinuxSyslogVer2v0
+- id: table.durable
+  kind: table
+  regex: ^[A-Za-z0-9]+(History|Instances|Partitions)$
+  mechanism: false
+  producer: Durable Functions task hub tables
+  tier: DESIGN_INTENT
+  unconfirmedTier: INFO
+  confirm: pair — `<hub>Instances` AND `<hub>History` exist (or `<hub>-workitems` queue) (§1-Q13(a))
+  freshness: TableEntityCount growth; `QueryEntities` in W
+  confidence: high
+  status: VERIFIED
+  source_url: https://learn.microsoft.com/en-us/azure/durable-task/durable-functions/durable-functions-azure-storage-provider
+  examples:
+  - TestHubNameHistory
+  - TestHubNameInstances
+  - TestHubNamePartitions
+  counterexamples:
+  - History
+  - OrderInstancesBackup
+- id: table.logicapps
+  kind: table
+  regex: ^flow[a-z0-9]{6,}(flows|flowaccesskeys|flowruns|flowsubscriptions|histories|jobdefinitions|jobs|runs)[a-z0-9]*$
+  mechanism: false
+  producer: Logic Apps Standard runtime tables
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: as queue.logicapps
+  freshness: TableEntityCount growth
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - flow1a2b3c4d5eflows
+  - flow1a2b3c4d5ehistories
+  counterexamples:
+  - flows
+- id: accountName.cloudshell
+  kind: accountName
+  regex: (?i)^cs[0-9a-f]{16,22}$
+  mechanism: false
+  producer: Cloud Shell auto-created account (`cs7xxxxxxxxxxxxxxx`, RG `cloud-shell-storage-<region>`,
+    tag `ms-resource-usage=azure-cloud-shell`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: RG name or tag matches (either is enough)
+  freshness: share.cloudshell
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/cloud-shell/persisting-shell-storage.md
+  examples:
+  - cs7100320000a1b2c3d
+  - cs210032000a1b2c3d4e
+  counterexamples:
+  - csharpdata
+  - cs1
+- id: accountName.aks
+  kind: accountName
+  regex: (?i)^f[0-9a-f]{23}$
+  mechanism: false
+  producer: AKS azurefile CSI dynamic accounts (driver-generated names; the reliable signal is the tag
+    and the `MC_` RG, not the name)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: tag `k8s-azure-created-by == azure` (files) and RG `MC_*` whose `managedBy` cluster exists
+  freshness: share.aks-pvc
+  confidence: low
+  status: SOURCE
+  source_url: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/pkg/azureconstants/azure_constants.go
+  examples:
+  - f1a2b3c4d5e6f7a8b9c0d1e2
+  counterexamples: []
+- id: accountName.databricks
+  kind: accountName
+  regex: (?i)^dbstorage[a-z0-9]{10,16}$
+  mechanism: false
+  producer: Databricks DBFS root account (inside `databricks-rg-*` managed RG)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: RG `managedBy` → `microsoft.databricks/workspaces` exists; deny assignment present (managed
+    RG)
+  freshness: none
+  confidence: medium
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - dbstoragea1b2c3d4e5f6
+  counterexamples:
+  - dbstorage
+- id: accountName.image-builder
+  kind: accountName
+  regex: .*
+  mechanism: true
+  producer: VM Image Builder staging storage account (lives in `IT_<rg>_<template>_<guid>` RG; "all resources
+    are deleted, except for the staging resource group and the storage account")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: RG matches rgName.image-builder and an `microsoft.virtualmachineimages/imagetemplates` with
+    that name exists (ARG)
+  freshness: last build = image template `lastRunStatus.endTime` (ARM GET)
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/image-builder-overview.md
+  examples: []
+  counterexamples: []
+  new: true
+- id: rgName.cloudshell
+  kind: rgName
+  regex: (?i)^cloud-shell-storage-[a-z0-9]+$
+  mechanism: false
+  producer: Cloud Shell
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: account tag `ms-resource-usage=azure-cloud-shell`
+  freshness: share.cloudshell
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/cloud-shell/persisting-shell-storage.md
+  examples:
+  - cloud-shell-storage-southcentralus
+  counterexamples: []
+- id: rgName.aks-node
+  kind: rgName
+  regex: ^MC_[^_]+_[^_]+_[a-z0-9]+$
+  mechanism: false
+  producer: AKS node resource group ("By default, the node resource group has a name like MC_myResourceGroup_myAKSCluster_eastus";
+    custom names allowed)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: RG `managedBy` == an existing `microsoft.containerservice/managedclusters` (K2) — the name
+    alone is not proof (custom node RG names exist)
+  freshness: 'n/a (platform-owned: "Modifying any resource under the node resource group … is an unsupported
+    action")'
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-aks-docs/blob/main/articles/aks/faq.yml
+  examples:
+  - MC_myResourceGroup_myAKSCluster_eastus
+  counterexamples:
+  - MC_rg
+- id: rgName.image-builder
+  kind: rgName
+  regex: ^IT_[^_]+_[^_]+(_[0-9a-f-]{36})?$
+  mechanism: false
+  producer: VM Image Builder staging RG (`IT_<DestinationResourceGroup>_<TemplateName>_(GUID)`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: image template `<TemplateName>` exists in `<DestinationResourceGroup>` (ARM GET `Microsoft.VirtualMachineImages/imageTemplates`)
+  freshness: template `lastRunStatus`
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/image-builder-overview.md
+  examples:
+  - IT_images-rg_ubuntu-base_1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+  counterexamples:
+  - IT_dept
+  new: true
+- id: rgName.backup
+  kind: rgName
+  regex: (?i)^AzureBackupRG_[a-z0-9]+_[0-9]+$
+  mechanism: false
+  producer: Azure Backup restore-point-collection RG ("Azure Backup creates a separate resource group
+    in the format AzureBackupRG_<geo>_<number>"; "Since this resource group is service owned, locking
+    it will cause backups to fail")
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: any `microsoft.compute/restorepointcollections` in the RG (ARG) whose source VM is protected
+    (K5)
+  freshness: restore point collection children timestamps (ARM GET; stretch)
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/backup/backup-azure-vm-backup-faq.yml
+  examples:
+  - AzureBackupRG_westus2_1
+  counterexamples:
+  - AzureBackupRG
+  new: true
+- id: rgName.network-watcher
+  kind: rgName
+  regex: (?i)^NetworkWatcherRG$
+  mechanism: false
+  producer: Network Watcher auto-created RG ("created in a resource group named NetworkWatcherRG"; instance
+    `NetworkWatcher_{region}`)
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: '`microsoft.network/networkwatchers` present in the RG (ARG)'
+  freshness: n/a
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/network-watcher/network-watcher-create.md
+  examples:
+  - NetworkWatcherRG
+  counterexamples: []
+  new: true
+- id: rgName.databricks
+  kind: rgName
+  regex: (?i)^databricks-rg-[a-z0-9-]+-[a-z0-9]{10,}$
+  mechanism: false
+  producer: Databricks managed RG
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: RG `managedBy` → workspace exists
+  freshness: n/a
+  confidence: medium
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - databricks-rg-myws-abc123def456
+  counterexamples: []
+- id: rgName.default-la
+  kind: rgName
+  regex: (?i)^DefaultResourceGroup-[A-Z0-9]+$
+  mechanism: false
+  producer: Default Log Analytics workspace RG created by the portal/Defender/Insights onboarding
+  tier: INFO
+  unconfirmedTier: INFO
+  confirm: a `DefaultWorkspace-<sub>-<region>` workspace exists in it (ARG)
+  freshness: n/a
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - DefaultResourceGroup-EUS
+  - DefaultResourceGroup-WEU
+  counterexamples: []
+- id: tag.hidden-link
+  kind: tag
+  regex: ^hidden-link:(/subscriptions/.+)$
+  mechanism: false
+  producer: 'Portal/RP association tag — key `hidden-link:<resourceId>` (e.g. App Insights web tests:
+    `-Tag @{ "hidden-link:$componentId" = "Resource" }`; Microsoft KQL parses `substring(tagName, strlen("hidden-link:"))`)'
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: the id in the key exists (K3 batch) → HARD_DEPENDENCY; missing → `generic.tags.hidden-link-dangling`
+    INFO
+  freshness: n/a
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-monitor-docs/blob/main/articles/azure-monitor/app/availability.md
+  examples:
+  - hidden-link:/subscriptions/…/providers/microsoft.insights/components/myai
+  counterexamples:
+  - hidden-title
+- id: tag.hidden-title
+  kind: tag
+  regex: ^hidden-title$
+  mechanism: false
+  producer: 'Portal display-name tag (documented for dashboards: "add a tag named hidden-title with the
+    dashboard name")'
+  tier: INFO
+  unconfirmedTier: INFO
+  confirm: n/a
+  freshness: n/a
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/azure-resource-manager/management/resource-name-rules.md
+  examples:
+  - hidden-title
+  counterexamples: []
+- id: tag.cloudshell
+  kind: tag
+  regex: ^ms-resource-usage$
+  mechanism: false
+  producer: Cloud Shell (value `azure-cloud-shell`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: INFO
+  confirm: value == `azure-cloud-shell`
+  freshness: share.cloudshell
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/cloud-shell/persisting-shell-storage.md
+  examples:
+  - ms-resource-usage=azure-cloud-shell
+  counterexamples: []
+- id: tag.aks-created-by
+  kind: tag
+  regex: ^k8s-azure-created-by$
+  mechanism: false
+  producer: AKS CSI drivers (`CreatedByTag = "k8s-azure-created-by"`; disks value `kubernetes-azure-dd`)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: RG `MC_*` managedBy cluster exists
+  freshness: n/a
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/pkg/azureconstants/azure_constants.go
+  examples:
+  - k8s-azure-created-by=kubernetes-azure-dd
+  - k8s-azure-created-by=azure
+  counterexamples: []
+- id: tag.aks-pvc
+  kind: tag
+  regex: ^kubernetes\.io-created-for-(pvc-name|pvc-namespace|pv-name)$
+  mechanism: false
+  producer: Kubernetes dynamic provisioning tags on disks / shares
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: cluster exists (via RG managedBy); the PV still exists is not verifiable from ARM → keep HARD_DEPENDENCY
+    only when `managedBy`/`diskState` says attached, else DESIGN_INTENT "released PV; cluster may reclaim"
+  freshness: disk `LastOwnershipUpdateTime`
+  confidence: high
+  status: SOURCE
+  source_url: https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/pkg/azurefile/azurefile.go
+  examples:
+  - kubernetes.io-created-for-pvc-name=data-postgres-0
+  counterexamples: []
+- id: tag.azd
+  kind: tag
+  regex: ^azd-(env-name|service-name|provision-param-hash|provision-template-hash)$
+  mechanism: false
+  producer: Azure Developer CLI (`TagKeyAzdEnvName = "azd-env-name"`, `TagKeyAzdServiceName = "azd-service-name"`,
+    `azd-provision-param-hash`, `azd-provision-template-hash`); azd treats an RG with a matching `azd-env-name`
+    as azd-created
+  tier: DESIGN_INTENT
+  unconfirmedTier: DESIGN_INTENT
+  confirm: n/a (IaC-managed; `azd down` will delete the whole environment)
+  freshness: n/a
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/Azure/azure-dev/blob/main/cli/azd/pkg/azure/tags.go
+  examples:
+  - azd-env-name=dev
+  - azd-service-name=api
+  counterexamples: []
+  new: true
+- id: tag.asr
+  kind: tag
+  regex: ^(ASR-ReplicaDisk|ASR-ReplicaDisk-Managed|RSVaultBackup|ASR-.*)$
+  mechanism: false
+  producer: Azure Site Recovery replica disks / vault tags (community-observed)
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: DESIGN_INTENT
+  confirm: ARG K5c replicated item references the VM/disk
+  freshness: n/a
+  confidence: low
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - ASR-ReplicaDisk=…
+  counterexamples: []
+- id: tag.protect-generic
+  kind: tag
+  regex: (?i)^(do-?not-?delete|protected|retain|keep|preserve|no-?delete)$
+  mechanism: false
+  producer: human convention (generic words) — value truthy → HARD_DEPENDENCY per architect `generic.tags.protect`
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: HARD_DEPENDENCY
+  confirm: value ∉ {false, no, 0, ""}
+  freshness: n/a
+  confidence: medium
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - do-not-delete=true
+  - DoNotDelete=yes
+  counterexamples:
+  - do-not-delete=false
+- id: tag.expiry-generic
+  kind: tag
+  regex: (?i)^(expires?|expiry|expiration|ttl|delete-?after|delete-?on|end-?date)$
+  mechanism: false
+  producer: human convention — date value in the future → HARD_DEPENDENCY; past → OBSERVED_IDLE `generic.tags.expired`
+  tier: HARD_DEPENDENCY
+  unconfirmedTier: HARD_DEPENDENCY
+  confirm: value parses as RFC3339/ISO date or `YYYY-MM-DD`
+  freshness: n/a
+  confidence: medium
+  status: OBSERVED
+  source_url: ''
+  examples:
+  - expires=2026-12-31
+  - delete-after=2026-01-01
+  counterexamples:
+  - ttl=forever
+- id: lockName.backup-blob-operational
+  kind: lockName
+  regex: (?i)^AzureBackupProtectionLock$
+  mechanism: false
+  producer: Azure Backup operational backup for blobs/files ("Operational backup when configured also
+    automatically applies a delete lock")
+  tier: BLOCKER
+  unconfirmedTier: BLOCKER
+  confirm: lock level CanNotDelete + ARG K5b backup instance for this account
+  freshness: n/a
+  confidence: high
+  status: VERIFIED
+  source_url: https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/backup/blob-backup-overview.md
+  examples:
+  - AzureBackupProtectionLock
+  counterexamples: []
+  new: true

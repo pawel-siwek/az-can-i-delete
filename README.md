@@ -18,6 +18,7 @@ tool, not a disclaimer.
 | `check` for storage accounts | full analyzer: immutability holds, private endpoints, resource-instance rules, replication and Event Grid, boot diagnostics, flow logs, backups, extensions and other references, the four child listings, leases, and the transaction, egress and object-count rules including the Defender scanner carve-out |
 | `check` for virtual machines | full analyzer: scale set, availability set, reservation and host membership, platform ownership, backups and retained recovery points, Site Recovery, images, network references and backend pools, identity roles, power state, start events, and the processor, connection and traffic rules |
 | `check` for App Service sites, slots and plans | full analyzers: custom domains, fronting, hybrid connections, virtual network integration, source control and deployments, function triggers, the request-ceiling and probe-shape rules, hosting class, stopped state, metric silence, and for plans the site count, autoscale and Advisor |
+| Name knowledge base | 79 entries recognize a container, share, queue or table name as the work of a known producer — diagnostic settings, flow logs, Functions host storage, boot diagnostics, Terraform state and the rest. A name match is reported at the tier a name alone may claim, never the confirmed one |
 | Output | `table` (default at a terminal), `json`, `jsonc`, `yaml`, `tsv`, `none` |
 | `cordon`, `uncordon`, `status`, `demo`, `mcp`, `patterns list`, `--fixture`, `--data-plane`, `--query` | not implemented; they exit 1 and say so |
 
