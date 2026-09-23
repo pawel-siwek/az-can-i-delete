@@ -54,9 +54,8 @@ outputs:
     value: ${{ steps.policy.outputs.verdict }}
   results-json:
     description: >-
-      Directory holding results.json (the combined JSON results) and
-      planned.tsv (each planned id and its change, in table order). The action
-      uploads nothing itself: upload it with an action pinned to a commit.
+      Path of results.json, the tool's own combined report. The action uploads
+      nothing itself: upload it with an action pinned to a commit.
     value: ${{ steps.policy.outputs.results-json }}
   summary-markdown:
     description: The comment table.
@@ -122,7 +121,7 @@ runs:
         "$GITHUB_ACTION_PATH/action/policy.sh" "$out" || status=$?
         {
           echo "verdict=$(cat "$out/verdict")"
-          echo "results-json=$out"
+          echo "results-json=$out/results.json"
           echo "summary-markdown<<AZCID_SUMMARY_EOF"
           cat "$out/summary.md"
           echo "AZCID_SUMMARY_EOF"

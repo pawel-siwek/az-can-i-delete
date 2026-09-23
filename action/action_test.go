@@ -236,8 +236,8 @@ func TestTheSummaryTable(t *testing.T) {
 		// Named by the id the tool parsed, from its own report; a row with
 		// no report is named by its number (ADR-0007).
 		"| `/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st-logs-prod` | delete | **no** | in-use | approved private endpoint \\| pe-sql-01 | 0 |",
-		"| #2 (row 2 of planned.tsv) | detach | not found | not-found |",
-		"| #3 (row 3 of planned.tsv) | unsupported | tentative | unsupported |",
+		"| #2 (planned deletion 2, in plan order) | detach | not found | not-found |",
+		"| #3 (planned deletion 3, in plan order) | unsupported | tentative | unsupported |",
 		"Window 2026-06-23 → 2026-09-21 (90 d) · rules 2026-09-21 · fail-on: no · skipped non-ARM ids: 0",
 		"never that deleting is safe",
 	} {
@@ -249,9 +249,9 @@ func TestTheSummaryTable(t *testing.T) {
 	if strings.Contains(summary, "nic-old-01") || strings.Contains(summary, "d-unknown") {
 		t.Fatalf("a planned id reached the comment:\n%s", summary)
 	}
-	planned := strings.Split(strings.TrimSpace(read(t, filepath.Join(out, "planned.tsv"))), "\n")
-	if len(planned) != 3 || !strings.HasPrefix(planned[2], sub+"rg/providers/microsoft.compute/disks/d-unknown\tunsupported") {
-		t.Fatalf("planned.tsv = %q", planned)
+	// Nothing the plan said is written out for upload either.
+	if _, err := os.Stat(filepath.Join(out, "planned.tsv")); err == nil {
+		t.Fatal("the plan's ids were written to an output file")
 	}
 }
 
