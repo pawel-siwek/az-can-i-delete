@@ -181,6 +181,20 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         blocking finding.
         """;
 
+    /// <summary>How long an answer may be.</summary>
+    ///
+    /// A review is a verdict line and a paragraph per finding. Saying so
+    /// bounds what the reviewer can write, which is worth doing on its own,
+    /// but it is not why this is here.
+    ///
+    /// Azure admits a request against the tokens it might use, not the tokens
+    /// it does: the prompt plus the largest answer the model is allowed to
+    /// give. With no limit set, that reservation is the model's whole output
+    /// window, and a request carrying a normal diff is refused with 429 while
+    /// the deployment sits idle with ten times the quota it needs. The
+    /// symptom reads as a quota problem and is not one.
+    const int AnswerBudget = 4000;
+
     /// <summary>The service's account of why it refused, bounded.</summary>
     static async Task<string> Detail(HttpResponseMessage response)
     {
@@ -263,6 +277,7 @@ sealed class Reviewer(string endpoint, string deployment, string token)
                 new { role = "system", content = system },
                 new { role = "user", content = user },
             },
+            max_completion_tokens = AnswerBudget,
         });
 
         var address = $"{endpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions?api-version={Rules.ApiVersion("azureAIInference")}";
