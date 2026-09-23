@@ -188,13 +188,17 @@ sealed class Reviewer(string endpoint, string deployment, string token)
     /// bounds what the reviewer can write, which is worth doing on its own,
     /// but it is not why this is here.
     ///
-    /// Azure admits a request against the tokens it might use, not the tokens
-    /// it does: the prompt plus the largest answer the model is allowed to
-    /// give. With no limit set, that reservation is the model's whole output
-    /// window, and a request carrying a normal diff is refused with 429 while
-    /// the deployment sits idle with ten times the quota it needs. The
-    /// symptom reads as a quota problem and is not one.
-    const int AnswerBudget = 4000;
+    /// Generous on purpose. A reasoning model spends this budget on thinking
+    /// before it spends any of it on writing, and the two come out of one
+    /// allowance: set it to what the visible answer needs and the model
+    /// reasons until the budget is gone, then returns nothing at all. The
+    /// failure does not look like a budget — it looks like the model
+    /// declining to answer.
+    ///
+    /// It is still bounded rather than absent, because Azure admits a request
+    /// against the tokens it might use: the prompt plus the largest answer
+    /// allowed. Unset, that reservation is the model's whole output window.
+    const int AnswerBudget = 16000;
 
     /// <summary>The service's account of why it refused, bounded.</summary>
     static async Task<string> Detail(HttpResponseMessage response)
@@ -227,6 +231,33 @@ sealed class Reviewer(string endpoint, string deployment, string token)
             body = body[..400] + "…";
         }
         return body + Limits(response);
+    }
+
+    /// <summary>Why an answer is missing, from the response that omitted it.</summary>
+    static string Absent(JsonElement choice, JsonElement root)
+    {
+        var parts = new List<string>();
+        if (choice.ValueKind == JsonValueKind.Object &&
+            choice.TryGetProperty("finish_reason", out var finish) && finish.GetString() is { } reason)
+        {
+            parts.Add("finish_reason=" + reason);
+        }
+        if (root.TryGetProperty("usage", out var usage))
+        {
+            foreach (var name in new[] { "prompt_tokens", "completion_tokens" })
+            {
+                if (usage.TryGetProperty(name, out var count))
+                {
+                    parts.Add($"{name}={count}");
+                }
+            }
+            if (usage.TryGetProperty("completion_tokens_details", out var details) &&
+                details.TryGetProperty("reasoning_tokens", out var reasoning))
+            {
+                parts.Add($"reasoning_tokens={reasoning}");
+            }
+        }
+        return parts.Count == 0 ? string.Empty : ": " + string.Join(" ", parts);
     }
 
     /// <summary>What the gateway says the limits actually are.</summary>
@@ -328,11 +359,17 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         }
 
         using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var content = answer.RootElement.GetProperty("choices").EnumerateArray().FirstOrDefault()
-            .GetProperty("message").GetProperty("content").GetString();
-        return string.IsNullOrWhiteSpace(content)
-            ? throw new InvalidOperationException("the model returned no answer")
-            : content!;
+        var choice = answer.RootElement.GetProperty("choices").EnumerateArray().FirstOrDefault();
+        var content = choice.GetProperty("message").GetProperty("content").GetString();
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            return content!;
+        }
+        // Say why there is nothing rather than only that there is nothing. An
+        // empty answer has more than one cause — a budget spent on reasoning
+        // before any of it reached the page, a content filter, a refusal —
+        // and the response names which every time.
+        throw new InvalidOperationException("the model returned no answer" + Absent(choice, answer.RootElement));
     }
 
     internal static string Git(params string[] arguments)
