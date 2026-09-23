@@ -45,6 +45,7 @@ files in `.github/instructions/`.
 | `internal/vm` — the virtual machine analyzer | complete | memberships, platform ownership, backup and replication, images, network references and pools, power state, start events, the three activity thresholds, deallocated silence |
 | `internal/site` — App Service sites, slots and plans | complete | hosting class, domains and fronting, triggers, the request ceiling and probe shape, stopped state, metric and deployment silence, plan site count and autoscale |
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
+| `internal/azure` data-plane adapter and `--data-plane` | complete; **not exercised against a live tenant** | the prefix walk against a local blob endpoint: descent, the call budget, the delimiter, and a 403 classified as permission |
 | `internal/kb` — the storage name knowledge base | complete | the 79 entries with the section 9.3 corrections, loader validation, ordered matcher, examples, precedence, tier sanity, tag value rules; end to end through the storage analyzer |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
@@ -62,20 +63,17 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **Data-plane collection.** The opt-in OAuth-only prefix walk behind
-   `--data-plane`, bounded as SPEC section 3.2 requires, with the fifth client
-   boundary implemented against the storage data plane.
-2. **Fixture replay and `demo`.** Recorded responses behind the same five
+1. **Fixture replay and `demo`.** Recorded responses behind the same five
    interfaces, golden JSON per scenario, `recorded` in every replayed header.
-3. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
+2. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
-4. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
+3. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
    only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
    the refusal wording for every other type.
-5. **The composite CI action** that extracts ids from `terraform show -json`
+4. **The composite CI action** that extracts ids from `terraform show -json`
    and `az stack group what-if`, with `fail-on: no|tentative`. The build and
    release pipeline already exists.
-6. **The day-1 empirical tests** against a real subscription, each with its
+5. **The day-1 empirical tests** against a real subscription, each with its
    documented rule flip.
 
 ## Deliberate gaps
@@ -97,7 +95,13 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   confirmed one: confirming a producer means finding it in configuration, which
   is the other storage signals' work. The six mechanism entries carry no name
   pattern and are unreachable until a confirming collector exists.
-- `storage.data-plane.freshness`, `storage.shares.usage`
+- The data-plane walk is a sample, not a survey: five containers, twelve calls
+  and three seconds each. It can show that something was written; it cannot
+  show that nothing was, and the signal's caveat says so. The `y=/m=/d=/h=`
+  layout and the delimited-listing shape it assumes are read from the
+  specification, not verified against a live account, so a producer that
+  partitions differently is simply not found — never reported as silent.
+- `storage.shares.usage`
   and `storage.metrics.writes-inventory-shaped` are not_evaluated stubs with
   the specification's strings, and a storage operation this version cannot
   classify (NFS, for example) makes the silence signal unknown(unsupported)

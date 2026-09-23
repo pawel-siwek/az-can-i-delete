@@ -304,14 +304,28 @@ func Policies() map[string]output.SignalPolicy {
 			},
 		},
 		SignalDataPlane: {
-			Family: "data-plane", Confidence: "unknown",
-			Summaries: map[verdict.Status]string{
-				verdict.StatusNotEvaluated: "Data-plane freshness is not collected in this version.",
+			Family: "data-plane", Confidence: "verified",
+			Details: map[string]output.DetailPolicy{
+				"lastWrite":         {Kind: output.Timestamp},
+				"containersWalked":  {Kind: output.Number},
+				"partitionDepth":    {Kind: output.Number},
+				"withinFreshWindow": {Kind: output.Boolean},
+				"complete":          {Kind: output.Boolean},
 			},
+			Summaries: say(
+				"A sample of this account's containers was walked and something was written inside one of them.",
+				"The sampled containers had no dated partitions to walk, so nothing was written where the walk could see it.",
+				"The data-plane walk could not complete, so the last write inside this account is unknown."),
 			NotEvaluated: &verdict.NotEvaluated{
-				Reason:      "data-plane blob listing (`--data-plane`) is not implemented in this version",
-				Consequence: "last-write dates inside containers are unknown; freshness relies on metrics only",
-				HowToCheck:  "az storage blob list --account-name <sa> -c <container> --auth-mode login --query \"max_by(@, &properties.lastModified).properties.lastModified\"",
+				Reason:      "the data-plane walk was not requested, so nothing inside the containers was read",
+				Consequence: "last-write dates inside containers are unknown, and freshness rests on the account metrics alone",
+				HowToCheck:  "run this again with --data-plane, or az storage blob list --account-name <sa> -c <container> --auth-mode login",
+			},
+			Caveats: []string{
+				"The data-plane walk samples at most five containers and stops after twelve calls or three seconds in each. It can show that something was written; it cannot show that nothing was.",
+			},
+			NextSteps: []string{
+				"Treat the walk as a sample. A date it did not find is not a date that does not exist.",
 			},
 		},
 		SignalSharesUsage: {
