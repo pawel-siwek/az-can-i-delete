@@ -575,3 +575,37 @@ func TestUncordonLeavesSomebodyElsesTag(t *testing.T) {
 		t.Fatalf("restored %+v err %v tags %v", restored, err, f.cloud.tags)
 	}
 }
+
+// SPEC appendix E, after section 6.3: a path that may leave the state
+// changed without a verified tag keeps the prior in history.
+func TestAnUnverifiedChangeLeavesThePriorInHistory(t *testing.T) {
+	for name, breakIt := range map[string]func(f *fixture){
+		"the change does not finish": func(f *fixture) {
+			f.cloud.failPatch = func(map[string]any) error { return ErrStillRunning }
+		},
+		"the read-back fails": func(f *fixture) {
+			get := f.cordoner.Reader.ARM.(*collecttest.ARM).GetFunc
+			calls := 0
+			f.cordoner.Reader.ARM.(*collecttest.ARM).GetFunc = func(ctx context.Context, id, v string) (collect.Resource, error) {
+				calls++
+				if calls > 1 {
+					return collect.Resource{}, collecttest.Forbidden()
+				}
+				return get(ctx, id, v)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := setup(t, storageCloud())
+			p := plan(t, f, accountID)
+			breakIt(f)
+			if _, err := f.cordoner.Apply(context.Background(), p); err == nil {
+				t.Fatal("an unverified cordon succeeded")
+			}
+			entry, err := f.cordoner.History.LatestCordon(accountID)
+			if err != nil || entry.Prior != "Enabled" || entry.Tag != p.Tag {
+				t.Fatalf("history %+v err %v", entry, err)
+			}
+		})
+	}
+}

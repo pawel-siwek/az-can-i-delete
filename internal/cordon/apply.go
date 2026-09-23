@@ -129,7 +129,9 @@ func (c Cordoner) change(ctx context.Context, plan Plan, version string) error {
 	case ModePNA:
 		err := c.Writer.Patch(ctx, target.ID, version, map[string]any{"properties": map[string]any{"publicNetworkAccess": "Disabled"}})
 		if errors.Is(err, ErrStillRunning) {
-			return refuse(CodeStillRunning, "disabling public network access did not finish within five minutes; nothing was reverted and no tag was written. Check the account, then run cordon again or restore by hand.")
+			// It may yet finish, so the prior is kept where uncordon can use it.
+			_ = c.record(plan, "")
+			return refuse(CodeStillRunning, "disabling public network access did not finish within five minutes; nothing was reverted and no tag was written. The prior is in the local history: check the account, then uncordon --from-history --yes.")
 		}
 		if err != nil {
 			return fmt.Errorf("disabling public network access: %w", err)
@@ -137,7 +139,8 @@ func (c Cordoner) change(ctx context.Context, plan Plan, version string) error {
 	case ModeStop:
 		if err := c.Writer.Action(ctx, target.ID, "stop", version); err != nil {
 			if errors.Is(err, ErrStillRunning) {
-				return refuse(CodeStillRunning, "stopping the site did not finish within five minutes; nothing was reverted and no tag was written")
+				_ = c.record(plan, "")
+				return refuse(CodeStillRunning, "stopping the site did not finish within five minutes; nothing was reverted and no tag was written. The prior is in the local history: check the site, then uncordon --from-history --yes.")
 			}
 			return fmt.Errorf("stopping the site: %w", err)
 		}
@@ -175,7 +178,10 @@ func (c Cordoner) verifyCordoned(ctx context.Context, plan Plan, version string)
 	target := plan.Target
 	resource, err := c.Reader.ARM.Get(ctx, target.ID, version)
 	if err != nil {
-		return fmt.Errorf("verifying the state change: %w", err)
+		// The state may well be changed; history keeps the prior so the
+		// cordon can still be found and undone.
+		_ = c.record(plan, "")
+		return fmt.Errorf("verifying the state change (the prior is in the local history): %w", err)
 	}
 	if CurrentState(plan.Mode, resource) != cordonedState(plan.Mode) {
 		return c.undo(ctx, plan, version, refuse(CodeStateNotApplied, "the state change reads back unchanged (a Modify policy or another writer?); what this run changed was restored and no tag was written"))
@@ -185,7 +191,8 @@ func (c Cordoner) verifyCordoned(ctx context.Context, plan Plan, version string)
 	}
 	listed, err := c.Reader.ARM.List(ctx, target.ID+"/slots", version)
 	if err != nil {
-		return fmt.Errorf("verifying the slots: %w", err)
+		_ = c.record(plan, "")
+		return fmt.Errorf("verifying the slots (the prior is in the local history): %w", err)
 	}
 	states := slotStates(listed)
 	for i, slot := range plan.State.Slots {
