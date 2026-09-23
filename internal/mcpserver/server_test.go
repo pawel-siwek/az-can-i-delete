@@ -283,3 +283,20 @@ func TestCordonStatusRefusesWhatCordonRefuses(t *testing.T) {
 		t.Fatalf("result = %+v", result)
 	}
 }
+
+// A damaged azcid tag is still a tag value: the agent learns that the tag is
+// damaged, never what it says.
+func TestADamagedCordonTagIsRedactedForTheAgent(t *testing.T) {
+	arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+		return collect.Resource{ID: id, Tags: map[string]string{"azcid": secret},
+			Properties: map[string]any{"publicNetworkAccess": "Disabled"}}, nil
+	}}
+	c := &clock{testNow}
+	cfg, _ := config(true, c)
+	cfg.Status = cordon.Reader{ARM: arm}
+	result := call(t, connect(t, cfg), CordonStatus, map[string]any{"id": accountID})
+	body := text(t, result)
+	if result.IsError || strings.Contains(body, secret) || !strings.Contains(body, `"tagCorrupt":true`) {
+		t.Fatalf("result = %s", body)
+	}
+}

@@ -90,11 +90,7 @@ func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
 	case s.Reverted:
 		fmt.Fprintf(&b, "‼  REVERTED — %s (%s %s)\n\n", name, field, s.CurrentState)
 		if s.RevertedAt != nil {
-			fmt.Fprintf(&b, "    last write at %s", s.RevertedAt.Format(time.RFC3339))
-			if who := s.Untrusted["revertedBy"]; who != "" {
-				fmt.Fprintf(&b, " by %s `%s`", s.Untrusted["revertedByClass"], who)
-			}
-			b.WriteString("\n\n")
+			fmt.Fprintf(&b, "    last write at %s by a %s\n\n", s.RevertedAt.Format(time.RFC3339), s.Untrusted["revertedByClass"])
 		}
 	default:
 		fmt.Fprintf(&b, "🧱  CORDONED — %s (%s %s)\n\n", name, field, s.CurrentState)
@@ -119,8 +115,15 @@ func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
 			fmt.Fprintf(&b, "    %s (%s) — %s\n", unknown.ID, unknown.Code, unknown.Message)
 		}
 	}
-	if s.TagCorrupt {
-		fmt.Fprintf(&b, "    raw tag (untrusted): %s\n", s.Untrusted["tag"])
+	// Azure's own text is never part of a sentence this tool says. It is
+	// printed on its own, labelled as what it is.
+	if len(s.Untrusted) > 0 {
+		b.WriteString("\n    untrusted (Azure metadata; may contain anybody's text):\n")
+		for _, key := range []string{"revertedBy", "tag"} {
+			if value := s.Untrusted[key]; value != "" {
+				fmt.Fprintf(&b, "      %s: %s\n", key, value)
+			}
+		}
 	}
 	if len(s.Caveats) > 0 {
 		b.WriteString("\n    What this cannot see:\n")

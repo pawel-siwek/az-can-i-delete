@@ -240,6 +240,12 @@ func (s *server) cordonStatus(ctx context.Context, _ *mcp.CallToolRequest, in St
 		}
 		return nil, nil, errors.New("the cordon status could not be read")
 	}
+	// The azcid tag is a tag, and a damaged one is anybody's text: under the
+	// default redaction its raw value does not reach the agent. That it is
+	// damaged, and what that means, still does.
+	if s.cfg.RedactTags && status.Untrusted["tag"] != "" {
+		status.Untrusted["tag"] = "(redacted)"
+	}
 	value, err := document(status)
 	if err != nil {
 		return nil, nil, err
