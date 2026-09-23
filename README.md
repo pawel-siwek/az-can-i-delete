@@ -49,40 +49,48 @@ Cloud Shell is the quickest place to try this: it is already signed in, its
 `$HOME` persists between sessions, and nothing has to be installed on your own
 machine.
 
-**From a release**, once one has been tagged — no Go toolchain needed:
+This repository is **private**, so every install path needs your GitHub
+credentials. Nothing can be fetched anonymously, and a command that appears to
+work without signing in is a command that is about to fail with a 404.
+
+**One line, works today** — clone and build:
 
 ```sh
-V=v0.1.0
-base=https://github.com/pawel-siwek/az-can-i-delete/releases/download/$V
-curl -fsSLO $base/install.sh
-curl -fsSLO $base/checksums.txt
-grep ' install.sh$' checksums.txt | sha256sum -c -   # the installer itself
-less install.sh                                      # read what you are about to run
-bash install.sh $V
+git clone --depth 1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid && ~/src/azcid/scripts/cloud-shell.sh
 ```
 
-Four commands instead of one, and the difference is the point. Nothing is
-piped from a URL into a shell: the installer is fetched as a file, checked
-against the release's checksums, and read before it runs. The version is
-always explicit — there is no `latest`, because an installer that picks the
-version for you cannot be reviewed before it runs.
+Cloud Shell will ask for your GitHub username and a personal access token the
+first time, or use a credential helper you have already set up. The script
+lands on disk before it runs, so you can read it — nothing is executed
+straight off the network.
 
-The installer then downloads the archive for this platform, verifies its
-SHA-256 against the same `checksums.txt`, and only then installs into
-`~/.local/bin`; a mismatch installs nothing.
-
-**From source**, which works today. Pin the tag or commit you mean, so that
-what you build is what you reviewed:
+**One line, from a release** — once a tag has been cut:
 
 ```sh
-git clone --branch v0.1.0 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
-less ~/src/az-can-i-delete/scripts/cloud-shell.sh
-~/src/az-can-i-delete/scripts/cloud-shell.sh
+V=v0.1.0; R=pawel-siwek/az-can-i-delete; curl -fsSLO https://github.com/$R/releases/download/$V/{install.sh,checksums.txt} && sha256sum --ignore-missing -c checksums.txt && bash install.sh $V
 ```
 
-Before any tag exists, clone the default branch and check out the commit you
-looked at (`git clone …` then `git checkout <sha>`). Cloning a moving branch
-and running its script unread is the same trust problem in a slower form.
+Still one line, and still verified: the installer and the checksums are
+downloaded as files, the installer is checked against the release's own
+checksums, and only then does it run — after which it verifies the archive
+before anything reaches your PATH. Private-repo release assets need a token,
+so add `-H "Authorization: Bearer $GITHUB_TOKEN"` to the `curl`, or use
+`gh release download`.
+
+**If this repository is ever made public**, the best one-liner needs no script
+at all:
+
+```sh
+go install github.com/pawel-siwek/az-can-i-delete/cmd/az-can-i-delete@v0.1.0
+```
+
+The Go toolchain verifies the module against the public checksum database
+before it builds. That is stronger than anything a shell script can do for
+itself, and it is one command.
+
+What none of these do is pipe a download into a shell. That is not about the
+number of commands — it is that a shell executes each line as it arrives, so
+a truncated or substituted download still runs, and you never see what ran.
 
 The script clones or updates the source, builds with the Go that Cloud Shell
 already has (from Go 1.21 the toolchain downloads the exact version the module
