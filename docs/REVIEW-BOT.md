@@ -115,6 +115,31 @@ paragraph, **requests changes** — which blocks the merge — and the check goe
 red. When a later run finds nothing to object to, it withdraws that refusal
 itself.
 
+## 6. Ask it something
+
+It also answers. A comment containing `/review` on a pull request re-runs the
+review; `/review` followed by a question answers that question instead, in the
+thread where it was asked when it was asked in one.
+
+```
+/review does the new AST check in internal/conformance overlap with driftcheck?
+```
+
+An answer is an answer, not a verdict: it approves nothing, blocks nothing, and
+a question the reviewer could not settle from the documents gets told so rather
+than guessed at.
+
+Only people with write access can ask. A comment is the cheapest thing in the
+world to write and this one spends your model, so the trigger is gated on
+having write access already — and on the commenter not being a bot, which is
+what keeps two of them from answering each other forever.
+
+The `Reply` workflow builds the reviewer from the base branch before any of the
+pull request's code is on disk. That matters here in a way it does not for
+`Review`: a comment trigger always runs with a writable token, where a pull
+request from a fork gets none. What runs is what the base branch says it is;
+the change itself is read as a diff, which is material, never something run.
+
 Check it is configured at all:
 
 ```sh
