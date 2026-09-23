@@ -181,6 +181,35 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         blocking finding.
         """;
 
+    /// <summary>The service's account of why it refused, bounded.</summary>
+    static async Task<string> Detail(HttpResponseMessage response)
+    {
+        string body;
+        try
+        {
+            body = await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception error)
+        {
+            return $"(the response could not be read: {error.Message})";
+        }
+        try
+        {
+            using var parsed = JsonDocument.Parse(body);
+            if (parsed.RootElement.TryGetProperty("error", out var failure) &&
+                failure.TryGetProperty("message", out var message))
+            {
+                body = message.GetString() ?? body;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON. Whatever it is, it is still the only account there is.
+        }
+        body = body.Trim();
+        return body.Length > 400 ? body[..400] + "…" : body;
+    }
+
     static (string Diff, bool Truncated) Diff(string baseRevision)
     {
         var diff = Git("diff", $"{baseRevision}...HEAD");
@@ -220,6 +249,13 @@ sealed class Reviewer(string endpoint, string deployment, string token)
 
     async Task<string> AskAsync(string system, string user)
     {
+        // No temperature. Pinning it to 0 for a reproducible review is the
+        // obvious thing to want, and the newer reasoning models reject the
+        // request outright rather than ignoring it: they sample at a fixed
+        // temperature and refuse to be told otherwise. Sending nothing works
+        // on every model, and the determinism it costs was never guaranteed
+        // anyway — what keeps this review honest is the contract it has to
+        // answer in and the mechanical checks beside it, not a sampling knob.
         var body = JsonSerializer.Serialize(new
         {
             messages = new[]
@@ -227,7 +263,6 @@ sealed class Reviewer(string endpoint, string deployment, string token)
                 new { role = "system", content = system },
                 new { role = "user", content = user },
             },
-            temperature = 0,
         });
 
         var address = $"{endpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions?api-version={Rules.ApiVersion("azureAIInference")}";
@@ -240,7 +275,14 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         using var response = await Http.SendAsync(request);
         if (!response.IsSuccessStatusCode)
         {
-            throw new HttpRequestException($"the model refused the request with status {(int)response.StatusCode}");
+            // Say which refusal it was. A bare status tells a reader nothing
+            // they can act on — a wrong deployment name, an unsupported
+            // parameter and an exhausted quota all read as 400 or 404, and
+            // they need different people to fix them. The service's own text
+            // goes in the workflow log, which is not the report: nothing
+            // provider-written reaches a verdict (ADR-0007).
+            throw new HttpRequestException(
+                $"the model refused the request with status {(int)response.StatusCode}: {await Detail(response)}");
         }
 
         using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
