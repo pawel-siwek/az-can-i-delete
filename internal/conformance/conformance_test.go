@@ -288,3 +288,127 @@ func TestTheAssessmentPathPerformsNoWrites(t *testing.T) {
 		}
 	}
 }
+
+// pipeToShell matches a download piped straight into an interpreter.
+var pipeToShell = regexp.MustCompile(`(?i)(curl|wget)[^\n|]*\|\s*(sudo\s+)?(ba)?sh\b`)
+
+// instruction distinguishes a command somebody could paste from prose about
+// the pattern. A real instruction carries a real address — a scheme or a
+// variable holding one — while a discussion of the anti-pattern elides it,
+// as this file and docs/adr/0014 both do. Writing out a working URL is what
+// turns a mention into an instruction, so that is what this looks for.
+func instruction(line string) bool {
+	if strings.Contains(line, "…") || strings.Contains(line, "...") {
+		return false
+	}
+	return strings.Contains(line, "://") || strings.Contains(line, "$")
+}
+
+// ADR-0014: nothing this project tells somebody to run arrives unread.
+//
+// The rule is easy to state and easy to lose: the convenient install line is
+// one command, the honest one is four, and the convenient one gets pasted into
+// a README by whoever is in a hurry. It was, which is why this test exists.
+//
+// The CI workflow is the one exception, named here rather than pattern-matched
+// away: it installs a linter at a pinned version onto an ephemeral runner that
+// holds nothing, and it is not something this project asks a user to run.
+func TestNothingTellsAnybodyToPipeAURLIntoAShell(t *testing.T) {
+	const allowed = ".github/workflows/ci.yml"
+
+	// The normative documents quote the rule and describe the historical
+	// design; they are the specification, not instructions to run anything.
+	historical := map[string]bool{
+		"REQUIREMENTS.md": true,
+		"docs/SPEC.md":    true,
+	}
+
+	err := filepath.WalkDir(root(), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		switch filepath.Ext(path) {
+		case ".md", ".sh", ".yaml", ".yml":
+		default:
+			return nil
+		}
+		relative, relErr := filepath.Rel(root(), path)
+		if relErr != nil {
+			return relErr
+		}
+		relative = filepath.ToSlash(relative)
+		if relative == allowed || historical[relative] {
+			return nil
+		}
+		body, readErr := os.ReadFile(path) //nolint:gosec // the path comes from walking this repository
+		if readErr != nil {
+			return readErr
+		}
+		for number, line := range strings.Split(string(body), "\n") {
+			if pipeToShell.MatchString(line) && instruction(line) {
+				t.Errorf("%s:%d tells somebody to pipe a download into a shell; publish the script, checksum it, and let them read it first (docs/adr/0014)\n\t%s",
+					relative, number+1, strings.TrimSpace(line))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ADR-0014: the scripts a release tells somebody to run are published with it
+// and listed in its checksums, so the verifying step is itself verifiable.
+func TestTheInstallScriptsAreReleasedAndChecksummed(t *testing.T) {
+	config, err := os.ReadFile(filepath.Join(root(), ".goreleaser.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(config)
+	checksum, release, found := strings.Cut(text, "\nrelease:")
+	if !found {
+		t.Fatal(".goreleaser.yaml has no release block")
+	}
+	for _, script := range []string{"./scripts/install.sh", "./scripts/cloud-shell.sh"} {
+		if !strings.Contains(checksum, script) {
+			t.Errorf("%s is not in the checksums, so nobody can verify the script they are told to run", script)
+		}
+		if !strings.Contains(release, script) {
+			t.Errorf("%s is not published with the release, so it could only be fetched from a branch", script)
+		}
+	}
+}
+
+// The detector above is only worth having if it fires on the line that started
+// this, so here is that line and its neighbours.
+func TestThePipeDetectorCatchesTheRealThing(t *testing.T) {
+	cases := []struct {
+		line string
+		want bool
+	}{
+		{"curl -fsSL https://raw.githubusercontent.com/o/r/main/scripts/cloud-shell.sh | bash", true},
+		{"curl -fsSL https://example.com/i.sh | sudo bash", true},
+		{"wget -qO- https://example.com/i.sh | sh", true},
+		{"curl -fsSLO $base/install.sh | bash", true},
+		// Prose about the pattern, which the records and the scripts both need
+		// to be able to write.
+		{"The convenient install line is `curl … | sh`, resolving \"latest\" server side.", false},
+		{"# Deliberately not documented as `curl ... | bash`.", false},
+		// The honest form: fetched as a file, verified, then run.
+		{"curl -fsSLO $base/install.sh", false},
+		{"grep ' install.sh$' checksums.txt | sha256sum -c -", false},
+		{"bash install.sh $V", false},
+	}
+	for _, test := range cases {
+		got := pipeToShell.MatchString(test.line) && instruction(test.line)
+		if got != test.want {
+			t.Errorf("detector said %v for %q, want %v", got, test.line, test.want)
+		}
+	}
+}
