@@ -118,9 +118,13 @@ func NewRootCommand(version string) *cobra.Command {
 func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	options := &outputOptions{}
 	root := &cobra.Command{
-		Use:           "az-can-i-delete",
-		Short:         "Evidence before infrastructure deletion",
-		Long:          "Collect deterministic Azure resource evidence before deletion.\nThis initial command scaffold exposes help and version; assessment and mutation commands are not implemented yet.",
+		Use:   "az-can-i-delete",
+		Short: "Evidence before infrastructure deletion",
+		Long: "Collect deterministic Azure resource evidence before deletion.\n\n" +
+			"`check` assesses storage accounts, managed disks, network interfaces, public IP\n" +
+			"addresses, network security groups, virtual machines, App Service sites and plans.\n" +
+			"It reads; it never writes. The commands marked not implemented say so and exit 1.\n\n" +
+			"A verdict is evidence, not permission.",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,

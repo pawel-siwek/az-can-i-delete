@@ -89,11 +89,14 @@ checkout: the one you can read. Run it again later to update and rebuild.
 publishes the bare binaries as well as the archives:
 
 ```sh
-gh release download v0.1.2 -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete && chmod +x ~/.local/bin/az-can-i-delete
+gh release download v0.1.2 -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete --clobber && chmod +x ~/.local/bin/az-can-i-delete
 ```
 
 Swap `linux_amd64` for `linux_arm64`, `darwin_arm64` or `darwin_amd64` as
-needed. `gh` carries your credentials, so this works on a private repository,
+needed. `--clobber` is what makes the second run work: without it `gh` refuses
+to replace the binary already on your PATH and the command stops, leaving the
+version you had. It overwrites only the one path named by `-O`, which is a
+path you wrote yourself. `gh` carries your credentials, so this works on a private repository,
 and it fetches over authenticated TLS from the release itself.
 
 **If you want the checksum checked as well**, that is what `install.sh` is
