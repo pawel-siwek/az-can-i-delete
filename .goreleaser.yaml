@@ -86,25 +86,19 @@ release:
   footer: |
     ## Installing
 
-    Fetch the installer and the checksums, verify the installer, read it, then
-    run it. Each step is one you can stop at.
+    One line, and still verified:
 
     ```sh
-    V={{ .Tag }}
-    base=https://github.com/pawel-siwek/az-can-i-delete/releases/download/$V
-    curl -fsSLO $base/install.sh
-    curl -fsSLO $base/checksums.txt
-    grep ' install.sh$' checksums.txt | sha256sum -c -
-    less install.sh
-    bash install.sh $V
+    V={{ .Tag }}; R=pawel-siwek/az-can-i-delete; curl -fsSLO https://github.com/$R/releases/download/$V/{install.sh,checksums.txt} && sha256sum --ignore-missing -c checksums.txt && bash install.sh $V
     ```
 
-    The installer then verifies the SHA-256 of the archive before it puts
-    anything on your PATH, and installs into `~/.local/bin`.
+    The installer and the checksums arrive as files, the installer is checked
+    against the release's own checksums, and only then does it run — after
+    which it verifies the archive's SHA-256 before anything reaches your PATH.
+    Installs into `~/.local/bin`; a mismatch installs nothing.
 
-    Nothing here is piped from a URL into a shell. A command you cannot read
-    before it runs is one you are trusting rather than checking, and a
-    truncated download of one can still execute the part that arrived.
+    Read `install.sh` first if you would rather: it is on disk before it runs,
+    which is the whole difference from piping it into a shell.
 
     A verdict from this tool is evidence, not permission. `yes` means no
     evidence of use was found by the signals it could evaluate, never that
