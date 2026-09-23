@@ -1,6 +1,6 @@
 # ADR-0011: The installer always names a version, and verifies what it fetched
 
-- Status: accepted
+- Status: superseded by ADR-0014
 - Date: 2026-09-22
 - Source: REQUIREMENTS.md section 7
 

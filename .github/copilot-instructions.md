@@ -58,8 +58,9 @@ blocking, because each is a documented way this tool becomes dangerous:
   (ADR-0010).
 - A change to an expected result in the 66-case acceptance suite that is not
   accompanied by a specification change (ADR-0012).
-- An install path that resolves a version server side, or skips checksum
-  verification (ADR-0011).
+- An install path that resolves a version server side, skips checksum
+  verification, or tells somebody to pipe a download into a shell rather
+  than fetch it, verify it and read it (ADR-0014, superseding ADR-0011).
 - A claim in the README, the plan or a command's help text that an analyzer,
   signal or command is implemented when the diff shows it is not.
 
