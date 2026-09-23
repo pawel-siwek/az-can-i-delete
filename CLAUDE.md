@@ -7,15 +7,15 @@ credit the agent as co-author — the owner is accountable for what lands, the
 agent is not a second contributor with its own standing.
 
 ```sh
-git config user.name "pawel-siwek"
-git config user.email "pawel.siwek@outlook.com"
+git config user.name "$(git log -1 --format='%an' origin/main)"
+git config user.email "$(git log -1 --format='%ae' origin/main)"
 ```
 
-That pair, and no other. It is the identity on this repository's own merge
-commits, which is the only place worth reading it from — an address that
-happens to belong to the same human can still belong to a different GitHub
-account, and commits written with it are attributed to that other account.
-Take the identity from `git log` here, never from a name that looks right.
+Read it from this repository's own history, never from an address that looks
+like the right person: one that belongs to the same human can still belong to
+a different account, and commits written with it are attributed to that other
+account. Reading it rather than writing it down also keeps the owner's address
+out of the files, where it would be one more copy to think about.
 
 Every commit message an agent writes ends with exactly this trailer, and
 nothing else:
