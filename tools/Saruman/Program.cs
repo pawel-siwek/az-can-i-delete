@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
@@ -221,7 +222,33 @@ sealed class Reviewer(string endpoint, string deployment, string token)
             // Not JSON. Whatever it is, it is still the only account there is.
         }
         body = body.Trim();
-        return body.Length > 400 ? body[..400] + "…" : body;
+        if (body.Length > 400)
+        {
+            body = body[..400] + "…";
+        }
+        return body + Limits(response);
+    }
+
+    /// <summary>What the gateway says the limits actually are.</summary>
+    ///
+    /// These headers are the only honest account of a 429. The deployment's
+    /// own record can say one thing while the gateway serving it enforces
+    /// another — a capacity change reaches the control plane first and the
+    /// serving layer minutes later — and during that gap `az` reports a limit
+    /// that is not the one refusing the request. Reading the refusal's own
+    /// headers is how that gap becomes visible instead of looking like a
+    /// mystery, or like somebody's arithmetic being wrong.
+    static string Limits(HttpResponseMessage response)
+    {
+        var parts = new List<string>();
+        foreach (var name in new[] { "x-ratelimit-limit-tokens", "x-ratelimit-remaining-tokens", "x-ratelimit-limit-requests", "retry-after" })
+        {
+            if (response.Headers.TryGetValues(name, out var values))
+            {
+                parts.Add($"{name}={string.Join(",", values)}");
+            }
+        }
+        return parts.Count == 0 ? string.Empty : " [" + string.Join(" ", parts) + "]";
     }
 
     static (string Diff, bool Truncated) Diff(string baseRevision)
