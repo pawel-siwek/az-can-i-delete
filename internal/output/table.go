@@ -17,9 +17,6 @@ import (
 // and nothing else. The rest is one flag away and always in the JSON.
 const tableWidth = 100
 
-// Full restores the complete view: every signal, and the limitations verbatim.
-var Full bool
-
 // verdictBanner is the headline and the one sentence that says what it means.
 // Nothing here is collected from Azure; it is the tool's own text.
 var verdictBanner = map[string]struct{ icon, word, remark string }{
@@ -31,7 +28,7 @@ var verdictBanner = map[string]struct{ icon, word, remark string }{
 		"I could not verify everything, so I do not know whether you can delete this. Read the evidence below and decide."},
 }
 
-func tableOutput(items []json.RawMessage) ([]byte, error) {
+func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 	var out bytes.Buffer
 	for i, item := range items {
 		decoder := json.NewDecoder(bytes.NewReader(item))
@@ -50,8 +47,8 @@ func tableOutput(items []json.RawMessage) ([]byte, error) {
 		}
 		writeVerdict(&out, value)
 		writeFindings(&out, value)
-		writeFooter(&out, value)
-		if Full {
+		writeFooter(&out, value, view)
+		if view.Full {
 			writeEverySignal(&out, value)
 			writeList(&out, "Limitations", textList(value["limitations"]))
 		}
@@ -167,7 +164,7 @@ func writeSignal(out *bytes.Buffer, row map[string]any) {
 }
 
 // writeFooter is one line of provenance and one of what else is available.
-func writeFooter(out *bytes.Buffer, value map[string]any) {
+func writeFooter(out *bytes.Buffer, value map[string]any, view View) {
 	parts := []string{}
 	if coverage, ok := value["coverage"].(map[string]any); ok {
 		parts = append(parts, fmt.Sprintf("%s/%s checked", text(coverage["evaluated"]), text(coverage["total"])))
@@ -182,7 +179,7 @@ func writeFooter(out *bytes.Buffer, value map[string]any) {
 	}
 	parts = append(parts, "rules "+text(value["rulesDate"]), "v"+text(value["toolVersion"]))
 	fmt.Fprintf(out, "\n    %s\n", strings.Join(parts, " · "))
-	if !Full {
+	if !view.Full {
 		fmt.Fprintf(out, "    everything: --full · machine-readable: -o json\n")
 	}
 	writeWrappedAt(out, "    ", "    ", text(value["resourceId"]))

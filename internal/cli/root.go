@@ -256,10 +256,7 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	if err != nil {
 		return err
 	}
-	// The terminal view shows what was found; --full restores everything.
-	if full, err := cmd.Flags().GetBool("full"); err == nil {
-		output.Full = full
-	}
+
 	runner, err := deps.Runner(version, dataPlane)
 	if err != nil {
 		return &ExitError{Code: 1, Err: err}
@@ -276,7 +273,12 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 			failures = append(failures, checkErr)
 		}
 	}
-	if err := output.Render(cmd.OutOrStdout(), options.format, outcomes); err != nil && len(failures) == 0 {
+	// The terminal view shows what was found; --full restores everything.
+	var view []output.ViewOption
+	if full, flagErr := cmd.Flags().GetBool("full"); flagErr == nil && full {
+		view = append(view, output.Detailed())
+	}
+	if err := output.Render(cmd.OutOrStdout(), options.format, outcomes, view...); err != nil && len(failures) == 0 {
 		return &ExitError{Code: 1, Err: err}
 	}
 	code := output.ExitCode(outcomes, exitOnVerdict)
