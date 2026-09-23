@@ -18,6 +18,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
 	"github.com/pawel-siwek/az-can-i-delete/internal/azure"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/replay"
 )
 
@@ -246,15 +247,15 @@ func TestTheRedactionCheckCatchesARealName(t *testing.T) {
 }
 
 // A recording is committed to a repository and read by people who were never
-// in that tenant. Blanking the fields that carry somebody's names is not
-// enough on its own: a resource body is Azure's structure with leaves a
-// stranger may have chosen, and a control character in one of them is a thing
-// a terminal acts on rather than shows.
-func TestARecordedStringIsTextAndNothingElse(t *testing.T) {
+// in that tenant. It carries Azure free-form text, so it is held to the same
+// character contract as anything else that leaves this tool (ADR-0007), and
+// to one documented difference from it (ADR-0016): no truncation.
+func TestARecordedStringIsHeldToTheTextContract(t *testing.T) {
 	dir := t.TempDir()
 	recorder, err := replay.Record(dir, answering(`{
 		"name": "ok\u0007bell",
-		"properties": {"note": "line\nbreak\tand tab", "id": "/subscriptions/x/resourceGroups/y"},
+		"spoofed": "invoice\u202Egpj.exe",
+		"properties": {"note": "line\nbreak", "id": "/subscriptions/x/resourceGroups/y/providers/Microsoft.Compute/disks/a-name-long-enough-to-be-cut-by-a-128-rune-cap-if-anything-here-still-applied-one-which-is-the-whole-point-of-the-record"},
 		"tags": {"owner": "someone"}
 	}`, map[string]string{"Content-Type": "application/json", "Retry-After": "30", "apim-request-id": "abc"}))
 	if err != nil {
@@ -267,17 +268,21 @@ func TestARecordedStringIsTextAndNothingElse(t *testing.T) {
 	if _, err := recorder.RoundTrip(&http.Request{Method: http.MethodGet, URL: address}); err != nil {
 		t.Fatal(err)
 	}
-
 	written := onlyFile(t, filepath.Join(dir, "responses"))
-	if strings.Contains(written, "\\u0007") {
+
+	// A control character is not text.
+	if strings.Contains(written, `\u0007`) {
 		t.Errorf("a control character was recorded:\n%s", written)
 	}
-	// A tab and a newline are things a JSON string legitimately carries.
-	if !strings.Contains(written, `line\nbreak\tand tab`) {
-		t.Errorf("ordinary whitespace was stripped:\n%s", written)
+	// Neither is a format character. This one reverses everything after it,
+	// so a file called `invoice<RLO>gpj.exe` reads as `invoice.jpg`, and a
+	// recording is a thing people read.
+	if strings.Contains(written, "\u202e") || strings.Contains(written, `\u202E`) {
+		t.Errorf("a bidirectional override was recorded:\n%s", written)
 	}
-	// Truncating would record something Azure never said.
-	if !strings.Contains(written, "/subscriptions/x/resourceGroups/y") {
+	// ADR-0016: no truncation. A resource id cut at 128 runes would be a
+	// recording of something Azure never said.
+	if !strings.Contains(written, "which-is-the-whole-point-of-the-record") {
 		t.Errorf("a long value was cut:\n%s", written)
 	}
 	// SPEC 7.5: a recorded response carries its headers.
@@ -289,6 +294,19 @@ func TestARecordedStringIsTextAndNothingElse(t *testing.T) {
 	// A per-call identifier helps no replay and names one tenant's traffic.
 	if strings.Contains(written, "apim-request-id") {
 		t.Errorf("a per-request identifier was recorded:\n%s", written)
+	}
+}
+
+// The recorder must not have its own idea of what text is. Whatever the
+// boundary strips, a recording strips, because they are one implementation.
+func TestTheRecorderAndTheBoundaryAgreeOnWhatTextIs(t *testing.T) {
+	for _, sample := range []string{
+		"plain", "ok\u0007bell", "invoice\u202Egpj.exe", "line\nbreak\ttab",
+		"\u200bzero width", "private\ue000use", "caf\u00e9",
+	} {
+		if got, want := replay.SanitizedForTest(sample), output.Sanitized(sample); got != want {
+			t.Errorf("%q: the recorder produced %q, the boundary %q", sample, got, want)
+		}
 	}
 }
 

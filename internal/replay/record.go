@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf8"
 
+	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"gopkg.in/yaml.v3"
 )
 
@@ -160,40 +160,6 @@ func redact(value any) any {
 	}
 }
 
-// sanitize is the recorder's half of ADR-0007, applied to every string rather
-// than only the three that are blanked.
-//
-// Blanking the fields that carry somebody's names is not enough on its own: a
-// resource body is Azure's structure but its leaves are text a stranger may
-// have chosen, and a control character or a lone surrogate committed into a
-// fixture is a thing a reader's terminal executes rather than shows. So every
-// string loses what is not text before it is written.
-//
-// It does not truncate, which the report boundary does. A report is read by a
-// person and a long value there is noise; a fixture is replayed through the
-// code, and a resource id or a token cut at 128 runes would be a recording of
-// something Azure never said.
-func sanitize(value string) string {
-	if utf8.ValidString(value) && strings.IndexFunc(value, unprintable) < 0 {
-		return value
-	}
-	return strings.Map(func(r rune) rune {
-		if r == utf8.RuneError || unprintable(r) {
-			return -1
-		}
-		return r
-	}, strings.ToValidUTF8(value, ""))
-}
-
-// unprintable reports a rune that is not text: a control character other than
-// the two a JSON string may legitimately carry, or an unassigned surrogate.
-func unprintable(r rune) bool {
-	if r == '\t' || r == '\n' {
-		return false
-	}
-	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || (r >= 0xd800 && r <= 0xdfff)
-}
-
 // blank keeps a redacted field's shape and loses its content: a collector that
 // counts tags must still see how many there were.
 func blank(value any) any {
@@ -217,15 +183,15 @@ func blank(value any) any {
 	}
 }
 
-func lower(s string) string {
-	out := []rune(s)
-	for i, r := range out {
-		if r >= 'A' && r <= 'Z' {
-			out[i] = r + ('a' - 'A')
-		}
-	}
-	return string(out)
-}
+func lower(s string) string { return strings.ToLower(s) }
+
+// sanitize applies ADR-0007's character contract to a recorded string, and
+// deliberately not its length cap. ADR-0016 is the record of that difference.
+//
+// It calls the boundary's own implementation rather than restating the rules.
+// A second copy of "which Unicode categories are not text" would agree with
+// the first until somebody fixed one of them.
+func sanitize(value string) string { return output.Sanitized(value) }
 
 // WriteManifest records what the run was, and what it produced. The expected
 // verdict is written from the run rather than typed in, so a fixture always
