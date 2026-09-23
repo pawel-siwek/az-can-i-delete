@@ -1,4 +1,4 @@
-# Deploying the pull request reviewer
+# Deploying Saruman, the pull request reviewer
 
 Every pull request is checked twice.
 
@@ -115,7 +115,42 @@ paragraph, **requests changes** — which blocks the merge — and the check goe
 red. When a later run finds nothing to object to, it withdraws that refusal
 itself.
 
-## 6. Ask it something
+## 6. Give it its own name
+
+Skip this and it still reviews — as `github-actions[bot]`, the identity of
+whatever workflow happened to run. That is accurate and anonymous: the same
+name signs every automated thing in the repository, so a reader cannot tell
+the reviewer from a release job.
+
+A GitHub App fixes that. An App is an identity, not a service: nothing is
+hosted, nothing runs between pull requests, and the token minted from it lasts
+an hour. Reviews are then signed `saruman[bot]`, and that is the name in the
+Reviewers list.
+
+1. **Settings → Developer settings → GitHub Apps → New GitHub App.** Name it
+   `saruman`. Homepage URL can be the repository. Uncheck **Webhook → Active**:
+   nothing listens, so nothing should be sent.
+2. **Repository permissions:** `Pull requests: Read and write`,
+   `Contents: Read-only`. Nothing else. It writes reviews; it does not push.
+3. **Where can this GitHub App be installed:** only this account.
+4. Create it, then **Generate a private key** — a `.pem` downloads — and
+   **Install App** on this repository.
+5. Tell the workflows who it is. The app id is public; the key is not:
+
+```sh
+gh variable set SARUMAN_APP_ID      -R "$REPO" -b "<the app id from its settings page>"
+gh secret   set SARUMAN_PRIVATE_KEY -R "$REPO" < ~/Downloads/saruman.<...>.private-key.pem
+```
+
+Both must be set before the workflows use the app; either one alone, and they
+fall back to `github-actions[bot]` rather than failing. A missing identity is
+not a reason to say nothing.
+
+Saruman still never approves, app or no app. An App *can* approve, where
+`github-actions[bot]` cannot, which is exactly why the rule is written in the
+code rather than left to what the token happens to permit.
+
+## 7. Ask it something
 
 It also answers. A comment containing `/review` on a pull request re-runs the
 review; `/review` followed by a question answers that question instead, in the
@@ -134,7 +169,7 @@ world to write and this one spends your model, so the trigger is gated on
 having write access already — and on the commenter not being a bot, which is
 what keeps two of them from answering each other forever.
 
-The `Reply` workflow builds the reviewer from the base branch before any of the
+The `Reply` workflow builds Saruman from the base branch before any of the
 pull request's code is on disk. That matters here in a way it does not for
 `Review`: a comment trigger always runs with a writable token, where a pull
 request from a fork gets none. What runs is what the base branch says it is;

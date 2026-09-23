@@ -55,13 +55,28 @@ jobs:
 
       # From the base branch, before the pull request's code exists here.
       - name: Build the reviewer
-        run: dotnet publish tools/ReviewBot -o "$RUNNER_TEMP/reviewer" -warnaserror --nologo
+        run: dotnet publish tools/Saruman -o "$RUNNER_TEMP/reviewer" -warnaserror --nologo
 
       # Say it was heard. A question that sits for a minute with no sign of
       # life reads as a question nobody is answering.
+      # Saruman's own identity, so a review is signed by Saruman rather than by
+      # the workflow that happened to run it. A GitHub App is an identity, not
+      # a service: nothing is hosted, and the token it mints lasts an hour.
+      #
+      # Optional on purpose. Without the app the reviewer still reviews, as
+      # `github-actions[bot]`; a missing identity is not a reason to say
+      # nothing.
+      - name: Speak as Saruman
+        id: saruman
+        if: vars.SARUMAN_APP_ID != '' && secrets.SARUMAN_PRIVATE_KEY != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.SARUMAN_APP_ID }}
+          private-key: ${{ secrets.SARUMAN_PRIVATE_KEY }}
+
       - name: Acknowledge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.saruman.outputs.token || secrets.GITHUB_TOKEN }}
           COMMENT: ${{ github.event.comment.id }}
           KIND: ${{ github.event_name }}
         run: |
@@ -75,7 +90,7 @@ jobs:
       - name: Read the pull request
         id: pr
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.saruman.outputs.token || secrets.GITHUB_TOKEN }}
           NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
         run: |
           base="$(gh pr view "$NUMBER" --json baseRefName --jq .baseRefName)"
@@ -113,7 +128,7 @@ jobs:
         env:
           AZURE_AI_ENDPOINT: ${{ vars.AZURE_AI_ENDPOINT }}
           AZURE_AI_DEPLOYMENT: ${{ vars.AZURE_AI_DEPLOYMENT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.saruman.outputs.token || secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
           REVIEW_COMMENT_ID: ${{ github.event_name == 'pull_request_review_comment' && github.event.comment.id || '' }}
           BODY: ${{ github.event.comment.body }}
@@ -129,4 +144,4 @@ jobs:
           REVIEW_QUESTION="$(printf '%s' "${BODY#*/review}" | sed 's/^[[:space:]]*//')"
           export REVIEW_QUESTION
 
-          dotnet "$RUNNER_TEMP/reviewer/ReviewBot.dll" "origin/$BASE"
+          dotnet "$RUNNER_TEMP/reviewer/Saruman.dll" "origin/$BASE"

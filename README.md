@@ -301,9 +301,11 @@ the records themselves: numbered, sectioned, indexed, and cited in the
 reviewer's brief. Both run in `go test ./...`, need no credential, and go red
 like any other failing test.
 
-The rest is judgement: `tools/ReviewBot` asks a model in your own Azure AI
-Foundry to read the diff against the same documents, writes what it found on
-the pull request, and fails its check when it disagrees. It is reached with a
+The rest is judgement: Saruman — `tools/Saruman` — asks a model in your own
+Azure AI Foundry to read the diff against the same documents, submits a review
+saying what it found, and fails its check when it disagrees. It requests
+changes when it disagrees and never approves, so it can block a merge but can
+never stand in for the human approval the repository requires. It is reached with a
 federated token, so no key is stored in GitHub and nothing bills per pull
 request. [`docs/REVIEW-BOT.md`](docs/REVIEW-BOT.md) is the setup; until it is
 configured the job reports that it did not run, rather than claiming an

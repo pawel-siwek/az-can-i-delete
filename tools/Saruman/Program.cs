@@ -18,7 +18,7 @@ using System.Text.RegularExpressions;
 
 if (args.Length != 1)
 {
-    Console.Error.WriteLine("usage: ReviewBot <base-revision>");
+    Console.Error.WriteLine("usage: saruman <base-revision>");
     return 2;
 }
 
@@ -319,7 +319,7 @@ static class GitHub
 
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("az-can-i-delete-reviewbot");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("saruman");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
         var review = Json(new { body = text, @event = ok ? "COMMENT" : "REQUEST_CHANGES" });
@@ -372,7 +372,7 @@ static class GitHub
 
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("az-can-i-delete-reviewbot");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("saruman");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
         // Set only when the question came from a review thread.
@@ -400,8 +400,8 @@ static class GitHub
         }
     }
 
-    const string OkHeading = "### ✅ Conformance review — OK";
-    const string NotOkHeading = "### ⛔ Conformance review — NOT OK";
+    const string OkHeading = "### ✅ Saruman — OK";
+    const string NotOkHeading = "### ⛔ Saruman — NOT OK";
 
     /// <summary>Takes back this reviewer's own earlier refusals.</summary>
     ///
