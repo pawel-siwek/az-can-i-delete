@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The pull request reviewer. It lives outside the Go module on purpose: it is
+    build infrastructure, not part of the tool anybody installs, and nothing it
+    depends on should reach the product's dependency surface or its test run.
+
+    No package references. Everything it needs is in the base class library, so
+    a run needs no restore from a feed and cannot be broken by one.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

@@ -150,22 +150,34 @@ func TestAnalyzersDependOnTheBoundariesNotTheSDK(t *testing.T) {
 // goReferenceLayout is the one date that is not an api-version.
 const goReferenceLayout = "2006-01-02"
 
-var apiVersion = regexp.MustCompile(`"(20\d\d-\d\d-\d\d)(-preview)?"`)
+// apiVersion matches a pinned version wherever it is written: quoted on its
+// own, or embedded in a request path as `api-version=`. The first form is how
+// a constant looks; the second is how one hides inside a formatted string,
+// which is how the C# reviewer's literal got past the first version of this.
+var apiVersion = regexp.MustCompile(`"(20\d\d-\d\d-\d\d)(-preview)?"|api-version=(20\d\d-\d\d-\d\d)(-preview)?`)
 
 // ADR-0008: one pin per operation, in the rule table. Two copies of a version
 // agree until they do not, and then a signal is collected under one and
 // reported under the other.
+//
+// The rule follows the code rather than the language: the reviewer in tools/
+// is C# and reads the same table, so a literal there would be the same
+// mistake and is caught the same way.
 func TestApiVersionsLiveOnlyInTheRuleTable(t *testing.T) {
-	for _, file := range sources(t, false) {
+	for _, file := range append(sources(t, false), otherLanguages(t)...) {
 		if under(file, "internal/rules") {
 			continue
 		}
 		for _, match := range apiVersion.FindAllStringSubmatch(file.body, -1) {
-			if strings.HasPrefix(match[1], goReferenceLayout) {
+			version := match[1]
+			if version == "" {
+				version = match[3] // the api-version= form
+			}
+			if strings.HasPrefix(version, goReferenceLayout) {
 				continue // the Go reference time, not a version
 			}
 			t.Errorf("%s carries the api-version %s as a literal; pin it in internal/rules/rules.yaml and read it back (docs/adr/0008)",
-				file.path, match[1])
+				file.path, version)
 		}
 	}
 }
@@ -411,4 +423,37 @@ func TestThePipeDetectorCatchesTheRealThing(t *testing.T) {
 			t.Errorf("detector said %v for %q, want %v", got, test.line, test.want)
 		}
 	}
+}
+
+// otherLanguages is the repository's source that is not Go. The constraints
+// the records set are about what this project does, not about which compiler
+// happens to be involved.
+func otherLanguages(t *testing.T) []sourceFile {
+	t.Helper()
+	var found []sourceFile
+	err := filepath.WalkDir(filepath.Join(root(), "tools"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil // no such tools yet
+			}
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".cs" {
+			return nil
+		}
+		body, readErr := os.ReadFile(path) //nolint:gosec // the path comes from walking this repository
+		if readErr != nil {
+			return readErr
+		}
+		relative, relErr := filepath.Rel(root(), path)
+		if relErr != nil {
+			return relErr
+		}
+		found = append(found, sourceFile{path: filepath.ToSlash(relative), body: string(body)})
+		return nil
+	})
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return found
 }

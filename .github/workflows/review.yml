@@ -42,3 +42,66 @@ jobs:
       # And the half that only exists between two versions.
       - name: Drift
         run: go run ./cmd/driftcheck "origin/${{ github.event.pull_request.base.ref }}"
+
+  judgement:
+    name: Judgement against the spec and the records
+    runs-on: ubuntu-latest
+    # The model is the repository owner's, reached with a federated token, so
+    # there is no key in a secret and nobody is billed per pull request. When
+    # the endpoint is not configured the job reports that it did not run.
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0"
+
+      - name: Fetch the base branch
+        run: git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
+
+      # Built on every pull request, whether or not a model is configured, so a
+      # broken reviewer is found here rather than the first time it is needed.
+      - name: Build the reviewer
+        run: dotnet build tools/ReviewBot -warnaserror --nologo
+
+      - name: Is a model configured
+        id: configured
+        env:
+          ENDPOINT: ${{ vars.AZURE_AI_ENDPOINT }}
+          CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+        run: |
+          if [ -n "$ENDPOINT" ] && [ -n "$CLIENT" ]; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Azure AI endpoint is configured, so no judgement was made. The drift check still decides this pull request."
+          fi
+
+      # Federated credentials: the workflow proves who it is to Entra and gets
+      # a short-lived token. No secret is stored anywhere.
+      - uses: azure/login@v2
+        if: steps.configured.outputs.yes == 'true'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Review
+        if: steps.configured.outputs.yes == 'true'
+        env:
+          AZURE_AI_ENDPOINT: ${{ vars.AZURE_AI_ENDPOINT }}
+          AZURE_AI_DEPLOYMENT: ${{ vars.AZURE_AI_DEPLOYMENT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          AZURE_AI_TOKEN="$(az account get-access-token \
+            --resource https://cognitiveservices.azure.com \
+            --query accessToken -o tsv)"
+          export AZURE_AI_TOKEN
+          dotnet run --project tools/ReviewBot --no-build -- "origin/${{ github.event.pull_request.base.ref }}"
