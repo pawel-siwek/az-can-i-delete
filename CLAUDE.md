@@ -8,12 +8,14 @@ agent is not a second contributor with its own standing.
 
 ```sh
 git config user.name "pawel-siwek"
-git config user.email "29552463+pawel-siwek@users.noreply.github.com"
+git config user.email "pawel.siwek@outlook.com"
 ```
 
-That is the owner's GitHub identity, so every commit links to their account.
-No other spelling of the name and no other address: one identity across the
-whole history is what makes `git log --author` and a blame worth reading.
+That pair, and no other. It is the identity on this repository's own merge
+commits, which is the only place worth reading it from — an address that
+happens to belong to the same human can still belong to a different GitHub
+account, and commits written with it are attributed to that other account.
+Take the identity from `git log` here, never from a name that looks right.
 
 Every commit message an agent writes ends with exactly this trailer, and
 nothing else:
