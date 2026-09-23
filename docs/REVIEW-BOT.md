@@ -40,14 +40,37 @@ The subject is exact. A run that is not a pull request on this repository gets
 no token, which is the point: the trust is scoped to one event on one
 repository, not to anybody holding a secret.
 
+Exact also means the shape has to be the one GitHub actually sends, and there
+are two. The familiar `repo:OWNER/REPO:pull_request` is one; the other embeds
+the numeric owner and repository ids, `repo:OWNER@1234/REPO@5678:pull_request`,
+so that the trust survives a rename and does not follow the name to whoever
+claims it next. A credential for the wrong one fails with `AADSTS700213: No
+matching federated identity record found`, and that error quotes the subject
+the run presented — which is the authoritative answer for this repository.
+
+Both are cheap, so register both and stop caring which a runner sends:
+
 ```sh
-az ad app federated-credential create --id "$APP_ID" --parameters "{
-  \"name\": \"az-can-i-delete-pull-requests\",
-  \"issuer\": \"https://token.actions.githubusercontent.com\",
-  \"subject\": \"repo:$REPO:pull_request\",
-  \"audiences\": [\"api://AzureADTokenExchange\"]
-}"
+OWNER=${REPO%/*}
+NAME=${REPO#*/}
+OWNER_ID=$(gh api "users/$OWNER" --jq .id)
+REPO_ID=$(gh api "repos/$REPO" --jq .id)
+
+add() {
+  az ad app federated-credential create --id "$APP_ID" --parameters "{
+    \"name\": \"$1\",
+    \"issuer\": \"https://token.actions.githubusercontent.com\",
+    \"subject\": \"$2\",
+    \"audiences\": [\"api://AzureADTokenExchange\"]
+  }"
+}
+
+add az-can-i-delete-pull-requests    "repo:$REPO:pull_request"
+add az-can-i-delete-pull-requests-id "repo:$OWNER@$OWNER_ID/$NAME@$REPO_ID:pull_request"
 ```
+
+Neither widens anything: each names one event on this one repository, and the
+id-bearing one names it more precisely than the other.
 
 ## 3. Give it the one role it needs
 
