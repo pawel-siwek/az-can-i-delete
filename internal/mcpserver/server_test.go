@@ -259,6 +259,15 @@ func TestTheCacheAnswersOnlyTheSameQuestion(t *testing.T) {
 	if checker.calls.Load() != 3 {
 		t.Fatalf("an expired entry was served")
 	}
+	// Across midnight the cutoff moves, and yesterday's report is not
+	// today's answer, however fresh it is.
+	c.at = time.Date(2026, 9, 21, 23, 59, 50, 0, time.UTC)
+	call(t, session, CanIDelete, map[string]any{"id": accountID})
+	c.at = c.at.Add(20 * time.Second)
+	call(t, session, CanIDelete, map[string]any{"id": accountID})
+	if checker.calls.Load() != 5 {
+		t.Fatalf("a report from before midnight was served after it (%d checks)", checker.calls.Load())
+	}
 }
 
 func TestCordonStatusSaysWhenThereIsNoCordon(t *testing.T) {

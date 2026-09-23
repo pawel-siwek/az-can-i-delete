@@ -197,7 +197,8 @@ func (s *server) canIDelete(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 	}
 	// Everything that can change the answer is in the key, so a cached report
 	// is only ever served for the question it answered.
-	key := fmt.Sprintf("%s|%s|%d|redact=%t|replay=%t", CanIDelete, strings.ToLower(target.ID), requested.Days, s.cfg.RedactTags, s.cfg.Replay)
+	key := fmt.Sprintf("%s|%s|%s|%d|redact=%t|replay=%t", CanIDelete, strings.ToLower(target.ID),
+		cutoff.Format(time.RFC3339), requested.Days, s.cfg.RedactTags, s.cfg.Replay)
 	if value, ok := s.lookup(key, at); ok {
 		return nil, value, nil
 	}
