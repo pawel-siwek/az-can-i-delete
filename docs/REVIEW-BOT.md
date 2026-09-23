@@ -127,9 +127,14 @@ hosted, nothing runs between pull requests, and the token minted from it lasts
 an hour. Reviews are then signed `saruman[bot]`, and that is the name in the
 Reviewers list.
 
-1. **Settings → Developer settings → GitHub Apps → New GitHub App.** Name it
-   `saruman`. Homepage URL can be the repository. Uncheck **Webhook → Active**:
-   nothing listens, so nothing should be sent.
+1. **Settings → Developer settings → GitHub Apps → New GitHub App.** App names
+   are unique across all of GitHub, so `saruman` may be taken and
+   `saruman-bot` or similar is what you get; nothing here depends on the name.
+   Saruman finds its own earlier reviews by the heading it writes, not by the
+   login it posted under, so the account can be renamed without stranding a
+   blocking review. Homepage URL can be the repository — the field is required
+   and does nothing. Uncheck **Webhook → Active**: nothing listens, so nothing
+   should be sent.
 2. **Repository permissions:** `Pull requests: Read and write`,
    `Contents: Read-only`. Nothing else. It writes reviews; it does not push.
 3. **Where can this GitHub App be installed:** only this account.
@@ -142,9 +147,15 @@ gh variable set SARUMAN_APP_ID      -R "$REPO" -b "<the app id from its settings
 gh secret   set SARUMAN_PRIVATE_KEY -R "$REPO" < ~/Downloads/saruman.<...>.private-key.pem
 ```
 
-Both must be set before the workflows use the app; either one alone, and they
-fall back to `github-actions[bot]` rather than failing. A missing identity is
-not a reason to say nothing.
+The app id is what the workflows look for. Set neither and they review as
+`github-actions[bot]` — a missing identity is not a reason to say nothing.
+Set the id without the key and the token step fails loudly, which is right:
+that is a half-finished setup, not a decision to go without.
+
+Do not move that test into the step's `if:`. A step condition cannot read the
+`secrets` context, and writing one there makes GitHub reject the whole file —
+the workflow does not run, its checks stop existing, and a ruleset requiring
+them has nothing to require. `internal/conformance` fails on it now.
 
 Saruman still never approves, app or no app. An App *can* approve, where
 `github-actions[bot]` cannot, which is exactly why the rule is written in the

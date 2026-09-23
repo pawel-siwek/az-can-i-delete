@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // root is the repository, relative to this package.
@@ -617,4 +619,65 @@ func f(response *body) { _ = &Failure{Message: response.Error.Message} }`, false
 			}
 		})
 	}
+}
+
+// stepCondition matches a step's `if:`, which is indented under a `- name:` or
+// `- uses:` and so sits deeper than a job's own `if:`.
+var stepCondition = regexp.MustCompile(`(?m)^ {8,}if:(.*)$`)
+
+// A workflow GitHub refuses to parse does not fail loudly. It fails as a run
+// with no jobs, named after its own file, in the same second it was created —
+// and every check that file declares silently stops existing. A ruleset then
+// has nothing to require, and a pull request looks like it passed.
+//
+// The `secrets` context is the easy way to cause that: it reads like every
+// other context, it is allowed in `with:` and `env:` a line below, and it is
+// not allowed in a step's `if:`. Writing it there took out this repository's
+// one blocking review check for as long as it took somebody to notice.
+//
+// Nobody notices reliably, so this does instead.
+func TestNoWorkflowStepAsksAboutASecretInItsCondition(t *testing.T) {
+	for _, file := range workflows(t) {
+		for _, match := range stepCondition.FindAllStringSubmatch(file.body, -1) {
+			if strings.Contains(match[1], "secrets.") {
+				t.Errorf("%s: a step condition reads the secrets context, which GitHub rejects, "+
+					"taking the whole workflow with it:%s", file.path, match[1])
+			}
+		}
+	}
+}
+
+// Every workflow is also valid YAML, which is the other way a file stops
+// declaring the checks it appears to declare.
+func TestEveryWorkflowParses(t *testing.T) {
+	for _, file := range workflows(t) {
+		var parsed map[string]any
+		if err := yaml.Unmarshal([]byte(file.body), &parsed); err != nil {
+			t.Errorf("%s does not parse: %v", file.path, err)
+			continue
+		}
+		if _, ok := parsed["jobs"]; !ok {
+			t.Errorf("%s declares no jobs", file.path)
+		}
+	}
+}
+
+func workflows(t *testing.T) []sourceFile {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(root(), ".github", "workflows", "*.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("no workflows were found, so these constraints checked nothing")
+	}
+	var found []sourceFile
+	for _, path := range paths {
+		body, readErr := os.ReadFile(path) //nolint:gosec // the path comes from globbing this repository
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		found = append(found, sourceFile{path: filepath.ToSlash(path), body: string(body)})
+	}
+	return found
 }

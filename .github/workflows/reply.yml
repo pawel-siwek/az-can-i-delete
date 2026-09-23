@@ -68,7 +68,7 @@ jobs:
       # nothing.
       - name: Speak as Saruman
         id: saruman
-        if: vars.SARUMAN_APP_ID != '' && secrets.SARUMAN_PRIVATE_KEY != ''
+        if: vars.SARUMAN_APP_ID != ''
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.SARUMAN_APP_ID }}
