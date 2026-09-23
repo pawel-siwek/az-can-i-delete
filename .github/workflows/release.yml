@@ -16,6 +16,14 @@ on:
 permissions:
   contents: write
 
+# One release at a time. Force-pushing rewritten tags fires this workflow once
+# per tag, and three goreleaser runs publishing at once is a race nobody wants
+# to reason about. Queued rather than cancelled: a release that has started
+# should finish or fail on its own merits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   goreleaser:
     name: Build and publish
