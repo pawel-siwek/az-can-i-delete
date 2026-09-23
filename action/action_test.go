@@ -148,10 +148,11 @@ func report(verdict, reasonClass string) map[string]any {
 		"resourceType": "Microsoft.Storage/storageAccounts",
 		"window":       map[string]any{"requested": map[string]any{"start": "2026-06-23T00:00:00Z", "end": "2026-09-21T00:00:00Z", "days": 90}},
 		"evidence": []any{
-			map[string]any{"status": "present", "tier": 2, "summary": "approved private endpoint | pe-sql-01"},
+			map[string]any{"status": "present", "tier": 2, "summary": "An approved private endpoint | connection targets this account."},
 			map[string]any{"status": "absent", "tier": 1, "summary": "no lock"},
 		},
-		"unknowns": []any{},
+		"unknowns":  []any{},
+		"untrusted": map[string]any{"name": "untrusted-name"},
 	}
 }
 
@@ -235,7 +236,7 @@ func TestTheSummaryTable(t *testing.T) {
 		"### az-can-i-delete — pre-flight for 3 planned deletions",
 		// Named by the id the tool parsed, from its own report; a row with
 		// no report is named by its number (ADR-0007).
-		"| `/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st-logs-prod` | delete | **no** | in-use | approved private endpoint \\| pe-sql-01 | 0 |",
+		"| `/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st-logs-prod` | delete | **no** | in-use | An approved private endpoint \\| connection targets this account. | 0 |",
 		"| #2 (planned deletion 2, in plan order) | detach | not found | not-found |",
 		"| #3 (planned deletion 3, in plan order) | unsupported | tentative | unsupported |",
 		"Window 2026-06-23 → 2026-09-21 (90 d) · rules 2026-09-21 · fail-on: no · skipped non-ARM ids: 0",
@@ -245,7 +246,11 @@ func TestTheSummaryTable(t *testing.T) {
 			t.Fatalf("missing %q in:\n%s", want, summary)
 		}
 	}
-	// The plan's own ids never reach the comment.
+	// The plan's own ids never reach the comment, and neither does anything
+	// under a report's untrusted.
+	if strings.Contains(summary, "untrusted-name") {
+		t.Fatalf("untrusted text reached the comment:\n%s", summary)
+	}
 	if strings.Contains(summary, "nic-old-01") || strings.Contains(summary, "d-unknown") {
 		t.Fatalf("a planned id reached the comment:\n%s", summary)
 	}

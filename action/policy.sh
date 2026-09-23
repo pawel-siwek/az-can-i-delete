@@ -57,6 +57,11 @@ jq -n \
         else
           $row + {resourceId: $r.resourceId, resourceType: $r.resourceType,
                   verdict: $r.verdict, policy: $r.verdict, reason: ($r.reasonClass // ""),
+                  # A summary is the tool'"'"'s own template text, chosen by signal
+                  # and status at the output boundary (internal/output/evidence.go:
+                  # p.Summaries[e.Status]); a collector'"'"'s text never becomes one,
+                  # and Azure'"'"'s free-form text sits under untrusted, which this
+                  # table never reads (ADR-0007).
                   evidence: ([$r.evidence[]? | select(.status == "present")] | sort_by(.tier) | .[0:2] | map(.summary | esc) | join("; ")),
                   unknowns: ([$r.unknowns[]?] | length | tostring),
                   window: $r.window.requested, rulesDate: $r.rulesDate}
