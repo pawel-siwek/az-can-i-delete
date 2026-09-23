@@ -89,7 +89,7 @@ release:
     One line, and still verified:
 
     ```sh
-    gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt --clobber && sha256sum --ignore-missing -c checksums.txt && bash install.sh {{ .Tag }}
+    d=$(mktemp -d) && gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt -D "$d" && (cd "$d" && sha256sum --ignore-missing -c checksums.txt && bash install.sh {{ .Tag }})
     ```
 
     Azure Cloud Shell ships the GitHub CLI; `gh auth login` once and this works
@@ -99,6 +99,9 @@ release:
     against the release's own checksums, and only then does it run — after
     which it verifies the archive's SHA-256 before anything reaches your PATH.
     Installs into `~/.local/bin`; a mismatch installs nothing.
+
+    It downloads into a temporary directory rather than the one you are
+    standing in, so it overwrites nothing of yours.
 
     Read `install.sh` first if you would rather: it is on disk before it runs,
     which is the whole difference from piping it into a shell.
