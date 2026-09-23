@@ -99,8 +99,11 @@ release:
     the archives:
 
     ```sh
-    gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete && chmod +x ~/.local/bin/az-can-i-delete
+    gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete --clobber && chmod +x ~/.local/bin/az-can-i-delete
     ```
+
+    `--clobber` overwrites the one path `-O` names, which is what lets an
+    upgrade work; without it `gh` refuses and you keep the version you had.
 
     To have the checksum checked too, use the installer, which verifies the
     archive's SHA-256 before anything reaches your PATH:
