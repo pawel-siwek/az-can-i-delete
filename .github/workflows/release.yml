@@ -3,6 +3,15 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # A release can also be cut from the Actions tab. The tag is created here
+  # rather than locally, so the pipeline is the only thing that ever decides
+  # what a version points at.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example v0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -21,6 +30,26 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      # The version arrives as an input, so it is validated and passed through
+      # the environment rather than interpolated into the script.
+      - name: Tag this commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$VERSION" in
+            v[0-9]*) ;;
+            *) echo "::error::version must look like v0.1.0, got '$VERSION'"; exit 1 ;;
+          esac
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::$VERSION already exists; a released version is never moved"
+            exit 1
+          fi
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
 
       - uses: goreleaser/goreleaser-action@v6
         with:
