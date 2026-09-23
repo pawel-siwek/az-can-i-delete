@@ -50,43 +50,59 @@ Cloud Shell is the quickest place to try this: it is already signed in, its
 machine.
 
 This repository is **private**, so every install path needs your GitHub
-credentials. Nothing can be fetched anonymously, and a command that appears to
-work without signing in is a command that is about to fail with a 404.
+credentials. Being signed in to Azure does not help: Cloud Shell authenticates
+you to ARM, and that token does not open github.com. They are two identities.
 
-**One line, works today** — clone and build:
+**Authorize once.** Cloud Shell ships the GitHub CLI, and `$HOME` persists, so
+this survives session restarts and you never do it again:
+
+```sh
+gh auth login --hostname github.com --git-protocol https --web && gh auth setup-git
+```
+
+`setup-git` installs the credential helper, so plain `git` and `curl` against
+release assets work afterwards without a token in sight.
+
+**Then one line, works today** — clone and build:
 
 ```sh
 git clone --depth 1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid && ~/src/azcid/scripts/cloud-shell.sh
 ```
 
-Cloud Shell will ask for your GitHub username and a personal access token the
-first time, or use a credential helper you have already set up. The script
-lands on disk before it runs, so you can read it — nothing is executed
-straight off the network.
-
 **One line, from a release** — once a tag has been cut:
 
 ```sh
-V=v0.1.0; R=pawel-siwek/az-can-i-delete; curl -fsSLO https://github.com/$R/releases/download/$V/{install.sh,checksums.txt} && sha256sum --ignore-missing -c checksums.txt && bash install.sh $V
+gh release download v0.1.0 -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt --clobber && sha256sum --ignore-missing -c checksums.txt && bash install.sh v0.1.0
 ```
 
-Still one line, and still verified: the installer and the checksums are
-downloaded as files, the installer is checked against the release's own
-checksums, and only then does it run — after which it verifies the archive
-before anything reaches your PATH. Private-repo release assets need a token,
-so add `-H "Authorization: Bearer $GITHUB_TOKEN"` to the `curl`, or use
-`gh release download`.
+Still verified: the installer and the checksums arrive as files, the installer
+is checked against the release's own checksums, and only then does it run —
+after which it verifies the archive before anything reaches your PATH.
+
+**Without GitHub at all.** If you would rather use the identity you already
+have, put the binary somewhere Azure can serve it and pull it with the Azure
+CLI. No token, no GitHub, and the same signed-in session you already use:
+
+```sh
+az storage blob download --account-name <sa> -c tools -n az-can-i-delete \
+  -f ~/.local/bin/az-can-i-delete --auth-mode login && chmod +x ~/.local/bin/az-can-i-delete
+```
+
+That needs `Storage Blob Data Reader` on the account and somebody to have
+uploaded the binary once. It is the fastest debugging loop if you rebuild
+often; it is not a distribution channel, because nothing checks what is in
+that blob.
 
 **If this repository is ever made public**, the best one-liner needs no script
-at all:
+and no credentials:
 
 ```sh
 go install github.com/pawel-siwek/az-can-i-delete/cmd/az-can-i-delete@v0.1.0
 ```
 
-The Go toolchain verifies the module against the public checksum database
-before it builds. That is stronger than anything a shell script can do for
-itself, and it is one command.
+Cloud Shell ships Go, and the toolchain verifies the module against the public
+checksum database before it builds. That is stronger than anything a shell
+script can do for itself, and it is one command.
 
 What none of these do is pipe a download into a shell. That is not about the
 number of commands — it is that a shell executes each line as it arrives, so
