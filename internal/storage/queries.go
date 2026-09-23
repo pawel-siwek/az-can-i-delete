@@ -82,6 +82,7 @@ func (listGroup) run(in Input) func(context.Context) ([]verdict.Evidence, error)
 			leaseHeld(lists), functionsArtefacts(lists), immutability(in, lists),
 		}
 		evidence = append(evidence, kbMatches(lists)...)
+		evidence = append(evidence, dataPlaneFreshness(ctx, in, lists))
 		if !complete {
 			return append(evidence, Catalogue.Unknown(SignalLists, &verdict.Unknown{
 				Code: verdict.UnkPartial, Message: "a child listing was longer than the page budget"})), nil
