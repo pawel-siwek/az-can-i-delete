@@ -122,7 +122,7 @@ var Catalogue = signal.Catalogue{
 	SignalInventory:       {Tier: verdict.TierInfo, Family: "structural", Confidence: "verified", API: "ARM"},
 	SignalDefenderConfig:  {Tier: verdict.TierInfo, Family: "structural", Confidence: "verified", API: "ARM"},
 	SignalInventoryShaped: {Tier: verdict.TierInfo, Family: "metrics", Confidence: "unknown", API: "Metrics"},
-	SignalDataPlane:       {Tier: verdict.TierInfo, Family: "data-plane", Confidence: "unknown", API: "DataPlane"},
+	SignalDataPlane:       {Tier: verdict.TierLiveActivity, Family: "data-plane", Confidence: "verified", API: "DataPlane"},
 	SignalSharesUsage:     {Tier: verdict.TierInfo, Family: "structural", Confidence: "unknown", API: "ARM"},
 }
 
@@ -187,7 +187,6 @@ func Collect(ctx context.Context, in Input) []verdict.Evidence {
 		SignalCloudShell:      cloudShell(in),
 		SignalSKUGeo:          geoRedundant(in.Resource),
 		SignalBackupLock:      backupLock(in),
-		SignalDataPlane:       Catalogue.NotEvaluated(SignalDataPlane),
 		SignalSharesUsage:     Catalogue.NotEvaluated(SignalSharesUsage),
 		SignalInventoryShaped: Catalogue.NotEvaluated(SignalInventoryShaped),
 	}
@@ -234,7 +233,7 @@ func Collect(ctx context.Context, in Input) []verdict.Evidence {
 func groupSignals(groupID string) []string {
 	switch groupID {
 	case SignalLists:
-		return []string{SignalLists, SignalLease, SignalFunctions, SignalImmutability, SignalKB}
+		return []string{SignalLists, SignalLease, SignalFunctions, SignalImmutability, SignalKB, SignalDataPlane}
 	case SignalReverse:
 		return []string{SignalReverse, SignalNetACL, SignalBootDiag, SignalFlowLogs, SignalBackup, SignalVMExt}
 	case SignalLifecycle:

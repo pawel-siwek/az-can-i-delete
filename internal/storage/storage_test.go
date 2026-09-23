@@ -31,6 +31,7 @@ type harness struct {
 	arm        *collecttest.ARM
 	graph      *collecttest.Graph
 	metrics    *collecttest.Metrics
+	plane      *collecttest.DataPlane
 	generic    generic.Result
 	points     []point
 }
@@ -109,7 +110,7 @@ func (h *harness) run(t *testing.T) map[string]verdict.Evidence {
 		Resource:  collect.Resource{ID: h.id, Type: storage.ResourceType, Name: target.Name, Properties: h.properties, Tags: h.tags},
 		Requested: window,
 		Cutoff:    cutoff,
-		Clients:   collecttest.Clients(h.arm, h.graph, h.metrics, &collecttest.ActivityLog{}, nil),
+		Clients:   collecttest.Clients(h.arm, h.graph, h.metrics, &collecttest.ActivityLog{}, h.plane),
 		Graph:     collect.NewGraphLimiter(collect.SystemClock()),
 		Generic:   h.generic,
 	})
@@ -658,5 +659,144 @@ func TestAnUnreadableListingIsNotAnAbsenceOfMatches(t *testing.T) {
 	}
 	if e.Unknown == nil || e.Unknown.Code != verdict.UnkPermission {
 		t.Errorf("kb match unknown = %+v, want permission", e.Unknown)
+	}
+}
+
+// dataPlane gives the harness an opt-in data-plane client. Passing nil models
+// a run without --data-plane, which is the default.
+func (h *harness) dataPlane(walk func(ctx context.Context, accountID, container string, budget collect.PrefixBudget) (collect.Prefix, error)) *harness {
+	h.plane = &collecttest.DataPlane{PrefixFunc: walk}
+	return h
+}
+
+// Without --data-plane nothing inside a container is read, and the report says
+// so rather than reporting that nothing was found.
+func TestWithoutTheFlagTheWalkIsADisclosedGap(t *testing.T) {
+	evidence := newHarness().run(t)
+	e := evidence[storage.SignalDataPlane]
+	if e.Status != verdict.StatusNotEvaluated {
+		t.Fatalf("data plane = %+v, want not evaluated", e)
+	}
+	if e.Critical {
+		t.Error("an option nobody exercised must not be critical")
+	}
+}
+
+// A recent write inside a container is live activity.
+func TestARecentWriteInsideAContainerIsActivity(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = containerList("logs", "archive")
+	h.dataPlane(func(_ context.Context, _, container string, _ collect.PrefixBudget) (collect.Prefix, error) {
+		if container != "logs" {
+			return collect.Prefix{Complete: true}, nil
+		}
+		return collect.Prefix{
+			Path:      "y=2026/m=09/d=20/h=13",
+			LastWrite: cutoff.AddDate(0, 0, -2),
+			Complete:  true,
+		}, nil
+	})
+	e := h.run(t)[storage.SignalDataPlane]
+	if e.Status != verdict.StatusPresent || e.Tier != verdict.TierLiveActivity {
+		t.Fatalf("data plane = %+v, want present live activity", e)
+	}
+	if fresh, _ := e.Details["withinFreshWindow"].(bool); !fresh {
+		t.Error("a write two days ago is inside the freshness window")
+	}
+	if complete, _ := e.Details["complete"].(bool); !complete {
+		t.Error("a walk that finished must not report itself as cut off")
+	}
+}
+
+// An old write is a date worth printing, not evidence that somebody is using
+// the account.
+func TestAnOldWriteIsInformationNotActivity(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = containerList("logs")
+	h.dataPlane(func(_ context.Context, _, _ string, _ collect.PrefixBudget) (collect.Prefix, error) {
+		return collect.Prefix{Path: "y=2024/m=01", LastWrite: cutoff.AddDate(-1, 0, 0), Complete: true}, nil
+	})
+	e := h.run(t)[storage.SignalDataPlane]
+	if e.Status != verdict.StatusPresent || e.Tier != verdict.TierInfo {
+		t.Fatalf("data plane = %+v, want present at INFO", e)
+	}
+	if fresh, _ := e.Details["withinFreshWindow"].(bool); fresh {
+		t.Error("a write a year ago is outside the freshness window")
+	}
+}
+
+// A caller with ARM Reader but no data access is told so. This is the failure
+// the whole signal exists to report honestly: the containers somebody may not
+// read are the ones most likely to hold the writes.
+func TestNoDataAccessIsUnknownNotEmpty(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = containerList("logs")
+	h.dataPlane(func(_ context.Context, _, _ string, _ collect.PrefixBudget) (collect.Prefix, error) {
+		return collect.Prefix{}, collecttest.Forbidden()
+	})
+	e := h.run(t)[storage.SignalDataPlane]
+	if e.Status != verdict.StatusUnknown {
+		t.Fatalf("data plane = %+v, want unknown", e)
+	}
+	if e.Unknown == nil || e.Unknown.Code != verdict.UnkPermission {
+		t.Errorf("unknown = %+v, want permission", e.Unknown)
+	}
+}
+
+// A walk that ran out of budget before finding anything is unknown, because
+// the budget stopped it rather than the account being quiet.
+func TestAnExhaustedBudgetIsUnknown(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = containerList("logs")
+	h.dataPlane(func(_ context.Context, _, _ string, _ collect.PrefixBudget) (collect.Prefix, error) {
+		return collect.Prefix{Complete: false}, nil
+	})
+	e := h.run(t)[storage.SignalDataPlane]
+	if e.Status != verdict.StatusUnknown {
+		t.Fatalf("data plane = %+v, want unknown", e)
+	}
+	if e.Unknown == nil || e.Unknown.Code != verdict.UnkPartial {
+		t.Errorf("unknown = %+v, want partial", e.Unknown)
+	}
+}
+
+// The walk is bounded at five containers whatever the account holds, and it
+// walks the same five on every run.
+func TestTheWalkStaysInsideItsBudget(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = containerList("f", "e", "d", "c", "b", "a", "g")
+	var walked []string
+	var budgets []collect.PrefixBudget
+	h.dataPlane(func(_ context.Context, _, container string, budget collect.PrefixBudget) (collect.Prefix, error) {
+		walked = append(walked, container)
+		budgets = append(budgets, budget)
+		return collect.Prefix{Complete: true}, nil
+	})
+	h.run(t)
+
+	if len(walked) != 5 {
+		t.Fatalf("walked %v, want five containers at most", walked)
+	}
+	if !slices.Equal(walked, []string{"a", "b", "c", "d", "e"}) {
+		t.Errorf("walked %v, want the same five in a stable order", walked)
+	}
+	for _, budget := range budgets {
+		if budget.MaxCalls != 12 || budget.MaxTime != 3*time.Second {
+			t.Errorf("budget = %+v, want twelve calls and three seconds", budget)
+		}
+	}
+}
+
+// containerList answers a container listing with these names.
+func containerList(names ...string) func(context.Context, string, string) ([]collect.Resource, error) {
+	return func(_ context.Context, path, _ string) ([]collect.Resource, error) {
+		if !contains(path, "/containers") {
+			return nil, nil
+		}
+		items := make([]collect.Resource, 0, len(names))
+		for _, name := range names {
+			items = append(items, collect.Resource{Name: name})
+		}
+		return items, nil
 	}
 }
