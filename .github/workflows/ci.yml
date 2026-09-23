@@ -80,9 +80,18 @@ jobs:
           version: "~> v2"
           args: build --snapshot --clean --single-target
 
+      # The binary is flattened out of goreleaser's dist layout so the
+      # artifact extracts as one executable. `gh run download` then puts a
+      # runnable file on disk, which is the whole point of publishing it.
+      - name: Collect the binary
+        run: |
+          mkdir -p snapshot
+          cp "$(find dist -type f -name az-can-i-delete | head -1)" snapshot/az-can-i-delete
+          sha256sum snapshot/az-can-i-delete | tee snapshot/az-can-i-delete.sha256
+
       - uses: actions/upload-artifact@v4
         with:
           name: az-can-i-delete-snapshot-linux-amd64
-          path: dist/**/az-can-i-delete
+          path: snapshot/
           if-no-files-found: error
           retention-days: 7
