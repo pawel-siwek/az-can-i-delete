@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -241,4 +243,86 @@ func TestTheRedactionCheckCatchesARealName(t *testing.T) {
 	if found := unredacted(value, ""); len(found) == 0 {
 		t.Error("a tag value that nobody redacted was not noticed")
 	}
+}
+
+// A recording is committed to a repository and read by people who were never
+// in that tenant. Blanking the fields that carry somebody's names is not
+// enough on its own: a resource body is Azure's structure with leaves a
+// stranger may have chosen, and a control character in one of them is a thing
+// a terminal acts on rather than shows.
+func TestARecordedStringIsTextAndNothingElse(t *testing.T) {
+	dir := t.TempDir()
+	recorder, err := replay.Record(dir, answering(`{
+		"name": "ok\u0007bell",
+		"properties": {"note": "line\nbreak\tand tab", "id": "/subscriptions/x/resourceGroups/y"},
+		"tags": {"owner": "someone"}
+	}`, map[string]string{"Content-Type": "application/json", "Retry-After": "30", "apim-request-id": "abc"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse("https://management.azure.com/subscriptions/x/providers/Microsoft.Compute/disks/d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.RoundTrip(&http.Request{Method: http.MethodGet, URL: address}); err != nil {
+		t.Fatal(err)
+	}
+
+	written := onlyFile(t, filepath.Join(dir, "responses"))
+	if strings.Contains(written, "\\u0007") {
+		t.Errorf("a control character was recorded:\n%s", written)
+	}
+	// A tab and a newline are things a JSON string legitimately carries.
+	if !strings.Contains(written, `line\nbreak\tand tab`) {
+		t.Errorf("ordinary whitespace was stripped:\n%s", written)
+	}
+	// Truncating would record something Azure never said.
+	if !strings.Contains(written, "/subscriptions/x/resourceGroups/y") {
+		t.Errorf("a long value was cut:\n%s", written)
+	}
+	// SPEC 7.5: a recorded response carries its headers.
+	for _, want := range []string{`"Content-Type"`, `"Retry-After"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("%s was not recorded:\n%s", want, written)
+		}
+	}
+	// A per-call identifier helps no replay and names one tenant's traffic.
+	if strings.Contains(written, "apim-request-id") {
+		t.Errorf("a per-request identifier was recorded:\n%s", written)
+	}
+}
+
+// answering is a transport that gives one canned response with the headers it
+// is told to.
+func answering(body string, header map[string]string) http.RoundTripper {
+	return roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		headers := http.Header{}
+		for key, value := range header {
+			headers.Set(key, value)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK, Header: headers,
+			Body: io.NopCloser(strings.NewReader(body)), Request: request,
+		}, nil
+	})
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func onlyFile(t *testing.T, dir string) string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected one recorded response, found %d", len(entries))
+	}
+	body, err := os.ReadFile(filepath.Join(dir, entries[0].Name())) //nolint:gosec // the directory is this test's own temporary one
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
 }
