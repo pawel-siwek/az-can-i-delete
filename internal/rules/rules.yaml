@@ -32,3 +32,7 @@ operations:
   metrics: "2024-02-01"
   eventGrid: "2025-02-15"
   defenderForStorage: "2025-06-01"
+  # The storage data-plane REST version the opt-in prefix walk speaks. It is
+  # not a control-plane api-version, but it is a version this tool pins and
+  # must be able to correct in one place.
+  storageDataPlane: "2025-11-05"

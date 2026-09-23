@@ -49,7 +49,7 @@ type Dependencies struct {
 	Now func() time.Time
 	// Runner builds the assessment runner, which is where credentials and
 	// network access enter the process.
-	Runner func(version string) (*assess.Runner, error)
+	Runner func(version string, dataPlane bool) (*assess.Runner, error)
 }
 
 // DefaultDependencies talk to Azure with the credential chain.
@@ -57,17 +57,27 @@ func DefaultDependencies() Dependencies {
 	return Dependencies{Now: time.Now, Runner: azureRunner}
 }
 
-func azureRunner(version string) (*assess.Runner, error) {
+func azureRunner(version string, dataPlane bool) (*assess.Runner, error) {
 	client, err := azure.New(azure.Options{ToolVersion: version})
 	if err != nil {
 		return nil, err
 	}
-	return assess.New(collect.Clients{
+	clients := collect.Clients{
 		ARM:         client.ARM(),
 		Graph:       client.Graph(),
 		Metrics:     client.Metrics(),
 		ActivityLog: client.ActivityLog(),
-	}, version), nil
+	}
+	// The storage data plane needs its own token, so it is built only when
+	// the caller asked for it: an ordinary run never requests that scope.
+	if dataPlane {
+		plane, err := azure.DataPlane(azure.DataPlaneOptions{ToolVersion: version})
+		if err != nil {
+			return nil, err
+		}
+		clients.DataPlane = plane
+	}
+	return assess.New(clients, version), nil
 }
 
 // Run executes an isolated command tree using the supplied streams.
@@ -216,9 +226,6 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	if fixture, err := cmd.Flags().GetString("fixture"); err == nil && fixture != "" {
 		return &ExitError{Code: 1, Err: errors.New("fixture replay is not implemented yet")}
 	}
-	if dataPlane, err := cmd.Flags().GetBool("data-plane"); err == nil && dataPlane {
-		return &ExitError{Code: 1, Err: errors.New("data-plane collection is not implemented yet")}
-	}
 	cutoff := deps.Now().UTC()
 	window, err := cmd.Flags().GetString("window")
 	if err != nil {
@@ -244,7 +251,11 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 		}
 		targets = append(targets, target)
 	}
-	runner, err := deps.Runner(version)
+	dataPlane, err := cmd.Flags().GetBool("data-plane")
+	if err != nil {
+		return err
+	}
+	runner, err := deps.Runner(version, dataPlane)
 	if err != nil {
 		return &ExitError{Code: 1, Err: err}
 	}
@@ -253,7 +264,7 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	var failures []error
 	for _, target := range targets {
 		outcome, checkErr := runner.Check(cmd.Context(), target, assess.Options{
-			Requested: requested, Cutoff: cutoff, RedactTags: redactTags,
+			Requested: requested, Cutoff: cutoff, RedactTags: redactTags, DataPlane: dataPlane,
 		})
 		outcomes = append(outcomes, outcome)
 		if checkErr != nil {

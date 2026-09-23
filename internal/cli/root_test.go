@@ -32,7 +32,7 @@ func testDeps(arm *collecttest.ARM, graph *collecttest.Graph) Dependencies {
 	}
 	return Dependencies{
 		Now: func() time.Time { return testCutoff },
-		Runner: func(version string) (*assess.Runner, error) {
+		Runner: func(version string, _ bool) (*assess.Runner, error) {
 			clients := collecttest.Clients(arm, graph, &collecttest.Metrics{}, &collecttest.ActivityLog{}, nil)
 			return assess.New(clients, version), nil
 		},
@@ -101,9 +101,8 @@ func TestUnimplementedCommandsFailExplicitly(t *testing.T) {
 		{"cordon", testTarget}, {"uncordon", testTarget},
 		{"status", testTarget}, {"history"}, {"demo", "recorded-example"},
 		{"patterns", "list"}, {"mcp"},
-		// check itself is implemented; these two paths of it are not.
+		// check itself is implemented; fixture replay is not.
 		{"check", testTarget, "--fixture", "recorded"},
-		{"check", testTarget, "--data-plane"},
 	} {
 		code, out, errOut := run(t, testDeps(nil, nil), args...)
 		if code != 1 || out != "" || !strings.Contains(errOut, "not implemented") {
@@ -305,5 +304,33 @@ func TestDefaultOutputFormat(t *testing.T) {
 	}()
 	if defaultOutputFormat(writer) != "json" {
 		t.Fatal("real pipe fd mistaken for a terminal")
+	}
+}
+
+// The data-plane walk is opt-in, and the opt-in has to reach the runner: a
+// flag that is accepted and then ignored is worse than one that is refused.
+func TestTheDataPlaneFlagReachesTheRunner(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"off by default", []string{"check", testTarget}, false},
+		{"on when asked", []string{"check", testTarget, "--data-plane"}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var asked bool
+			deps := testDeps(nil, nil)
+			inner := deps.Runner
+			deps.Runner = func(version string, dataPlane bool) (*assess.Runner, error) {
+				asked = dataPlane
+				return inner(version, dataPlane)
+			}
+			run(t, deps, test.args...)
+			if asked != test.want {
+				t.Errorf("the runner was built with dataPlane=%v, want %v", asked, test.want)
+			}
+		})
 	}
 }
