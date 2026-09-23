@@ -507,3 +507,16 @@ func TestACordonIsReportedAndDoesNotMoveTheVerdict(t *testing.T) {
 		})
 	}
 }
+
+// SPEC section 2: a live assessment is cut off at today 00:00Z.
+func TestTheCutoffIsTheStartOfTheDay(t *testing.T) {
+	for _, now := range []time.Time{
+		time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 21, 23, 59, 59, 0, time.UTC),
+		time.Date(2026, 9, 22, 1, 30, 0, 0, time.FixedZone("CEST", 2*3600)),
+	} {
+		if got := assess.Cutoff(now); !got.Equal(time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("Cutoff(%s) = %s", now, got)
+		}
+	}
+}

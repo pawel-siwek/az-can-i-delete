@@ -260,7 +260,7 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 		}
 		return runReplay(cmd, version, options, fixture)
 	}
-	cutoff := deps.Now().UTC()
+	cutoff := assess.Cutoff(deps.Now())
 	window, err := cmd.Flags().GetString("window")
 	if err != nil {
 		return err

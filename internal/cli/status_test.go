@@ -46,7 +46,7 @@ func TestStatusSaysWhenACordonWasUndone(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
-	for _, want := range []string{"REVERTED — store", "prior Enabled (from the tag)", "denied public requests may not be recorded"} {
+	for _, want := range []string{"REVERTED (publicNetworkAccess Enabled)\n    resource " + testTarget, "prior Enabled (from the tag)", "denied public requests may not be recorded"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
@@ -125,5 +125,28 @@ func TestStatusKeepsTheWriterOutOfItsOwnSentences(t *testing.T) {
 	}
 	if !strings.Contains(out, "untrusted (Azure metadata") || !strings.Contains(out, "last write at 2026-09-21T09:00:00Z by a service principal") {
 		t.Fatalf("output:\n%s", out)
+	}
+}
+
+// check is cut off at today 00:00Z, whatever time of day it runs (SPEC
+// section 2, ADR-0003), which is also what can_i_delete answers with.
+func TestCheckIsCutOffAtTheStartOfTheDay(t *testing.T) {
+	t.Parallel()
+	code, out, errOut := run(t, liveDeps(), "check", testTarget, "-o", "json")
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
+	}
+	var report struct {
+		Window struct {
+			Requested struct {
+				End string `json:"end"`
+			} `json:"requested"`
+		} `json:"window"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Window.Requested.End != "2026-09-21T00:00:00Z" {
+		t.Fatalf("window ends %s, want the start of the day", report.Window.Requested.End)
 	}
 }

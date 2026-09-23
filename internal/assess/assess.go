@@ -124,6 +124,14 @@ func (r *Runner) analyze(ctx context.Context, target armid.Target, resource coll
 	}
 }
 
+// Cutoff is the observation cutoff of a live assessment taken at now: today
+// 00:00Z (SPEC section 2, ADR-0003). A day that is still running has not
+// reported its metrics, so the window ends where the last complete day does,
+// and two runs on the same day assess the same window.
+func Cutoff(now time.Time) time.Time {
+	return now.UTC().Truncate(24 * time.Hour)
+}
+
 // ParseWindow turns the --window flag into an explicit observation window.
 // A window shorter than 30 days is accepted and can only yield `no` or
 // `tentative`; the rules, not this parser, enforce that.

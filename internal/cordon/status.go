@@ -384,8 +384,14 @@ func (r Reader) total(ctx context.Context, status *Status, since time.Time, quer
 // trusted service or a private endpoint still writing.
 func (r Reader) growth(ctx context.Context, status *Status, query collect.MetricQuery) {
 	result, err := r.Metrics.Metrics(ctx, query)
-	if err != nil {
+	switch {
+	case err != nil:
 		status.Unknowns = append(status.Unknowns, StatusUnknown{ID: "cordon.metric.UsedCapacity", Unknown: *collect.Classify(err)})
+		return
+	case result.Truncated:
+		// Part of a series cannot show growth or its absence.
+		status.Unknowns = append(status.Unknowns, StatusUnknown{ID: "cordon.metric.UsedCapacity",
+			Unknown: verdict.Unknown{Code: verdict.UnkPartial, Message: "the metric answer was truncated"}})
 		return
 	}
 	var points []collect.MetricPoint

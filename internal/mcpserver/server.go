@@ -129,6 +129,16 @@ func (s *server) now() time.Time {
 	return s.cfg.Now().UTC()
 }
 
+// cutoff is the observation cutoff a live assessment is computed at: today
+// 00:00Z (SPEC section 2, ADR-0003), the same one check uses. A recording
+// keeps its own.
+func (s *server) cutoff() time.Time {
+	if s.cfg.Replay {
+		return s.cfg.ReplayTime.UTC()
+	}
+	return assess.Cutoff(s.cfg.Now())
+}
+
 // ErrRateLimited is the answer to a thirty-first call inside five minutes.
 var ErrRateLimited = errors.New("rate limit: at most 30 calls per 5 minutes; wait and ask again with the same arguments")
 
@@ -170,7 +180,9 @@ func (s *server) store(key string, at time.Time, value map[string]any) {
 }
 
 func (s *server) canIDelete(ctx context.Context, _ *mcp.CallToolRequest, in CheckInput) (*mcp.CallToolResult, map[string]any, error) {
-	at := s.now()
+	// The budget and the cache run on the clock; the assessment runs at the
+	// cutoff.
+	at, cutoff := s.now(), s.cutoff()
 	target, err := armid.Parse(strings.TrimSpace(in.ID))
 	if err != nil {
 		return nil, nil, fmt.Errorf("id: %w", err)
@@ -179,7 +191,7 @@ func (s *server) canIDelete(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 	if window == "" {
 		window = fmt.Sprintf("%dd", assess.DefaultWindowDays)
 	}
-	requested, err := assess.ParseWindow(window, at)
+	requested, err := assess.ParseWindow(window, cutoff)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,7 +205,7 @@ func (s *server) canIDelete(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 		return nil, nil, err
 	}
 	outcome, err := s.cfg.Checker.Check(ctx, target, assess.Options{
-		Requested: requested, Cutoff: at, RedactTags: s.cfg.RedactTags, Replay: s.cfg.Replay,
+		Requested: requested, Cutoff: cutoff, RedactTags: s.cfg.RedactTags, Replay: s.cfg.Replay,
 	})
 	if err != nil {
 		// A failure is never a verdict. The agent is told the assessment did

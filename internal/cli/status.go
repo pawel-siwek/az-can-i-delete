@@ -75,25 +75,27 @@ func statusError(err error) error {
 // the cordon cannot hear.
 func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
 	var b strings.Builder
-	name := output.Untrusted(target.Name)
 	field := "publicNetworkAccess"
 	if strings.EqualFold(target.ResourceType, cordon.SiteType) {
 		field = "state"
 	}
 	switch {
 	case !s.Cordoned:
-		fmt.Fprintf(&b, "   not cordoned — %s (%s %s)\n", name, field, s.CurrentState)
+		fmt.Fprintf(&b, "   not cordoned (%s %s)\n    resource %s\n", field, s.CurrentState, target.ID)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case s.TagCorrupt:
-		fmt.Fprintf(&b, "‼  CORDON TAG DAMAGED — %s (%s %s)\n\n", name, field, s.CurrentState)
+		fmt.Fprintf(&b, "‼  CORDON TAG DAMAGED (%s %s)\n", field, s.CurrentState)
 	case s.Reverted:
-		fmt.Fprintf(&b, "‼  REVERTED — %s (%s %s)\n\n", name, field, s.CurrentState)
-		if s.RevertedAt != nil {
-			fmt.Fprintf(&b, "    last write at %s by a %s\n\n", s.RevertedAt.Format(time.RFC3339), s.Untrusted["revertedByClass"])
-		}
+		fmt.Fprintf(&b, "‼  REVERTED (%s %s)\n", field, s.CurrentState)
 	default:
-		fmt.Fprintf(&b, "🧱  CORDONED — %s (%s %s)\n\n", name, field, s.CurrentState)
+		fmt.Fprintf(&b, "🧱  CORDONED (%s %s)\n", field, s.CurrentState)
+	}
+	// The canonical id, never the name on its own: the name is somebody's
+	// text, and the id is the one form of it this tool has parsed.
+	fmt.Fprintf(&b, "    resource %s\n", target.ID)
+	if s.Reverted && s.RevertedAt != nil {
+		fmt.Fprintf(&b, "    last write at %s by a %s\n", s.RevertedAt.Format(time.RFC3339), s.Untrusted["revertedByClass"])
 	}
 	if s.Since != nil {
 		fmt.Fprintf(&b, "    mode %s since %s by %s · %d h elapsed · %d h left of %d d\n",

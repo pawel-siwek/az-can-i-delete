@@ -177,7 +177,8 @@ func TestCanIDeleteReturnsTheReportTwiceOver(t *testing.T) {
 		t.Fatalf("report = %v", fromText)
 	}
 	window := fromText["window"].(map[string]any)["requested"].(map[string]any)
-	if window["days"] != float64(30) {
+	// Assessed at today 00:00Z, as check is, not at the moment of the call.
+	if window["days"] != float64(30) || window["end"] != "2026-09-21T00:00:00Z" {
 		t.Fatalf("default window = %v", window)
 	}
 }

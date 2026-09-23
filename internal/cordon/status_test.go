@@ -130,6 +130,29 @@ func TestAnUnreadableCounterIsUnknownNotSilence(t *testing.T) {
 	}
 }
 
+// Part of a capacity series cannot show growth, or that there was none.
+func TestATruncatedCapacitySeriesIsUnknown(t *testing.T) {
+	metrics := &collecttest.Metrics{MetricsFunc: func(_ context.Context, q collect.MetricQuery) (collect.MetricResult, error) {
+		if q.Names[0] == "UsedCapacity" {
+			return collect.MetricResult{Truncated: true, Series: []collect.MetricSeries{{Name: "UsedCapacity", Points: hourlyPoints(100, 900)}}}, nil
+		}
+		return collect.MetricResult{}, nil
+	}}
+	status, err := Reader{ARM: account(map[string]string{TagKey: pnaTag}, "Disabled"), Metrics: metrics}.
+		Status(context.Background(), target(t, accountID), StatusOptions{Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, counter := range status.Activity {
+		if counter.Metric == "UsedCapacity" {
+			t.Fatalf("a truncated series was reported as growth: %+v", counter)
+		}
+	}
+	if len(status.Unknowns) != 1 || status.Unknowns[0].ID != "cordon.metric.UsedCapacity" || status.Unknowns[0].Code != verdict.UnkPartial {
+		t.Fatalf("unknowns = %+v", status.Unknowns)
+	}
+}
+
 // Somebody opened the account again. Who did it is Azure's text and is only
 // ever printed under untrusted, cleaned.
 func TestARevertedCordonNamesTheWriterUnderUntrusted(t *testing.T) {
