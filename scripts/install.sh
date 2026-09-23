@@ -75,20 +75,65 @@ sha256() {
   fi
 }
 
-command -v curl >/dev/null 2>&1 || fail "curl is required"
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 
 number="${VERSION#v}"
 archive="${BINARY}_${number}_$(platform).tar.gz"
-base="${BASE_URL:-https://github.com/$REPO/releases/download/$VERSION}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# how_fetch reports the way this machine can reach the release assets.
+#
+# A private repository serves nothing to an anonymous request, so curl alone
+# gets a 404 that looks exactly like a missing platform build. The GitHub CLI
+# already holds the caller's credentials, so it is preferred when it is signed
+# in; GITHUB_TOKEN is the next choice; plain curl is for a public release.
+how_fetch() {
+  if [ -n "${BASE_URL:-}" ]; then
+    printf 'curl\n'
+  elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    printf 'gh\n'
+  elif [ -n "${GITHUB_TOKEN:-}" ]; then
+    printf 'token\n'
+  else
+    printf 'curl\n'
+  fi
+}
+
+how="$(how_fetch)"
+if [ "$how" = "curl" ] || [ "$how" = "token" ]; then
+  command -v curl >/dev/null 2>&1 || fail "curl is required, or sign in with: gh auth login"
+fi
+
+# fetch downloads one named release asset into the work directory.
+fetch() {
+  local name="$1"
+  local base="${BASE_URL:-https://github.com/$REPO/releases/download/$VERSION}"
+  case "$how" in
+    gh)
+      gh release download "$VERSION" -R "$REPO" -p "$name" -D "$work" --clobber 2>/dev/null
+      ;;
+    token)
+      curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$base/$name" -o "$work/$name"
+      ;;
+    *)
+      curl -fsSL "$base/$name" -o "$work/$name"
+      ;;
+  esac
+}
+
+# unreachable explains a failed download without guessing which cause it was.
+unreachable() {
+  local name="$1"
+  if [ "$how" = "curl" ] && [ -z "${BASE_URL:-}" ]; then
+    fail "could not download $name from $VERSION. If $REPO is private, sign in with 'gh auth login' or set GITHUB_TOKEN; otherwise check that $VERSION was released for this platform"
+  fi
+  fail "could not download $name from $VERSION; check that $VERSION was released for this platform"
+}
+
 say "downloading $archive from $VERSION"
-curl -fsSL "$base/$archive" -o "$work/$archive" ||
-  fail "could not download $archive; check that $VERSION was released for this platform"
-curl -fsSL "$base/checksums.txt" -o "$work/checksums.txt" ||
-  fail "could not download the checksums for $VERSION"
+fetch "$archive" || unreachable "$archive"
+fetch checksums.txt || unreachable checksums.txt
 
 expected="$(awk -v name="$archive" '$2 == name || $2 == "*" name {print $1}' "$work/checksums.txt")"
 [ -n "$expected" ] || fail "$archive is not listed in the release checksums"
