@@ -202,15 +202,34 @@ evidence: targets that completed are still printed.
 
 ## How to read the output
 
-* **verdict** — `yes`, `no` or `tentative`, with its reason class.
-* **coverage** — how many signals were evaluated, how many are unknown, and how
-  many of those are critical. A critical unknown is marked `!` and is what
-  keeps a `yes` out of reach.
-* **Evidence** — every signal, at its tier, with what was found. Tiers run
-  `BLOCKER → HARD_DEPENDENCY → LIVE_ACTIVITY → DESIGN_INTENT → OBSERVED_IDLE →
-  INFO`; the first tier with something present decides the verdict.
-* **not_evaluated** — a check this version does not perform, with the
-  consequence and the command to run yourself.
+The terminal view leads with the answer and one sentence saying what it means:
+
+```
+⚠️  TENTATIVE — kacz3h2lx6uy5ebomkb
+
+    I could not verify everything, so I do not know whether you can delete
+    this. Read the evidence below and decide.
+
+🚧  Could not check (2)
+    storage.metrics.user-writes (transient) ‼
+      The transaction metric could not be read.
+      → Find the writer before deleting; its next write will fail.
+
+✅  45 signals looked and found nothing
+
+    47/56 checked · window 30 d · age ≥96 d · rules 2026-09-21 · v0.2.0
+```
+
+`⛔ NO` means the resource is in use and the evidence says where. `✅ YES`
+means no evidence of use was found — which is not proof it is unused, because
+nothing here can see a consumer that names the resource only in code, a
+pipeline or a config file. `⚠️ TENTATIVE` means something could not be read,
+so the tool does not know; `‼` marks the signal that kept it from an answer.
+
+Signals that looked and found nothing are counted rather than listed: their
+silence is what a `yes` is made of, but reading fifty lines of it buries the
+verdict. `--full` prints every signal and the limitations in full, and `-o
+json` carries all of it always, for a machine or an agent.
 
 ## Limitations, printed with every `yes`
 

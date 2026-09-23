@@ -162,8 +162,10 @@ func TestFormats(t *testing.T) {
 					t.Fatalf("wide table: %q", line)
 				}
 			}
-			if !strings.Contains(out.String(), "`yes` means") {
-				t.Fatal("table omitted limitations")
+			// The limitations live in the JSON and behind --full; the table
+			// carries the one sentence that says what the verdict means.
+			if !strings.Contains(out.String(), "--full") {
+				t.Fatal("table must say where the rest of the evidence is")
 			}
 		}
 	}
@@ -196,9 +198,11 @@ func TestReducer(t *testing.T) {
 	}
 }
 
-func TestTableViewShowsEverySignalAndTheVerdict(t *testing.T) {
-	in := sample()
-	report := build(t, in, config())
+// The default view answers the question and shows what was found. It is not a
+// smaller version of the full report: the signals that looked and found
+// nothing are counted, because that is what a reader needs from them.
+func TestTableViewLeadsWithTheVerdictAndWhatWasFound(t *testing.T) {
+	report := build(t, sample(), config())
 	var out bytes.Buffer
 	if err := Render(&out, "table", []Outcome{Completed(report)}); err != nil {
 		t.Fatal(err)
@@ -208,21 +212,82 @@ func TestTableViewShowsEverySignalAndTheVerdict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"verdict", "resource", "window", "coverage", "Evidence", "Limitations"} {
+
+	// The verdict is the first thing on the page, in words a reader can act on.
+	word := strings.ToUpper(value["verdict"].(string))
+	if !strings.HasPrefix(strings.TrimLeft(rendered, "✅⛔⚠️❔ "), word) {
+		t.Errorf("the verdict must lead the output, got %q", firstLine(rendered))
+	}
+	// The remark is wrapped to the terminal width, so compare it flattened.
+	if !strings.Contains(unwrapped(rendered), unwrapped(verdictBanner[value["verdict"].(string)].remark)) {
+		t.Error("the verdict must be followed by the sentence that says what it means")
+	}
+
+	// Provenance stays, in one line rather than six.
+	for _, field := range []string{"checked", "window", "rules"} {
 		if !strings.Contains(rendered, field) {
-			t.Errorf("table omitted %s", field)
+			t.Errorf("the footer omitted %s", field)
 		}
 	}
-	evidence, _ := value["evidence"].([]any)
-	for _, item := range evidence {
+	// And the way to everything else.
+	if !strings.Contains(rendered, "--full") || !strings.Contains(rendered, "-o json") {
+		t.Error("the view must say where the rest of the evidence is")
+	}
+
+	// Signals that found nothing are counted, not listed.
+	if strings.Contains(rendered, "Limitations") {
+		t.Error("the limitations are not printed by default; they are in the JSON and behind --full")
+	}
+	quiet := 0
+	for _, item := range value["evidence"].([]any) {
+		row := item.(map[string]any)
+		if row["status"] == "absent" {
+			quiet++
+			if strings.Contains(rendered, row["id"].(string)) {
+				t.Errorf("a signal that found nothing was listed: %s", row["id"])
+			}
+		}
+	}
+	if quiet > 0 && !strings.Contains(rendered, "found nothing") {
+		t.Error("the signals that found nothing must still be accounted for")
+	}
+}
+
+// --full restores the complete report, including the limitations verbatim.
+func TestTheFullViewHidesNothing(t *testing.T) {
+	Full = true
+	t.Cleanup(func() { Full = false })
+
+	report := build(t, sample(), config())
+	var out bytes.Buffer
+	if err := Render(&out, "table", []Outcome{Completed(report)}); err != nil {
+		t.Fatal(err)
+	}
+	rendered := out.String()
+	value, err := report.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"Evidence", "Limitations"} {
+		if !strings.Contains(rendered, field) {
+			t.Errorf("the full view omitted %s", field)
+		}
+	}
+	for _, item := range value["evidence"].([]any) {
 		row := item.(map[string]any)
 		if !strings.Contains(rendered, row["id"].(string)) {
-			t.Errorf("table omitted signal %s", row["id"])
+			t.Errorf("the full view omitted signal %s", row["id"])
 		}
 	}
-	if !strings.Contains(rendered, value["verdict"].(string)) {
-		t.Error("table omitted the verdict")
-	}
+}
+
+// unwrapped collapses wrapping so a sentence can be compared to what was
+// printed across several lines.
+func unwrapped(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
 }
 
 func TestTableViewReportsFailuresByCode(t *testing.T) {
@@ -230,7 +295,7 @@ func TestTableViewReportsFailuresByCode(t *testing.T) {
 	if err := Render(&out, "table", []Outcome{Failed(NotFound)}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "not-found") || !strings.Contains(out.String(), "exit") {
-		t.Fatalf("a failed target must name its code and exit: %q", out.String())
+	if !strings.Contains(out.String(), "not-found") {
+		t.Fatalf("a failed target must name its code: %q", out.String())
 	}
 }
