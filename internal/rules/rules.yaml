@@ -36,3 +36,6 @@ operations:
   # not a control-plane api-version, but it is a version this tool pins and
   # must be able to correct in one place.
   storageDataPlane: "2025-11-05"
+  # The Azure AI inference api-version the pull request reviewer speaks. Not a
+  # control-plane version either, and pinned here for the same reason.
+  azureAIInference: "2024-10-21"
