@@ -231,3 +231,46 @@ func list[T any](ctx context.Context, c *Client, path string, query url.Values) 
 	}
 	return items, false, nil
 }
+
+// Recorded builds a client that reads a recording instead of Azure.
+//
+// It lives here because the SDK types do: ADR-0010 keeps the pipeline, the
+// transporter and the credential inside this package, so internal/replay can
+// be a plain http.RoundTripper that knows nothing about any of them.
+//
+// The credential is a placeholder rather than a real one. A recorded run must
+// work on a machine that has never signed in — otherwise a demonstration fails
+// for a reason that has nothing to do with what it is demonstrating — and
+// there is nothing on the other end to authenticate to.
+func Recorded(transport http.RoundTripper, toolVersion string) (*Client, error) {
+	if transport == nil {
+		return nil, errors.New("a recording needs a transport to read it")
+	}
+	return New(Options{
+		ToolVersion: toolVersion,
+		Credential:  recordedCredential{},
+		Transport:   roundTripper{transport},
+	})
+}
+
+// Transport adapts a standard transport to the SDK's, so a caller outside this
+// package can supply one without naming an SDK type.
+func Transport(inner http.RoundTripper) policy.Transporter { return roundTripper{inner} }
+
+// RecordedCredential is the placeholder a replay signs with. Exported so a
+// recording can be made against a test endpoint, which needs no identity
+// either.
+func RecordedCredential() azcore.TokenCredential { return recordedCredential{} }
+
+// roundTripper adapts a standard transport to the SDK's.
+type roundTripper struct{ inner http.RoundTripper }
+
+func (r roundTripper) Do(request *http.Request) (*http.Response, error) {
+	return r.inner.RoundTrip(request)
+}
+
+type recordedCredential struct{}
+
+func (recordedCredential) GetToken(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	return azcore.AccessToken{Token: "replay", ExpiresOn: time.Now().Add(time.Hour)}, nil
+}

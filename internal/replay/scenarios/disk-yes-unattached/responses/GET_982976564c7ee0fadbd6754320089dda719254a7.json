@@ -1,0 +1,73 @@
+{
+  "status": 200,
+  "body": {
+    "interval": "P1D",
+    "timespan": "2026-08-02T00:00:00Z/2026-09-01T00:00:00Z",
+    "value": [
+      {
+        "name": {
+          "value": "Composite Disk Read Bytes/sec"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-03T00:00:00Z",
+                "total": 0
+              }
+            ]
+          }
+        ],
+        "unit": "BytesPerSecond"
+      },
+      {
+        "name": {
+          "value": "Composite Disk Write Bytes/sec"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-03T00:00:00Z",
+                "total": 0
+              }
+            ]
+          }
+        ],
+        "unit": "BytesPerSecond"
+      },
+      {
+        "name": {
+          "value": "Composite Disk Read Operations/sec"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-03T00:00:00Z",
+                "total": 0
+              }
+            ]
+          }
+        ],
+        "unit": "CountPerSecond"
+      },
+      {
+        "name": {
+          "value": "Composite Disk Write Operations/sec"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-03T00:00:00Z",
+                "total": 0
+              }
+            ]
+          }
+        ],
+        "unit": "CountPerSecond"
+      }
+    ]
+  }
+}

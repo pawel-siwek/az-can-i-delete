@@ -43,3 +43,4 @@ next free number.
 | [0013](0013-review-is-copilot-plus-mechanical-checks.md) | Conformance is checked mechanically first, and by Copilot second | accepted |
 | [0014](0014-nothing-arrives-unread.md) | Nothing this project tells you to run arrives unread | accepted |
 | [0015](0015-a-change-is-reviewed-against-the-documents.md) | A change is reviewed against the documents, and that review blocks | accepted |
+| [0016](0016-a-recording-is-sanitized-but-never-truncated.md) | A recording is sanitized but never truncated | accepted |

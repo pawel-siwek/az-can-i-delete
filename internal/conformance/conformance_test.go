@@ -140,7 +140,14 @@ func TestAnalyzersDependOnTheBoundariesNotTheSDK(t *testing.T) {
 			continue
 		}
 		for _, path := range imports(file) {
-			if path == boundary {
+			// internal/replay's own tests build the adapters on purpose: a
+			// recording is replayed through the real pipeline, and a test that
+			// substituted the boundaries would be testing the fakes instead of
+			// proving the demonstration works. The exemption is exactly that
+			// narrow — its production code stays a plain http.RoundTripper,
+			// and the SDK check below still applies to every file here.
+			replayTest := under(file, "internal/replay") && strings.HasSuffix(file.path, "_test.go")
+			if path == boundary && !replayTest {
 				t.Errorf("%s imports the SDK adapters directly; analyzers depend on internal/collect (docs/adr/0010)", file.path)
 			}
 			if strings.HasPrefix(path, "github.com/Azure/azure-sdk-for-go/") {

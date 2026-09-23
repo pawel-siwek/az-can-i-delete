@@ -14,6 +14,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/azure"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
+	"github.com/pawel-siwek/az-can-i-delete/internal/replay"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -33,6 +34,9 @@ func (e *ExitError) Error() string {
 	return e.Err.Error()
 }
 func (e *ExitError) Unwrap() error { return e.Err }
+
+// defaultWindow is the observation window a run uses when nobody chose one.
+const defaultWindow = "30d"
 
 type outputOptions struct {
 	format         string
@@ -166,13 +170,21 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	}
 	check.Flags().StringArrayVar(&ids, "ids", nil, "Resource IDs or portal URLs (space-delimited or repeated --ids)")
 	check.Args = usageArgs(func(cmd *cobra.Command, args []string) error {
+		// A replay names its own target: the recording says what it is of, so
+		// asking for one again is a chance to point it at the wrong resource.
+		if fixture, err := cmd.Flags().GetString("fixture"); err == nil && fixture != "" {
+			if len(ids)+len(args) > 0 {
+				return errors.New("a fixture names its own target; pass --fixture or a target, not both")
+			}
+			return nil
+		}
 		if len(ids)+len(args) == 0 {
 			return errors.New("check requires a target or --ids")
 		}
 
 		return validateTargets(cmd, append(append([]string(nil), ids...), args...))
 	})
-	check.Flags().String("window", "30d", "Observation window, 7-93 days")
+	check.Flags().String("window", defaultWindow, "Observation window, 7-93 days")
 	check.Flags().Bool("data-plane", false, "Opt in to bounded OAuth-only storage metadata collection")
 	check.Flags().Bool("full", false, "Print every signal and the limitations, not just what was found")
 	check.Flags().String("subscription", "", "Expected subscription ID")
@@ -201,7 +213,26 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 		})
 	}
 	history := unavailableCommand("history", "Inspect local operation history (not implemented)", cobra.NoArgs)
-	demo := unavailableCommand("demo <scenario>", "Run a labelled recorded fixture (not implemented)", cobra.ExactArgs(1))
+	demo := &cobra.Command{
+		Use:   "demo [scenario]",
+		Short: "Replay a recorded scenario through the real collectors and rules",
+		Long: "Run one of the recordings shipped in this binary. No credential is used and no\n" +
+			"connection is opened: the collectors, the analyzers and the verdict rules are the\n" +
+			"real ones, and only the answers Azure gave are recorded.\n\n" +
+			"A recording is not an observation. Every replayed report says so.",
+		Args: usageArgs(cobra.MaximumNArgs(1)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return listScenarios(cmd)
+			}
+			fixture, err := replay.Scenario(args[0])
+			if err != nil {
+				return &ExitError{Code: 2, Err: err}
+			}
+			return runReplay(cmd, version, options, fixture)
+		},
+	}
+	demo.Flags().Bool("full", false, "Print every signal and the limitations, not just what was found")
 	patterns := &cobra.Command{
 		Use: "patterns", Short: "Inspect storage knowledge-base patterns",
 		Args: usageArgs(cobra.NoArgs),
@@ -228,8 +259,12 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 // reported on the error stream and as a failed outcome, and the completed
 // assessments are still printed.
 func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *outputOptions, inputs []string) error {
-	if fixture, err := cmd.Flags().GetString("fixture"); err == nil && fixture != "" {
-		return &ExitError{Code: 1, Err: errors.New("fixture replay is not implemented yet")}
+	if dir, err := cmd.Flags().GetString("fixture"); err == nil && dir != "" {
+		fixture, openErr := replay.Open(dir)
+		if openErr != nil {
+			return &ExitError{Code: 2, Err: openErr}
+		}
+		return runReplay(cmd, version, options, fixture)
 	}
 	cutoff := deps.Now().UTC()
 	window, err := cmd.Flags().GetString("window")
@@ -259,6 +294,12 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	dataPlane, err := cmd.Flags().GetBool("data-plane")
 	if err != nil {
 		return err
+	}
+
+	// SPEC 7.5: the recording path is the ordinary check with a directory to
+	// keep the answers in.
+	if dir := os.Getenv(RecordEnv); dir != "" {
+		return runRecord(cmd, version, options, dir, targets, cutoff, requested, redactTags)
 	}
 
 	runner, err := deps.Runner(version, dataPlane)

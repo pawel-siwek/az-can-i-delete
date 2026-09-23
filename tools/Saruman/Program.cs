@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
@@ -181,6 +182,106 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         blocking finding.
         """;
 
+    /// <summary>How long an answer may be.</summary>
+    ///
+    /// A review is a verdict line and a paragraph per finding. Saying so
+    /// bounds what the reviewer can write, which is worth doing on its own,
+    /// but it is not why this is here.
+    ///
+    /// Generous on purpose. A reasoning model spends this budget on thinking
+    /// before it spends any of it on writing, and the two come out of one
+    /// allowance: set it to what the visible answer needs and the model
+    /// reasons until the budget is gone, then returns nothing at all. The
+    /// failure does not look like a budget — it looks like the model
+    /// declining to answer.
+    ///
+    /// It is still bounded rather than absent, because Azure admits a request
+    /// against the tokens it might use: the prompt plus the largest answer
+    /// allowed. Unset, that reservation is the model's whole output window.
+    const int AnswerBudget = 16000;
+
+    /// <summary>The service's account of why it refused, bounded.</summary>
+    static async Task<string> Detail(HttpResponseMessage response)
+    {
+        string body;
+        try
+        {
+            body = await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception error)
+        {
+            return $"(the response could not be read: {error.Message})";
+        }
+        try
+        {
+            using var parsed = JsonDocument.Parse(body);
+            if (parsed.RootElement.TryGetProperty("error", out var failure) &&
+                failure.TryGetProperty("message", out var message))
+            {
+                body = message.GetString() ?? body;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON. Whatever it is, it is still the only account there is.
+        }
+        body = body.Trim();
+        if (body.Length > 400)
+        {
+            body = body[..400] + "…";
+        }
+        return body + Limits(response);
+    }
+
+    /// <summary>Why an answer is missing, from the response that omitted it.</summary>
+    static string Absent(JsonElement choice, JsonElement root)
+    {
+        var parts = new List<string>();
+        if (choice.ValueKind == JsonValueKind.Object &&
+            choice.TryGetProperty("finish_reason", out var finish) && finish.GetString() is { } reason)
+        {
+            parts.Add("finish_reason=" + reason);
+        }
+        if (root.TryGetProperty("usage", out var usage))
+        {
+            foreach (var name in new[] { "prompt_tokens", "completion_tokens" })
+            {
+                if (usage.TryGetProperty(name, out var count))
+                {
+                    parts.Add($"{name}={count}");
+                }
+            }
+            if (usage.TryGetProperty("completion_tokens_details", out var details) &&
+                details.TryGetProperty("reasoning_tokens", out var reasoning))
+            {
+                parts.Add($"reasoning_tokens={reasoning}");
+            }
+        }
+        return parts.Count == 0 ? string.Empty : ": " + string.Join(" ", parts);
+    }
+
+    /// <summary>What the gateway says the limits actually are.</summary>
+    ///
+    /// These headers are the only honest account of a 429. The deployment's
+    /// own record can say one thing while the gateway serving it enforces
+    /// another — a capacity change reaches the control plane first and the
+    /// serving layer minutes later — and during that gap `az` reports a limit
+    /// that is not the one refusing the request. Reading the refusal's own
+    /// headers is how that gap becomes visible instead of looking like a
+    /// mystery, or like somebody's arithmetic being wrong.
+    static string Limits(HttpResponseMessage response)
+    {
+        var parts = new List<string>();
+        foreach (var name in new[] { "x-ratelimit-limit-tokens", "x-ratelimit-remaining-tokens", "x-ratelimit-limit-requests", "retry-after" })
+        {
+            if (response.Headers.TryGetValues(name, out var values))
+            {
+                parts.Add($"{name}={string.Join(",", values)}");
+            }
+        }
+        return parts.Count == 0 ? string.Empty : " [" + string.Join(" ", parts) + "]";
+    }
+
     static (string Diff, bool Truncated) Diff(string baseRevision)
     {
         var diff = Git("diff", $"{baseRevision}...HEAD");
@@ -220,6 +321,13 @@ sealed class Reviewer(string endpoint, string deployment, string token)
 
     async Task<string> AskAsync(string system, string user)
     {
+        // No temperature. Pinning it to 0 for a reproducible review is the
+        // obvious thing to want, and the newer reasoning models reject the
+        // request outright rather than ignoring it: they sample at a fixed
+        // temperature and refuse to be told otherwise. Sending nothing works
+        // on every model, and the determinism it costs was never guaranteed
+        // anyway — what keeps this review honest is the contract it has to
+        // answer in and the mechanical checks beside it, not a sampling knob.
         var body = JsonSerializer.Serialize(new
         {
             messages = new[]
@@ -227,7 +335,7 @@ sealed class Reviewer(string endpoint, string deployment, string token)
                 new { role = "system", content = system },
                 new { role = "user", content = user },
             },
-            temperature = 0,
+            max_completion_tokens = AnswerBudget,
         });
 
         var address = $"{endpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions?api-version={Rules.ApiVersion("azureAIInference")}";
@@ -240,15 +348,28 @@ sealed class Reviewer(string endpoint, string deployment, string token)
         using var response = await Http.SendAsync(request);
         if (!response.IsSuccessStatusCode)
         {
-            throw new HttpRequestException($"the model refused the request with status {(int)response.StatusCode}");
+            // Say which refusal it was. A bare status tells a reader nothing
+            // they can act on — a wrong deployment name, an unsupported
+            // parameter and an exhausted quota all read as 400 or 404, and
+            // they need different people to fix them. The service's own text
+            // goes in the workflow log, which is not the report: nothing
+            // provider-written reaches a verdict (ADR-0007).
+            throw new HttpRequestException(
+                $"the model refused the request with status {(int)response.StatusCode}: {await Detail(response)}");
         }
 
         using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var content = answer.RootElement.GetProperty("choices").EnumerateArray().FirstOrDefault()
-            .GetProperty("message").GetProperty("content").GetString();
-        return string.IsNullOrWhiteSpace(content)
-            ? throw new InvalidOperationException("the model returned no answer")
-            : content!;
+        var choice = answer.RootElement.GetProperty("choices").EnumerateArray().FirstOrDefault();
+        var content = choice.GetProperty("message").GetProperty("content").GetString();
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            return content!;
+        }
+        // Say why there is nothing rather than only that there is nothing. An
+        // empty answer has more than one cause — a budget spent on reasoning
+        // before any of it reached the page, a content filter, a refusal —
+        // and the response names which every time.
+        throw new InvalidOperationException("the model returned no answer" + Absent(choice, answer.RootElement));
     }
 
     internal static string Git(params string[] arguments)

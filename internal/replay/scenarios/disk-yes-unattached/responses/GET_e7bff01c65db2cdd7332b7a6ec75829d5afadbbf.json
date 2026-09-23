@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/disks/disk-orphan",
+    "location": "westeurope",
+    "name": "disk-orphan",
+    "properties": {
+      "diskSizeGB": 128,
+      "diskState": "Unattached",
+      "lastOwnershipUpdateTime": "2025-08-17T00:00:00Z",
+      "networkAccessPolicy": "DenyAll",
+      "provisioningState": "Succeeded",
+      "publicNetworkAccess": "Disabled",
+      "timeCreated": "2025-07-28T00:00:00Z"
+    },
+    "sku": {
+      "name": "Premium_LRS",
+      "tier": "Premium"
+    },
+    "tags": {
+      "costCentre": "REDACTED",
+      "owner": "REDACTED"
+    },
+    "type": "Microsoft.Compute/disks"
+  }
+}

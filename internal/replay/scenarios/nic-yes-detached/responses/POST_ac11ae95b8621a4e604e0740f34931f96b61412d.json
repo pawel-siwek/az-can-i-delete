@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo",
+        "managedBy": "",
+        "tags": {}
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

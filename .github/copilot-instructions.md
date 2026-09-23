@@ -61,6 +61,11 @@ blocking, because each is a documented way this tool becomes dangerous:
 - An install path that resolves a version server side, skips checksum
   verification, or tells somebody to pipe a download into a shell rather
   than fetch it, verify it and read it (ADR-0014, superseding ADR-0011).
+- A recorded fixture carrying Azure text that did not pass the report
+  boundary's own sanitizer, or a recorder that restates those rules instead
+  of calling it. The one sanctioned difference is truncation, and it is
+  ADR-0016; a second exception is a new record, not a wider reading of that
+  one.
 - A claim in the README, the plan or a command's help text that an analyzer,
   signal or command is implemented when the diff shows it is not.
 

@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "changeType": "Create",
+        "op": "Create",
+        "ts": "2025-07-18T00:00:00Z"
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

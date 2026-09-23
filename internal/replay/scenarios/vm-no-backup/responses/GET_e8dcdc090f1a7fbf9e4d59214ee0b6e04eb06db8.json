@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/vm-quiet-nic",
+    "location": "westeurope",
+    "name": "vm-quiet-nic",
+    "properties": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig1",
+          "properties": {
+            "primary": true,
+            "privateIPAddress": "10.0.1.9",
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/virtualNetworks/vnet-demo/subnets/default"
+            }
+          }
+        }
+      ],
+      "provisioningState": "Succeeded",
+      "virtualMachine": {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet"
+      }
+    },
+    "type": "Microsoft.Network/networkInterfaces"
+  }
+}

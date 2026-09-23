@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "body": {
+    "statuses": [
+      {
+        "code": "ProvisioningState/succeeded",
+        "displayStatus": "Provisioning succeeded",
+        "level": "Info"
+      },
+      {
+        "code": "PowerState/deallocated",
+        "displayStatus": "VM deallocated",
+        "level": "Info"
+      }
+    ]
+  }
+}

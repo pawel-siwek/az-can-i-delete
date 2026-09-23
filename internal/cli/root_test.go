@@ -99,10 +99,8 @@ func TestUnimplementedCommandsFailExplicitly(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
 		{"cordon", testTarget}, {"uncordon", testTarget},
-		{"status", testTarget}, {"history"}, {"demo", "recorded-example"},
+		{"status", testTarget}, {"history"},
 		{"patterns", "list"}, {"mcp"},
-		// check itself is implemented; fixture replay is not.
-		{"check", testTarget, "--fixture", "recorded"},
 	} {
 		code, out, errOut := run(t, testDeps(nil, nil), args...)
 		if code != 1 || out != "" || !strings.Contains(errOut, "not implemented") {

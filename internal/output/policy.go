@@ -81,6 +81,17 @@ func validRuleID(s string) bool {
 	return len(s) <= 128 && ruleID.MatchString(s) && !urlPattern.MatchString(s)
 }
 
+// Sanitized is the character half of ADR-0007's boundary: control, format,
+// surrogate, private-use and unassigned runes removed, and what is left
+// normalized to NFC. It is exported so that the one other place that has to
+// apply this contract — the fixture recorder — runs this code rather than a
+// second copy of the rules, because two copies agree until they do not and
+// the one that drifts is the one nobody is reading.
+//
+// The length cap ADR-0007 also sets is applied by the callers that publish a
+// report, not here: see ADR-0016 for the one boundary that must not truncate.
+func Sanitized(s string) string { return cleanRunes(s) }
+
 func cleanRunes(s string) string {
 	var b strings.Builder
 	for len(s) > 0 {

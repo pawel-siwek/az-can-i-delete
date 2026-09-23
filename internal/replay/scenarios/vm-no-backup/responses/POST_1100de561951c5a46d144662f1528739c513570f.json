@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet",
+        "systemData": {
+          "createdAt": "2025-04-19T00:00:00Z"
+        },
+        "tags": {
+          "owner": "REDACTED"
+        },
+        "type": "microsoft.compute/virtualmachines"
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

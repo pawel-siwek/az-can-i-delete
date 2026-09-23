@@ -1,0 +1,9 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A virtual machine deallocated for months that a backup vault is still protecting
+expect:
+    verdict: "no"
+    reasonClass: in-use
+    reasons:
+        - vm.backup.protected

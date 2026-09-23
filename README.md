@@ -21,9 +21,29 @@ tool, not a disclaimer.
 | Name knowledge base | 79 entries recognize a container, share, queue or table name as the work of a known producer — diagnostic settings, flow logs, Functions host storage, boot diagnostics, Terraform state and the rest. A name match is reported at the tier a name alone may claim, never the confirmed one |
 | Output | `table` (default at a terminal), `json`, `jsonc`, `yaml`, `tsv`, `none` |
 | `--data-plane` | opt-in, OAuth only: samples up to five containers and walks their `y=/m=/d=/h=` partitions for the last write, at most twelve calls and three seconds each. No account key is ever acquired, and no data access means `unknown`, never "empty" |
-| `cordon`, `uncordon`, `status`, `demo`, `mcp`, `patterns list`, `--fixture`, `--query` | not implemented; they exit 1 and say so |
+| `AZCID_RECORD=<dir> check <id>` | record a real assessment as a fixture: the ordinary check path, keeping every answer, with tag values, callers and claims removed and every string held to the report boundary's sanitizer |
+| `demo`, `check --fixture` | replay a recording through the real collectors, analyzers and rules, with no credential and no connection. Three scenarios are shipped in the binary; `demo` with no argument lists them. A replayed report says it is one, in every format |
+| `cordon`, `uncordon`, `status`, `mcp`, `patterns list`, `--query` | not implemented; they exit 1 and say so |
 
 `IMPLEMENTATION-PLAN.md` has the full status and the order the rest is built in.
+
+## See it work without an Azure subscription
+
+```sh
+az-can-i-delete demo                  # what is recorded
+az-can-i-delete demo vm-no-backup     # the one worth seeing
+```
+
+`vm-no-backup` is a machine that has been switched off for four months, which
+looks abandoned, and which a backup vault is still protecting. It comes out
+`no`. That is the whole argument for the tool in one screen: quiet is not
+unused, and the difference is not something you can see by looking.
+
+A recording is not an observation and never pretends to be one. Every replayed
+report carries `replay: true`, the table says so on its own line, and a request
+nobody recorded is an error rather than an empty answer — because an empty
+answer would be read as absence, which is the mistake this tool exists to
+prevent.
 
 ## Build and run
 

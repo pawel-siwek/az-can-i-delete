@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "changeType": "Update",
+        "op": "Deallocate",
+        "ts": "2026-05-04T00:00:00Z"
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

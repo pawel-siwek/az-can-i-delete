@@ -85,6 +85,22 @@ func ExitCode(outcomes []Outcome, exitOnVerdict bool) int {
 	return 0
 }
 
+// Value returns a completed outcome's report as a decoded document, or nil for
+// a failed one. It exists so a caller that has to act on a verdict — the
+// recorder writing what a fixture is a recording of — reads the same document
+// a consumer would, rather than a private view of it.
+func (o Outcome) Value() (map[string]any, error) {
+	if len(o.report.data) == 0 {
+		return nil, nil
+	}
+	return o.report.Value()
+}
+
+// IsHuman reports whether a format is meant to be read on a screen rather than
+// parsed. A note addressed to a person belongs only in those; anywhere else it
+// would be corruption in the middle of somebody's data.
+func IsHuman(format string) bool { return format == "table" }
+
 // ValidateFormat rejects unknown formats without echoing potentially unsafe text.
 func ValidateFormat(format string) error {
 	if !slices.Contains([]string{"json", "jsonc", "table", "tsv", "yaml", "none"}, format) {

@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/nic-orphan",
+    "location": "westeurope",
+    "name": "nic-orphan",
+    "properties": {
+      "enableAcceleratedNetworking": false,
+      "ipConfigurations": [
+        {
+          "name": "ipconfig1",
+          "properties": {
+            "primary": true,
+            "privateIPAddress": "10.0.1.4",
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/virtualNetworks/vnet-demo/subnets/default"
+            }
+          }
+        }
+      ],
+      "provisioningState": "Succeeded"
+    },
+    "tags": {
+      "owner": "REDACTED"
+    },
+    "type": "Microsoft.Network/networkInterfaces"
+  }
+}
