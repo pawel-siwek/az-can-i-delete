@@ -92,6 +92,10 @@ anything: an author who disagrees says so in the thread and a human decides.
 A blocking finding means "a human should look at this before merge", never
 "this is forbidden".
 
+A change is also compared against the documents by `cmd/driftcheck`, which
+blocks the merge on a record edited to agree with new code or a status claim
+without tests (ADR-0015). Findings it already raised need no repeating here.
+
 Some of what it checks is not left to judgement (ADR-0013):
 `internal/conformance` holds the mechanically checkable half of these rules as
 tests, so `go test ./...` goes red on them without anyone reading a diff — no

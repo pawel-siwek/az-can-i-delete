@@ -1,0 +1,44 @@
+name: Review
+
+# Every pull request is compared against the documents that govern it before a
+# human spends attention on it. This check blocks the merge; Copilot's review
+# comments beside it do not, and are not meant to.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Drift against the spec and the records
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The comparison needs both sides, so the whole history comes along.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fetch the base branch
+        run: git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
+
+      # The records' own constraints, checked against the source rather than
+      # against a diff: no clock in the verdict engine, no api-version literal,
+      # no key acquisition, and the records themselves well formed and indexed.
+      - name: Conformance
+        run: go test ./internal/conformance/ ./internal/adr/ ./internal/drift/
+
+      # And the half that only exists between two versions.
+      - name: Drift
+        run: go run ./cmd/driftcheck "origin/${{ github.event.pull_request.base.ref }}"
