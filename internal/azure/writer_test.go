@@ -17,6 +17,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/azure"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/cordon"
+	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 )
 
 const accountPath = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/st1"
@@ -96,12 +97,12 @@ func TestPatchFollowsTheOperationToItsEnd(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"` + status + `"}`))
 		}
 	})
-	err := writer.Patch(context.Background(), accountPath, "2026-04-01", map[string]any{"properties": map[string]any{"publicNetworkAccess": "Disabled"}})
+	err := writer.Patch(context.Background(), accountPath, storageVersion(t), map[string]any{"properties": map[string]any{"publicNetworkAccess": "Disabled"}})
 	if err != nil || polls != 3 {
 		t.Fatalf("err %v after %d polls", err, polls)
 	}
 	first := s.requests[0]
-	if first.Query["api-version"][0] != "2026-04-01" || first.Body["properties"].(map[string]any)["publicNetworkAccess"] != "Disabled" {
+	if first.Query["api-version"][0] != storageVersion(t) || first.Body["properties"].(map[string]any)["publicNetworkAccess"] != "Disabled" {
 		t.Fatalf("request = %+v", first)
 	}
 }
@@ -115,7 +116,7 @@ func TestAnOperationThatNeverEndsIsStillRunningNotDone(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusAccepted)
 	})
-	err := writer.Action(context.Background(), "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Web/sites/app1", "stop", "2025-05-01")
+	err := writer.Action(context.Background(), "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Web/sites/app1", "stop", siteVersion(t))
 	if !errors.Is(err, cordon.ErrStillRunning) {
 		t.Fatalf("err = %v", err)
 	}
@@ -130,7 +131,7 @@ func TestAFailedOperationIsAFailure(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`{"status":"Failed"}`))
 	})
-	err := writer.Patch(context.Background(), accountPath, "2026-04-01", map[string]any{})
+	err := writer.Patch(context.Background(), accountPath, storageVersion(t), map[string]any{})
 	var failure *collect.Failure
 	if !errors.As(err, &failure) || failure.ErrorCode != "OperationFailed" {
 		t.Fatalf("err = %v", err)
@@ -144,7 +145,7 @@ func TestAPollerOffTheManagementEndpointIsNotFollowed(t *testing.T) {
 		w.Header().Set("Azure-AsyncOperation", "https://attacker.example/operations/1")
 		w.WriteHeader(http.StatusAccepted)
 	})
-	err := writer.Patch(context.Background(), accountPath, "2026-04-01", map[string]any{})
+	err := writer.Patch(context.Background(), accountPath, storageVersion(t), map[string]any{})
 	var failure *collect.Failure
 	if !errors.As(err, &failure) || failure.ErrorCode != "UntrustedPoller" || len(s.requests) != 1 {
 		t.Fatalf("err %v requests %d", err, len(s.requests))
@@ -158,7 +159,7 @@ func TestTagsGoThroughTheTagsResource(t *testing.T) {
 	}
 	got := s.requests[0]
 	if got.Method != http.MethodPatch || got.Path != accountPath+"/providers/Microsoft.Resources/tags/default" ||
-		got.Query["api-version"][0] != "2025-04-01" || got.Body["operation"] != "Merge" ||
+		got.Query["api-version"][0] != rules.MustOperation("tags") || got.Body["operation"] != "Merge" ||
 		got.Body["properties"].(map[string]any)["tags"].(map[string]any)["azcid"] != "v=1" {
 		t.Fatalf("request = %+v", got)
 	}
@@ -181,7 +182,7 @@ func TestCheckPolicyReadsDenyAndModifyOnTheFlippedField(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			writer, s := newWriter(t, nil, func(w http.ResponseWriter, _ *http.Request, _ string) { _, _ = w.Write([]byte(tc.answer)) })
 			result, err := writer.CheckPolicy(context.Background(), cordon.PolicyCheck{
-				Scope: groupID, APIVersion: "2026-04-01", Field: "Microsoft.Storage/storageAccounts/publicNetworkAccess",
+				Scope: groupID, APIVersion: storageVersion(t), Field: "Microsoft.Storage/storageAccounts/publicNetworkAccess",
 				Content: map[string]any{"type": "Microsoft.Storage/storageAccounts", "properties": map[string]any{"publicNetworkAccess": "Enabled"}},
 			})
 			if err != nil || result.Restricted != tc.restricted || strings.Join(result.Effects, ",") != tc.effects {
@@ -189,7 +190,7 @@ func TestCheckPolicyReadsDenyAndModifyOnTheFlippedField(t *testing.T) {
 			}
 			got := s.requests[0]
 			if got.Method != http.MethodPost || got.Path != groupID+"/providers/Microsoft.PolicyInsights/checkPolicyRestrictions" ||
-				got.Query["api-version"][0] != "2024-10-01" {
+				got.Query["api-version"][0] != rules.MustOperation("policyInsights") {
 				t.Fatalf("request = %+v", got)
 			}
 		})
@@ -206,4 +207,23 @@ func TestThePrincipalComesFromTheTokenClaims(t *testing.T) {
 	if _, err := writer.Principal(context.Background()); err == nil {
 		t.Fatal("a token without an object id was accepted")
 	}
+}
+
+// The versions come from the rule table, like every call site's (ADR-0008).
+func storageVersion(t *testing.T) string {
+	t.Helper()
+	version, err := rules.APIVersion("Microsoft.Storage/storageAccounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return version
+}
+
+func siteVersion(t *testing.T) string {
+	t.Helper()
+	version, err := rules.APIVersion("Microsoft.Web/sites")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return version
 }
