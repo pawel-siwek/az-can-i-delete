@@ -119,8 +119,15 @@ func (h *harness) run(t *testing.T) map[string]verdict.Evidence {
 		ids = append(ids, item.ID)
 		byID[item.ID] = item
 	}
-	if !slices.Equal(ids, storage.Signals) {
+	// The fixed catalogue comes first, in order; knowledge base matches follow
+	// it, one per matching entry, so their number depends on the account.
+	if len(ids) < len(storage.Signals) || !slices.Equal(ids[:len(storage.Signals)], storage.Signals) {
 		t.Fatalf("evidence = %v, want the catalogue in order %v", ids, storage.Signals)
+	}
+	for _, id := range ids[len(storage.Signals):] {
+		if !strings.HasPrefix(id, storage.SignalKB+".") {
+			t.Fatalf("evidence carries %s after the catalogue, want only knowledge base matches", id)
+		}
 	}
 	return byID
 }
@@ -149,11 +156,17 @@ func TestQuietAccountSatisfiesItsRequiredSignals(t *testing.T) {
 	if evidence[storage.SignalPE].Status != verdict.StatusNotEvaluated {
 		t.Errorf("private endpoints = %+v, want not evaluated", evidence[storage.SignalPE])
 	}
-	for _, id := range []string{storage.SignalKB, storage.SignalDataPlane,
+	for _, id := range []string{storage.SignalDataPlane,
 		storage.SignalSharesUsage, storage.SignalInventoryShaped} {
 		if evidence[id].Status != verdict.StatusNotEvaluated || evidence[id].Critical {
 			t.Errorf("%s = %+v, want an honest non-critical stub", id, evidence[id])
 		}
+	}
+	// The knowledge base is consulted now, so its silence is a finding rather
+	// than a disclosed gap: none of this account's names identifies a producer.
+	if evidence[storage.SignalKB].Status != verdict.StatusAbsent {
+		t.Errorf("%s = %+v, want absent on an account with no recognizable names",
+			storage.SignalKB, evidence[storage.SignalKB])
 	}
 }
 
@@ -530,9 +543,120 @@ func TestPoliciesCoverEverySignal(t *testing.T) {
 			t.Errorf("signal %s has no output policy", id)
 		}
 	}
-	if len(policies) != len(storage.Signals) {
-		t.Errorf("the policy set has %d entries for %d signals", len(policies), len(storage.Signals))
+	// The knowledge base contributes one signal per entry on top of the fixed
+	// catalogue, so the policy set is larger than the signal list by exactly
+	// the number of name-matchable entries — and every one of them must have a
+	// catalogue row, or a match would be emitted at tier zero.
+	extra := 0
+	for id := range policies {
+		if !strings.HasPrefix(id, storage.SignalKB+".") {
+			continue
+		}
+		extra++
+		if _, known := storage.Catalogue[id]; !known {
+			t.Errorf("%s has a policy but no catalogue row", id)
+		}
+	}
+	if len(policies) != len(storage.Signals)+extra {
+		t.Errorf("the policy set has %d entries for %d signals and %d knowledge base rows",
+			len(policies), len(storage.Signals), extra)
+	}
+	if extra == 0 {
+		t.Error("the knowledge base contributed no signals at all")
 	}
 }
 
 func contains(value, substring string) bool { return strings.Contains(value, substring) }
+
+// A name that identifies its producer is reported, at the tier a name alone
+// may claim, and never at the confirmed one: this account has a diagnostic
+// settings container and a boot diagnostics container, but nothing here has
+// found the diagnostic setting or the virtual machine that would confirm them.
+func TestNamesThatIdentifyTheirProducerAreReported(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = func(_ context.Context, path, _ string) ([]collect.Resource, error) {
+		switch {
+		case contains(path, "/containers"):
+			return []collect.Resource{
+				{Name: "insights-logs-auditevent"},
+				{Name: "insights-logs-kube-audit"},
+				{Name: "bootdiagnostics-myvm-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"},
+				{Name: "my-holiday-photos"},
+			}, nil
+		case contains(path, "/tables"):
+			return []collect.Resource{{Name: "WADMetricsPT1HP10DV2S20151108"}}, nil
+		default:
+			return nil, nil
+		}
+	}
+	evidence := h.run(t)
+
+	if e := evidence[storage.SignalKB]; e.Status != verdict.StatusPresent || e.Details["matchCount"] != 3 {
+		t.Fatalf("kb match = %+v, want three matched entries", e)
+	}
+
+	// Two containers share one entry, and it is reported once with a count.
+	logs := evidence["storage.kb.match.container.insights-logs"]
+	if logs.Status != verdict.StatusPresent || logs.Details["matchCount"] != 2 {
+		t.Errorf("insights-logs = %+v, want one signal covering both containers", logs)
+	}
+	if logs.Tier != verdict.TierDesignIntent {
+		t.Errorf("insights-logs tier = %v, want the unconfirmed DESIGN_INTENT, not the confirmed HARD_DEPENDENCY", logs.Tier)
+	}
+	if confirmed, _ := logs.Details["confirmed"].(bool); confirmed {
+		t.Error("insights-logs claims to be confirmed; only finding the diagnostic setting would confirm it")
+	}
+
+	// Precedence holds through the analyzer, not only in the base package.
+	if _, wrong := evidence["storage.kb.match.table.wad"]; wrong {
+		t.Error("a WAD metrics table was reported as an unspecified WAD table")
+	}
+	if e := evidence["storage.kb.match.table.wadmetrics"]; e.Status != verdict.StatusPresent {
+		t.Errorf("wadmetrics = %+v, want the specific entry", e)
+	}
+
+	// A name nobody recognizes stays unrecognized.
+	for id := range evidence {
+		if contains(id, "holiday") {
+			t.Errorf("%s was invented for an unrecognized name", id)
+		}
+	}
+}
+
+// An account whose names mean nothing says so, rather than staying silent
+// about whether the knowledge base ran at all.
+func TestAnAccountWithNoRecognizableNamesSaysSo(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = func(_ context.Context, path, _ string) ([]collect.Resource, error) {
+		if contains(path, "/containers") {
+			return []collect.Resource{{Name: "my-holiday-photos"}, {Name: "invoices"}}, nil
+		}
+		return nil, nil
+	}
+	evidence := h.run(t)
+	if e := evidence[storage.SignalKB]; e.Status != verdict.StatusAbsent {
+		t.Errorf("kb match = %+v, want absent", e)
+	}
+	for id := range evidence {
+		if strings.HasPrefix(id, storage.SignalKB+".") {
+			t.Errorf("%s was emitted with nothing to match", id)
+		}
+	}
+}
+
+// A listing that could not be read produces no match, and never an absence:
+// the account may be full of recognizable names nobody was allowed to see.
+func TestAnUnreadableListingIsNotAnAbsenceOfMatches(t *testing.T) {
+	h := newHarness()
+	h.arm.ListFunc = func(_ context.Context, _, _ string) ([]collect.Resource, error) {
+		return nil, collecttest.Forbidden()
+	}
+	evidence := h.run(t)
+	e := evidence[storage.SignalKB]
+	if e.Status != verdict.StatusUnknown {
+		t.Fatalf("kb match = %+v, want unknown when the listings could not be read", e)
+	}
+	if e.Unknown == nil || e.Unknown.Code != verdict.UnkPermission {
+		t.Errorf("kb match unknown = %+v, want permission", e.Unknown)
+	}
+}
