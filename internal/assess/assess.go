@@ -15,6 +15,7 @@ import (
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	"github.com/pawel-siwek/az-can-i-delete/internal/cordon"
 	"github.com/pawel-siwek/az-can-i-delete/internal/disk"
 	"github.com/pawel-siwek/az-can-i-delete/internal/generic"
 	"github.com/pawel-siwek/az-can-i-delete/internal/network"
@@ -123,6 +124,14 @@ func (r *Runner) analyze(ctx context.Context, target armid.Target, resource coll
 	}
 }
 
+// Cutoff is the observation cutoff of a live assessment taken at now: today
+// 00:00Z (SPEC section 2, ADR-0003). A day that is still running has not
+// reported its metrics, so the window ends where the last complete day does,
+// and two runs on the same day assess the same window.
+func Cutoff(now time.Time) time.Time {
+	return now.UTC().Truncate(24 * time.Hour)
+}
+
 // ParseWindow turns the --window flag into an explicit observation window.
 // A window shorter than 30 days is accepted and can only yield `no` or
 // `tentative`; the rules, not this parser, enforce that.
@@ -209,6 +218,7 @@ func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opt
 			Callers:       collected.Metadata.Callers,
 			Tags:          tags,
 		},
+		Cordon: cordonState(resource),
 		Scope: output.Scope{
 			ARGSubscriptionsQueried: []string{target.SubscriptionID},
 			ARGVisible:              collected.ARGVisible,
@@ -216,6 +226,23 @@ func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opt
 			ResourceChangesDays:     changesDays,
 		},
 	}
+}
+
+// cordonState reports a scream test in progress. It is labelled, never
+// weighed: a cordon changes what the evidence means to a reader, not what the
+// rules decide (SPEC appendix E section 6.5). A tag that does not parse still
+// says a cordon is active — the resource is isolated whatever the tag says —
+// and only the fields that would have to be guessed are left out.
+func cordonState(resource collect.Resource) output.Cordon {
+	raw, tagged := cordon.TagValue(resource.Tags)
+	if !tagged {
+		return output.Cordon{}
+	}
+	state, err := cordon.Parse(raw)
+	if err != nil {
+		return output.Cordon{Active: true}
+	}
+	return output.Cordon{Active: true, Since: state.Since, By: state.By, Mode: string(state.Mode)}
 }
 
 // hostingClass is the App Service hosting class. Every other type is explicitly

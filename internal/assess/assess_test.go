@@ -461,3 +461,62 @@ func TestAPlanWithSitesIsBlocked(t *testing.T) {
 			report["verdict"], report["reasonClass"])
 	}
 }
+
+// A cordon is labelled in the report and weighed nowhere: the same quiet
+// account reaches the same verdict with the tag on it (SPEC appendix E
+// section 6.5).
+func TestACordonIsReportedAndDoesNotMoveTheVerdict(t *testing.T) {
+	accountID := "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/store1"
+	for name, tag := range map[string]string{
+		"valid":   "v=1;m=pna;t=2026-09-20T10:30:00Z;by=0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9;p=Enabled;w=7",
+		"damaged": "v=1;m=pna;garbage",
+	} {
+		t.Run(name, func(t *testing.T) {
+			arm := &collecttest.ARM{GetFunc: func(_ context.Context, id, _ string) (collect.Resource, error) {
+				if id != accountID {
+					return collect.Resource{}, &collect.Failure{StatusCode: http.StatusNotFound, ErrorCode: "NotFound"}
+				}
+				return collect.Resource{ID: id, Name: "store1", Type: "Microsoft.Storage/storageAccounts",
+					Tags:       map[string]string{"azcid": tag},
+					SystemData: map[string]any{"createdAt": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)},
+					Properties: map[string]any{"provisioningState": "Succeeded", "publicNetworkAccess": "Disabled",
+						"privateEndpointConnections": []any{}, "sku": map[string]any{"name": "Standard_LRS"}}}, nil
+			}}
+			graph := &collecttest.Graph{Answers: []collecttest.GraphAnswer{{
+				Match: "where id =~", Rows: collect.Rows{Rows: []map[string]any{{"id": accountID}}}}}}
+			outcome, err := runner(arm, graph, &collecttest.ActivityLog{Log: collect.ActivityLog{Days: 90}}).
+				Check(context.Background(), target(t, accountID), options())
+			if err != nil {
+				t.Fatal(err)
+			}
+			report := reportValue(t, outcome)
+			if report["verdict"] != "yes" {
+				t.Fatalf("verdict = %v, want the uncordoned verdict", report["verdict"])
+			}
+			cordon, _ := report["cordon"].(map[string]any)
+			if cordon["active"] != true {
+				t.Fatalf("cordon = %v", cordon)
+			}
+			if name == "valid" && (cordon["mode"] != "pna" || cordon["since"] != "2026-09-20T10:30:00Z" ||
+				cordon["by"] != "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9") {
+				t.Fatalf("cordon = %v", cordon)
+			}
+			if name == "damaged" && len(cordon) != 1 {
+				t.Fatalf("a damaged tag was interpreted: %v", cordon)
+			}
+		})
+	}
+}
+
+// SPEC section 2: a live assessment is cut off at today 00:00Z.
+func TestTheCutoffIsTheStartOfTheDay(t *testing.T) {
+	for _, now := range []time.Time{
+		time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 21, 23, 59, 59, 0, time.UTC),
+		time.Date(2026, 9, 22, 1, 30, 0, 0, time.FixedZone("CEST", 2*3600)),
+	} {
+		if got := assess.Cutoff(now); !got.Equal(time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("Cutoff(%s) = %s", now, got)
+		}
+	}
+}

@@ -44,13 +44,15 @@ files in `.github/instructions/`.
 | `internal/storage` — the storage account analyzer | complete except the name knowledge base | operation classification, write and read thresholds, Defender carve-out, queue polling, count growth, listings, references, control-plane silence |
 | `internal/vm` — the virtual machine analyzer | complete | memberships, platform ownership, backup and replication, images, network references and pools, power state, start events, the three activity thresholds, deallocated silence |
 | `internal/site` — App Service sites, slots and plans | complete | hosting class, domains and fronting, triggers, the request ceiling and probe shape, stopped state, metric and deployment silence, plan site count and autoscale |
-| `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
+| `internal/cli` — command tree, `check`, exit codes | `check`, `status`, `mcp`, `patterns list`, `demo` and `version` implemented; `cordon`, `uncordon` and `history` exit 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits, status in JSON and table, the refusal exit for an uncordonable type, the MCP server's configuration, the pattern list |
 | `internal/azure` data-plane adapter and `--data-plane` | complete; **not exercised against a live tenant** | the prefix walk against a local blob endpoint: descent, the call budget, the delimiter, and a 403 classified as permission |
 | `internal/kb` — the storage name knowledge base | complete | the 79 entries with the section 9.3 corrections, loader validation, ordered matcher, examples, precedence, tier sanity, tag value rules; end to end through the storage analyzer |
 | Fixture replay (`--fixture`), `demo`, recording (`AZCID_RECORD`) | three scenarios recorded of the seven in SPEC 7.6; the recorder is wired into `check` but has not been run against a live subscription | every embedded scenario replayed end to end and held to its manifest; every string in every committed recording held to the report boundary's sanitizer; a miss proved to be an error rather than an empty answer; the recording command's refusals covered, its network half not |
-| `cordon` / `uncordon` / `status` | **not started** | — |
+| `internal/cordon` — `azcid` tag grammar, type gate, history, `status` | grammar, gate, history and `status` complete; `status` **not exercised against a live tenant**. `cordon` and `uncordon` **not started** | the ABNF cases (valid, wrong order, unknown key, bad prior, window bounds, slots, the 200-byte limit refusing three long slot names), the section 4.3 refusal strings, history append at 0600, newest-cordon lookup closed by an uncordon, a damaged line skipped; status: the own hour excluded, an unreadable or truncated counter as unknown rather than zero, a revert and its writer under `untrusted`, a damaged tag never interpreted, a tag of the wrong mode, every slot read, history only when asked |
+| `check` on a cordoned resource | complete | the `cordon` field set from a valid tag, only `active` from a damaged one, and the verdict unchanged |
 | Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
-| MCP server, the composite CI action for `terraform plan` and what-if | **not started** | — |
+| `internal/mcpserver` — the MCP server | complete; **not exercised with a live client or tenant** | an in-process client: exactly two tools, read-only annotations, the verbatim descriptions, no flag an agent could use to change a verdict, structured content equal to the JSON text, tag values redacted, failures as error results without a verdict, the 30-call budget, the cache keyed on everything that changes the answer, cordon_status on an untagged resource and on a refused type |
+| The composite CI action for `terraform plan` and what-if | **not started** | — |
 | `docs/adr/` — the binding decisions | complete | structure, index, enforcement sections and the reviewer's brief are checked in `internal/adr` |
 | `tools/Saruman` (Saruman) — the judgement half of the review, on the owner's Azure AI model | written; **not yet exercised against a live endpoint** | built on every pull request so a compile error surfaces there; the api-version it reads is covered by the conformance scan, which was proved against a deliberate literal |
 | `internal/drift` + `cmd/driftcheck` — the change compared against its base | complete | a test per rule: the edited Decision, the supersession that must be allowed and the one that must not, the claim without tests, the dropped stub, the untested package, the normative edit |
@@ -71,15 +73,13 @@ its tests and its honest `not_evaluated` strings all exist — not before.
    replay, `--fixture`, `demo` — so each is a scenario file and a re-record.
    `demo` lists what exists and refuses what does not; a missing recording is
    never answered with a different one.
-2. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
-   values redacted by default, the verbatim tool descriptions.
-3. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
-   only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
-   the refusal wording for every other type.
-4. **The composite CI action** that extracts ids from `terraform show -json`
+2. **Cordon and uncordon.** Storage `publicNetworkAccess` and site `stop`
+   only; the preflight order, rollback on mismatch and history. The tag
+   grammar, the refusal wording for every other type and `status` exist.
+3. **The composite CI action** that extracts ids from `terraform show -json`
    and `az stack group what-if`, with `fail-on: no|tentative`. The build and
    release pipeline already exists.
-5. **The day-1 empirical tests** against a real subscription, each with its
+4. **The day-1 empirical tests** against a real subscription, each with its
    documented rule flip.
 
 ## Deliberate gaps

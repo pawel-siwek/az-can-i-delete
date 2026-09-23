@@ -99,8 +99,7 @@ func TestUnimplementedCommandsFailExplicitly(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
 		{"cordon", testTarget}, {"uncordon", testTarget},
-		{"status", testTarget}, {"history"},
-		{"patterns", "list"}, {"mcp"},
+		{"history"},
 	} {
 		code, out, errOut := run(t, testDeps(nil, nil), args...)
 		if code != 1 || out != "" || !strings.Contains(errOut, "not implemented") {
@@ -114,9 +113,14 @@ func TestTargetValidation(t *testing.T) {
 	// A parsed target reaches the runner, which answers 404 here, so exit 3
 	// distinguishes "parsed and assessed" from a usage error.
 	for _, command := range []string{"check", "cordon", "uncordon", "status"} {
-		parsed := 1
-		if command == "check" {
-			parsed = 3
+		// status reads, so a parsed target reaches the fake and comes back
+		// not found; a slot is a type the cordon gate refuses, which is usage.
+		parsed, slot := 1, 1
+		switch command {
+		case "check":
+			parsed, slot = 3, 3
+		case "status":
+			parsed, slot = 3, 2
 		}
 		for _, tc := range []struct {
 			name string
@@ -125,7 +129,7 @@ func TestTargetValidation(t *testing.T) {
 		}{
 			{"invalid", []string{"/placeholder"}, 2},
 			{"portal", []string{"https://portal.azure.com/#resource" + testTarget + "/overview"}, parsed},
-			{"slot preserved", []string{strings.ReplaceAll(testTarget, "Microsoft.Storage/storageAccounts/store", "Microsoft.Web/sites/app/slots/staging")}, parsed},
+			{"slot preserved", []string{strings.ReplaceAll(testTarget, "Microsoft.Storage/storageAccounts/store", "Microsoft.Web/sites/app/slots/staging")}, slot},
 			{"subscription match", []string{testTarget, "--subscription", "01234567-89AB-CDEF-0123-456789ABCDEF"}, parsed},
 			{"subscription mismatch", []string{testTarget, "--subscription", "fedcba98-7654-3210-fedc-ba9876543210"}, 2},
 			{"subscription invalid", []string{testTarget, "--subscription", "not-a-guid"}, 2},

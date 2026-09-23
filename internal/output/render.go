@@ -198,6 +198,57 @@ func Render(w io.Writer, format string, outcomes []Outcome, options ...ViewOptio
 	return err
 }
 
+// RenderValues prints documents that are not assessment reports — a cordon's
+// status, the pattern list — through the same machine formats, so a script
+// reads every command's output the same way. The table view is the caller's,
+// because only the caller knows what a person needs to see first. A single
+// value is printed bare, several as an array, exactly like Render.
+func RenderValues(w io.Writer, format string, values []any, human func(io.Writer) error) error {
+	if err := ValidateFormat(format); err != nil {
+		return err
+	}
+	switch format {
+	case "none":
+		return nil
+	case "table":
+		return human(w)
+	}
+	items := make([]json.RawMessage, 0, len(values))
+	for _, value := range values {
+		b, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		items = append(items, b)
+	}
+	var document any = items
+	if len(items) == 1 {
+		document = items[0]
+	}
+	data, err := json.Marshal(document)
+	if err != nil {
+		return err
+	}
+	switch format {
+	case "json", "jsonc":
+		data = append(data, '\n')
+	case "yaml":
+		var node yaml.Node
+		if err := yaml.Unmarshal(data, &node); err != nil {
+			return err
+		}
+		if data, err = yaml.Marshal(&node); err != nil {
+			return err
+		}
+	case "tsv":
+		if data, err = textOutput(items, format); err != nil {
+			return err
+		}
+	}
+	_, err = w.Write(data)
+	return err
+}
+
 // textOutput is the flat machine view behind tsv: one path-and-value row per
 // field, so every field of the report is addressable by a script.
 func textOutput(items []json.RawMessage, format string) ([]byte, error) {

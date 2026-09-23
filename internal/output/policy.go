@@ -111,6 +111,12 @@ func cleanRunes(s string) string {
 	return norm.NFC.String(b.String())
 }
 
+// Untrusted applies the whole ADR-0007 contract, the cap included, to a value
+// that is published outside a report. Cordon status is that case: it prints a
+// caller and, for a damaged tag, the raw value, and neither may reach a reader
+// by a path that skips the rules a report follows.
+func Untrusted(s string) string { return sanitize(s) }
+
 func sanitize(s string) string {
 	s = cleanRunes(s)
 	if urlPattern.MatchString(s) {

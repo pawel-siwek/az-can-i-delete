@@ -27,7 +27,11 @@ tool, not a disclaimer.
 | `--data-plane` | opt-in, OAuth only: samples up to five containers and walks their `y=/m=/d=/h=` partitions for the last write, at most twelve calls and three seconds each. No account key is ever acquired, and no data access means `unknown`, never "empty" |
 | `AZCID_RECORD=<dir> check <id>` | record a real assessment as a fixture: the ordinary check path, keeping every answer, with tag values, callers and claims removed and every string held to the report boundary's sanitizer |
 | `demo`, `check --fixture` | replay a recording through the real collectors, analyzers and rules, with no credential and no connection. Three scenarios are shipped in the binary; `demo` with no argument lists them. A replayed report says it is one, in every format |
-| `cordon`, `uncordon`, `status`, `mcp`, `patterns list`, `--query` | not implemented; they exit 1 and say so |
+| `status <id>` | reads the `azcid` cordon tag (or, with `--from-history`, the local history file), the state the resource is in now, whether somebody reverted it and who, and the traffic since the cordon — storage transactions and capacity growth, site requests, 403s and 5xx — with the hour of the cordon itself left out and the fixed caveats about what a cordon cannot hear. It reads; it never writes. A counter that cannot be read is listed as unknown, never as zero |
+| `mcp` | a stdio MCP server with exactly two read-only tools, `can_i_delete` (the `check` report) and `cordon_status` (the `status` document), described in the specification's words verbatim. Tag values are redacted unless the person starting it passes `--redact-tags=false`; 30 calls per five minutes; identical questions are answered from a one-minute cache. `--fixture` serves a recording |
+| `patterns list` | the 79 knowledge-base entries in the order they are matched, with the tier a name alone may claim and what would confirm it |
+| `check` on a cordoned resource | the report's `cordon` field says so; the verdict is unchanged |
+| `cordon`, `uncordon` | not implemented; they exit 1 and say so. `--query` is rejected as not implemented |
 
 `IMPLEMENTATION-PLAN.md` has the full status and the order the rest is built in.
 
@@ -273,7 +277,7 @@ json` carries all of it always, for a machine or an agent.
 11. Cordon (scream test) is available for storage accounts (public network access) and App Service sites (stop) only. It does not block private endpoints, resource-instance rules or trusted Azure services, and denied requests may not appear in metrics. Infrastructure-as-code applies can revert it.
 12. The MCP server cannot change Azure state; it exposes `can_i_delete` and `cordon_status` only.
 
-Limitations 4 to 7, 11 and 12 describe parts of the specification that are not
+Limitations 4 to 7 and 11 describe parts of the specification that are not
 implemented yet; they are printed because the rules they belong to are part of
 the verdict model, and `IMPLEMENTATION-PLAN.md` says what exists today.
 
