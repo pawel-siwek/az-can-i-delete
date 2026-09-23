@@ -54,6 +54,8 @@ type Dependencies struct {
 	// Runner builds the assessment runner, which is where credentials and
 	// network access enter the process.
 	Runner func(version string, dataPlane bool) (*assess.Runner, error)
+	// Serve runs the MCP server. Nil serves stdio.
+	Serve Serve
 }
 
 // DefaultDependencies talk to Azure with the credential chain.
@@ -201,8 +203,7 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	uncordon.Flags().Bool("yes", false, "Confirm the CLI operation")
 	uncordon.Flags().Bool("from-history", false, "Use local recorded state")
 	uncordon.Flags().String("prior", "", "Explicit prior state for manual recovery")
-	status := unavailableCommand("status <id>", "Inspect trial status (not implemented)", cobra.ExactArgs(1))
-	status.Flags().Bool("from-history", false, "Use local recorded state")
+	status := statusCommand(deps, version, options)
 	for _, command := range []*cobra.Command{cordon, uncordon, status} {
 		command.Flags().String("subscription", "", "Expected subscription ID")
 		command.Args = usageArgs(func(cmd *cobra.Command, args []string) error {
@@ -233,15 +234,8 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 		},
 	}
 	demo.Flags().Bool("full", false, "Print every signal and the limitations, not just what was found")
-	patterns := &cobra.Command{
-		Use: "patterns", Short: "Inspect storage knowledge-base patterns",
-		Args: usageArgs(cobra.NoArgs),
-		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
-	}
-	patterns.AddCommand(unavailableCommand("list", "List embedded patterns (not implemented)", cobra.NoArgs))
-	mcp := unavailableCommand("mcp", "Serve read-only MCP tools (not implemented)", cobra.NoArgs)
-	mcp.Flags().Bool("redact-tags", true, "Redact tag values in MCP output")
-	mcp.Flags().String("fixture", "", "Replay recorded responses instead of Azure")
+	patterns := patternsCommand(options)
+	mcp := mcpCommand(deps, version)
 	versionCommand := &cobra.Command{
 		Use: "version", Short: "Print the binary version",
 		Args: usageArgs(cobra.NoArgs),
