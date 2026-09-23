@@ -344,3 +344,107 @@ func onlyFile(t *testing.T, dir string) string {
 	}
 	return string(body)
 }
+
+// The two findings before this one were both a new path into a recording that
+// did not call the sanitizer: a non-JSON body, and the response headers. Each
+// was one line, and fixing lines is how the third one gets written.
+//
+// So this asserts the property over the whole artifact instead. Every string
+// anywhere in a committed recording — body, headers, keys, nested — is already
+// what the boundary would make of it. A field added later is covered without
+// anybody remembering to cover it.
+func TestEveryStringInEveryRecordingIsAlreadySanitized(t *testing.T) {
+	checked := 0
+	err := fs.WalkDir(os.DirFS("scenarios"), ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(name, ".json") {
+			return err
+		}
+		body, readErr := fs.ReadFile(os.DirFS("scenarios"), name)
+		if readErr != nil {
+			return readErr
+		}
+		var value any
+		if jsonErr := json.Unmarshal(body, &value); jsonErr != nil {
+			return fmt.Errorf("%s is not valid JSON: %w", name, jsonErr)
+		}
+		checked++
+		for _, raw := range unsanitized(value, "") {
+			t.Errorf("%s carries text the boundary would change: %s", name, raw)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked == 0 {
+		t.Fatal("no recorded responses were read, so this checked nothing")
+	}
+}
+
+// unsanitized reports every string, and every key, that the boundary would
+// change. Keys count: a recording is read, and a key is text on the page.
+func unsanitized(value any, at string) []string {
+	var found []string
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, inner := range typed {
+			where := at + "." + key
+			if output.Sanitized(key) != key {
+				found = append(found, where+" (the key)")
+			}
+			found = append(found, unsanitized(inner, where)...)
+		}
+	case []any:
+		for i, inner := range typed {
+			found = append(found, unsanitized(inner, fmt.Sprintf("%s[%d]", at, i))...)
+		}
+	case string:
+		if output.Sanitized(typed) != typed {
+			found = append(found, at)
+		}
+	}
+	return found
+}
+
+// A recorded header is text on the page like any other. This one reverses
+// everything after it, and it was not sanitized until a reviewer said so.
+func TestARecordedHeaderIsTextToo(t *testing.T) {
+	const override = "\u202e" // written as an escape; a literal one here is the hazard itself
+	dir := t.TempDir()
+	recorder, err := replay.Record(dir, answering(`{"a":"b"}`, map[string]string{"Retry-After": "3" + override + "0"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse("https://management.azure.com/subscriptions/x/y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.RoundTrip(&http.Request{Method: http.MethodGet, URL: address}); err != nil {
+		t.Fatal(err)
+	}
+	if written := onlyFile(t, filepath.Join(dir, "responses")); strings.Contains(written, `\u202e`) {
+		t.Errorf("an override survived in a header:\n%s", written)
+	}
+}
+
+// A body that is not JSON is kept rather than guessed at, and it is still text.
+func TestANonJSONBodyIsTextToo(t *testing.T) {
+	dir := t.TempDir()
+	recorder, err := replay.Record(dir, answering("not json at all\u0007\u202e", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, err := url.Parse("https://management.azure.com/subscriptions/x/z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recorder.RoundTrip(&http.Request{Method: http.MethodGet, URL: address}); err != nil {
+		t.Fatal(err)
+	}
+	written := onlyFile(t, filepath.Join(dir, "responses"))
+	for _, unwanted := range []string{`\u0007`, `\u202e`} {
+		if strings.Contains(written, unwanted) {
+			t.Errorf("%s survived a non-JSON body:\n%s", unwanted, written)
+		}
+	}
+}

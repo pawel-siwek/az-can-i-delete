@@ -83,9 +83,10 @@ func (r *Recorder) write(request *http.Request, question []byte, response *http.
 	var value any
 	if len(bytes.TrimSpace(body)) > 0 {
 		if err := json.Unmarshal(body, &value); err != nil {
-			// A non-JSON answer is kept verbatim rather than guessed at; it is
-			// still a thing the code has to cope with on replay.
-			value = string(body)
+			// A non-JSON answer is kept rather than guessed at; it is still a
+			// thing the code has to cope with on replay. It is text like any
+			// other, so it passes the same filter.
+			value = sanitize(string(body))
 		} else {
 			value = redact(value)
 		}
@@ -116,7 +117,10 @@ var keptHeaders = []string{
 func headers(response *http.Response) map[string]string {
 	kept := map[string]string{}
 	for _, name := range keptHeaders {
-		if value := response.Header.Get(name); value != "" {
+		// A header is Azure's text too. `Retry-After` is a number and
+		// `Azure-AsyncOperation` is a URL the service chose, and neither is
+		// exempt from being read by a person looking at the fixture.
+		if value := sanitize(response.Header.Get(name)); value != "" {
 			kept[name] = value
 		}
 	}
