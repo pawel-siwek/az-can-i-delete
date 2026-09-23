@@ -52,19 +52,37 @@ machine.
 **From a release**, once one has been tagged — no Go toolchain needed:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/pawel-siwek/az-can-i-delete/v0.1.0/scripts/install.sh | bash -s -- v0.1.0
+V=v0.1.0
+base=https://github.com/pawel-siwek/az-can-i-delete/releases/download/$V
+curl -fsSLO $base/install.sh
+curl -fsSLO $base/checksums.txt
+grep ' install.sh$' checksums.txt | sha256sum -c -   # the installer itself
+less install.sh                                      # read what you are about to run
+bash install.sh $V
 ```
 
-The version is always explicit. The installer downloads the archive for this
-platform, verifies its SHA-256 against the release's `checksums.txt`, and only
-then installs into `~/.local/bin`; a mismatch installs nothing.
+Four commands instead of one, and the difference is the point. Nothing is
+piped from a URL into a shell: the installer is fetched as a file, checked
+against the release's checksums, and read before it runs. The version is
+always explicit — there is no `latest`, because an installer that picks the
+version for you cannot be reviewed before it runs.
 
-**From source**, which works today:
+The installer then downloads the archive for this platform, verifies its
+SHA-256 against the same `checksums.txt`, and only then installs into
+`~/.local/bin`; a mismatch installs nothing.
+
+**From source**, which works today. Pin the tag or commit you mean, so that
+what you build is what you reviewed:
 
 ```sh
-git clone https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
+git clone --branch v0.1.0 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/az-can-i-delete
+less ~/src/az-can-i-delete/scripts/cloud-shell.sh
 ~/src/az-can-i-delete/scripts/cloud-shell.sh
 ```
+
+Before any tag exists, clone the default branch and check out the commit you
+looked at (`git clone …` then `git checkout <sha>`). Cloning a moving branch
+and running its script unread is the same trust problem in a slower form.
 
 The script clones or updates the source, builds with the Go that Cloud Shell
 already has (from Go 1.21 the toolchain downloads the exact version the module
