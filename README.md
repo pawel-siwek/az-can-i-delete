@@ -63,11 +63,27 @@ gh auth login --hostname github.com --git-protocol https --web && gh auth setup-
 `setup-git` installs the credential helper, so plain `git` and `curl` against
 release assets work afterwards without a token in sight.
 
-**Then one line, works today** — clone and build:
+**Fastest: take the binary CI already built.** Every push to `main` produces a
+static linux/amd64 build, so there is nothing to compile:
+
+```sh
+gh run download -R pawel-siwek/az-can-i-delete -n az-can-i-delete-snapshot-linux-amd64 -D /tmp/azcid \
+  && install -m755 /tmp/azcid/az-can-i-delete ~/.local/bin/ && az-can-i-delete version
+```
+
+The artifact carries the binary's SHA-256 beside it (`az-can-i-delete.sha256`)
+if you want to check it. These artifacts expire after seven days and are a
+convenience for the person who owns the repository, not a release: they are not
+tagged, not signed, and not what anybody else should be pointed at.
+
+**Or build from source, one line:**
 
 ```sh
 git clone --depth 1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid && ~/src/azcid/scripts/cloud-shell.sh
 ```
+
+The script builds the clone it was run from, so there is only ever one
+checkout: the one you can read. Run it again later to update and rebuild.
 
 **One line, from a release** — once a tag has been cut:
 
