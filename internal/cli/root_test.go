@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect/collecttest"
+	"github.com/pawel-siwek/az-can-i-delete/internal/cordon"
 )
 
 const testTarget = "/subscriptions/01234567-89ab-cdef-0123-456789abcdef/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/store"
@@ -31,7 +33,9 @@ func testDeps(arm *collecttest.ARM, graph *collecttest.Graph) Dependencies {
 		graph = &collecttest.Graph{}
 	}
 	return Dependencies{
-		Now: func() time.Time { return testCutoff },
+		// No test builds the real writer: a cordon test hands in its own.
+		Writer: func(string) (cordon.Writer, error) { return nil, errors.New("no writer in this test") },
+		Now:    func() time.Time { return testCutoff },
 		Runner: func(version string, _ bool) (*assess.Runner, error) {
 			clients := collecttest.Clients(arm, graph, &collecttest.Metrics{}, &collecttest.ActivityLog{}, nil)
 			return assess.New(clients, version), nil
@@ -98,7 +102,6 @@ func TestUsageErrors(t *testing.T) {
 func TestUnimplementedCommandsFailExplicitly(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
-		{"cordon", testTarget}, {"uncordon", testTarget},
 		{"history"},
 	} {
 		code, out, errOut := run(t, testDeps(nil, nil), args...)
@@ -121,6 +124,10 @@ func TestTargetValidation(t *testing.T) {
 			parsed, slot = 3, 3
 		case "status":
 			parsed, slot = 3, 2
+		case "uncordon":
+			// The gate answers before a writer is built, which in this test
+			// fails with exit 1.
+			slot = 2
 		}
 		for _, tc := range []struct {
 			name string

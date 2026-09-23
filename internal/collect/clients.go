@@ -115,6 +115,10 @@ type ActivityEvent struct {
 	age.ActivityEvent
 	Caller     string `json:"caller,omitempty"`
 	CallerType string `json:"callerType,omitempty"`
+	// AppID is the application id from the event's claims, lower-case, and
+	// only when it is a well-formed GUID. It tells one automation writer from
+	// another, which the cordon pre-flight needs and no verdict rule reads.
+	AppID string `json:"appId,omitempty"`
 }
 
 // ActivityLog is a normalized Activity Log page with the coverage it actually

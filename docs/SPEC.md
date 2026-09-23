@@ -1068,6 +1068,18 @@ Hosting class (`site.hosting.class`) per architect-2 §1-Q2 (unchanged). Metrics
 6. append history (§7.8); print the uncordon command and the scream-test instructions
 ```
 
+**Where the steps above leave a gap, v0.1 resolves it as follows, and nothing here adds a way for a cordon to proceed.**
+
+- *The idempotent re-run has no prior to record.* A resource already `Disabled` or stopped cannot tell this tool what it was before, and `Disabled` is not a prior the grammar admits. So step 3's `already-isolated` / `already-stopped` refusal wins. What makes a failed run recoverable instead is that every path which leaves the state changed without a verified tag — a tag write still running after five minutes, a read-back that fails, a foreign tag — appends the history entry with the prior before exiting, so `status --from-history` and `uncordon --from-history --yes` can find it.
+- *A tag write that is refused outright* (for example, the caller has the resource write but not Tag Contributor) reverts the state change and exits 1 `tag-write-failed`. A cordon nobody can find is worse than no cordon. A tag write that times out is not reverted, as step 4 says.
+- *Step 1 runs `check` on a window of at least 7 days*, the shortest `check` accepts; a 1–6 day cordon window still sets `w`. When `check` cannot run because the type has no analyzer, the type gate answers with its own refusal and exit 2, rather than a runtime error.
+- *Locks that cannot be read* refuse with `locks-unreadable`, and `--force` may override that: an unread lock is not an absent one, but a ReadOnly lock makes the write fail rather than do harm.
+- *Policy that cannot be evaluated* refuses with `policy-unknown` (section 4: not knowing is not permission), and `--force` may override that. A `Deny`, or a `Modify` that would rewrite the restored field (`Required`/`Removed` on the field, or a non-compliant Deny/Modify on the uncordon body), refuses with `policy-restricted` and cannot be forced.
+- *A state that changes back after the tag lands* (step 5, state no longer the cordon state) removes the tag and exits 1 `state-not-applied`: the tag would otherwise describe a cordon that is not there.
+- *Uncordon of a tag written by another principal* restores the state and verifies it, and leaves that tag in place unless `--from-history` or `--prior` was confirmed with `--yes` (§6.6 step 5). The output says so.
+- *No Azure text in a refusal.* §6.1 step 4 names the lock and step 5 prints the raw tag value. Both are free text somebody else chose, and a refusal is a sentence this tool says (ADR-0007), so the lock is named by its scope with the `az lock list` command that shows it, and a damaged tag points at `status`, which prints the raw value on its own line under `untrusted`.
+- *The poller.* `Azure-AsyncOperation` and `Location` addresses are followed only on the management endpoint. The address is Azure's text, and following it elsewhere would hand another host the caller's token.
+
 ### E: Status, uncordon and permissions source
 
 ### 6.5 `status`
@@ -1218,6 +1230,11 @@ Comment (one per PR, edited in place; `summary` strings already sanitised; tag v
 Window 2026-06-23 → 2026-09-21 (90 d) · rules 2026-09-21 · fail-on: no · skipped non-ARM ids: 1 · [results.json artifact]
 ```
 `change` ∈ `delete | detach | delete (potential) | unsupported`. Requires a prior `azure/login` (OIDC) with Reader at subscription scope.
+
+**Two places where v0.1 departs from the text above, and why.**
+
+- *`version` has no `latest`.* ADR-0014 holds everything this project asks somebody to run to a version they chose, and "latest" is the one value nobody chose. An empty `version` means the release tag the workflow pinned the action to (`uses: pawel-siwek/az-can-i-delete@v0.4.0` installs v0.4.0); an action pinned to a branch or a commit has no release to match and refuses until `version` is given. The binary is checked against the release's `checksums.txt` before it is made executable.
+- *`// ""` before each `ascii_downcase` in §9.2.* A what-if row without `changeCertainty` — an unsupported row, for instance — made the verbatim filter abort, taking every other row with it. With the fallback such a row simply does not match; nothing that matched before stops matching.
 
 ---
 

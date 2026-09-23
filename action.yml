@@ -1,0 +1,159 @@
+name: az-can-i-delete pre-flight
+description: >-
+  Check every Azure resource a Terraform plan or a deployment stack what-if
+  would delete, and fail the job on a `no` (or a `tentative`). A verdict is
+  evidence, not permission.
+author: pawel-siwek
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  resource-ids:
+    description: Newline-separated ARM ids to check.
+    required: false
+    default: ""
+  terraform-plan-json:
+    description: Path of `terraform show -json tfplan`.
+    required: false
+    default: ""
+  stack-whatif-json:
+    description: Path of `az stack-whatif group show … --no-pretty-print -o json`.
+    required: false
+    default: ""
+  arm-whatif-json:
+    description: Path of `az deployment group what-if --mode Complete --no-pretty-print -o json`. Complete mode only; incremental what-if does not report deletions.
+    required: false
+    default: ""
+  fail-on:
+    description: "`no` fails on any no; `tentative` fails on no or tentative."
+    required: false
+    default: "no"
+  window-days:
+    description: Observation window in days, 7-93.
+    required: false
+    default: "90"
+  comment:
+    description: Post one pull request comment and edit it in place (needs `pull-requests write`).
+    required: false
+    default: "true"
+  version:
+    description: >-
+      Release tag to install. Empty means the tag this action is pinned to;
+      a branch or a commit pin needs this set. There is no `latest`.
+    required: false
+    default: ""
+  github-token:
+    description: Token for the release download and the comment.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: Worst verdict across ids (no > tentative > yes), `none` when there are no ids, `error` when a check did not complete.
+    value: ${{ steps.policy.outputs.verdict }}
+  results-json:
+    description: Path of the combined JSON results.
+    value: ${{ steps.policy.outputs.results-json }}
+  summary-markdown:
+    description: The comment table.
+    value: ${{ steps.policy.outputs.summary-markdown }}
+  ids-count:
+    description: Ids evaluated.
+    value: ${{ steps.extract.outputs.ids-count }}
+  skipped-count:
+    description: Non-ARM ids skipped (Terraform data-plane ids).
+    value: ${{ steps.extract.outputs.skipped-count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install az-can-i-delete
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+        REPO: ${{ github.action_repository }}
+      run: '"$GITHUB_ACTION_PATH/action/install.sh"'
+
+    - name: Extract planned deletions
+      id: extract
+      shell: bash
+      env:
+        RESOURCE_IDS: ${{ inputs.resource-ids }}
+        TF_PLAN_JSON: ${{ inputs.terraform-plan-json }}
+        STACK_WHATIF_JSON: ${{ inputs.stack-whatif-json }}
+        ARM_WHATIF_JSON: ${{ inputs.arm-whatif-json }}
+      run: |
+        out="$RUNNER_TEMP/az-can-i-delete/out"
+        "$GITHUB_ACTION_PATH/action/extract.sh" "$out"
+        echo "ids-count=$(wc -l < "$out/ids.txt" | tr -d ' ')" >> "$GITHUB_OUTPUT"
+        echo "skipped-count=$(cat "$out/skipped")" >> "$GITHUB_OUTPUT"
+
+    - name: Check each resource
+      id: check
+      shell: bash
+      env:
+        WINDOW_DAYS: ${{ inputs.window-days }}
+      run: |
+        out="$RUNNER_TEMP/az-can-i-delete/out"
+        code=0
+        if [ -s "$out/ids.txt" ]; then
+          # The tool's exit code reports errors only; the policy step decides
+          # on verdicts, so an error and a verdict are never confused.
+          mapfile -t ids < "$out/ids.txt"
+          az-can-i-delete check --ids "${ids[@]}" --window "${WINDOW_DAYS}d" --redact-tags -o json > "$out/results.json" || code=$?
+        fi
+        echo "exit=$code" >> "$GITHUB_OUTPUT"
+
+    - name: Apply the fail policy
+      id: policy
+      shell: bash
+      env:
+        FAIL_ON: ${{ inputs.fail-on }}
+        TOOL_EXIT: ${{ steps.check.outputs.exit }}
+      run: |
+        out="$RUNNER_TEMP/az-can-i-delete/out"
+        status=0
+        "$GITHUB_ACTION_PATH/action/policy.sh" "$out" || status=$?
+        {
+          echo "verdict=$(cat "$out/verdict")"
+          echo "results-json=$out/results.json"
+          echo "summary-markdown<<AZCID_SUMMARY_EOF"
+          cat "$out/summary.md"
+          echo "AZCID_SUMMARY_EOF"
+        } >> "$GITHUB_OUTPUT"
+        cat "$out/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        echo "$status" > "$out/policy-exit"
+
+    - name: Upload results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: az-can-i-delete
+        path: ${{ runner.temp }}/az-can-i-delete/out/results.json
+        if-no-files-found: ignore
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event.pull_request.number }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPOSITORY: ${{ github.repository }}
+      run: |
+        out="$RUNNER_TEMP/az-can-i-delete/out"
+        marker='<!-- az-can-i-delete -->'
+        body="$(printf '%s\n%s' "$marker" "$(cat "$out/summary.md")")"
+        existing=$(gh api "repos/$REPOSITORY/issues/$PR/comments" --paginate \
+          --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" -f body="$body" > /dev/null
+        else
+          gh api -X POST "repos/$REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+        fi
+
+    - name: Fail on the policy
+      shell: bash
+      run: exit "$(cat "$RUNNER_TEMP/az-can-i-delete/out/policy-exit")"

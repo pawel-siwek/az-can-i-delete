@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "changes": {
+      "resourceChanges": [
+        {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Web/sites/func-batch", "changeType": "Delete", "changeCertainty": "Potential"},
+        {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic-old-01", "changeType": "Detach", "changeCertainty": "Definite"},
+        {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/d-unknown", "changeType": "Unsupported"},
+        {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/kept", "changeType": "Modify"},
+        {"changeType": "Delete"}
+      ]
+    }
+  }
+}

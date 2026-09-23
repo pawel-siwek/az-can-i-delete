@@ -13,6 +13,7 @@ import (
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
 	"github.com/pawel-siwek/az-can-i-delete/internal/azure"
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
+	cordonpkg "github.com/pawel-siwek/az-can-i-delete/internal/cordon"
 	"github.com/pawel-siwek/az-can-i-delete/internal/output"
 	"github.com/pawel-siwek/az-can-i-delete/internal/replay"
 	"github.com/spf13/cobra"
@@ -56,6 +57,9 @@ type Dependencies struct {
 	Runner func(version string, dataPlane bool) (*assess.Runner, error)
 	// Serve runs the MCP server. Nil serves stdio.
 	Serve Serve
+	// Writer builds the cordon's write boundary, the only one that changes
+	// Azure. Nil builds the real one; check and status never ask for it.
+	Writer func(version string) (cordonpkg.Writer, error)
 }
 
 // DefaultDependencies talk to Azure with the credential chain.
@@ -129,7 +133,8 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 		Long: "Collect deterministic Azure resource evidence before deletion.\n\n" +
 			"`check` assesses storage accounts, managed disks, network interfaces, public IP\n" +
 			"addresses, network security groups, virtual machines, App Service sites and plans.\n" +
-			"It reads; it never writes. The commands marked not implemented say so and exit 1.\n\n" +
+			"It reads; it never writes. cordon and uncordon are the only commands that change\n" +
+			"Azure, and each is confirmed on its own. The commands marked not implemented say so.\n\n" +
 			"A verdict is evidence, not permission.",
 		Version:       version,
 		SilenceUsage:  true,
@@ -194,15 +199,8 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	check.Flags().String("fixture", "", "Replay recorded responses instead of Azure")
 	check.Flags().Bool("redact-tags", false, "Redact tag values")
 
-	cordon := unavailableCommand("cordon <id>", "Start a reversible observation trial (not implemented)", cobra.ExactArgs(1))
-	cordon.Flags().Bool("yes", false, "Confirm the CLI operation")
-	cordon.Flags().Bool("force", false, "Acknowledge supported explicit preflight overrides")
-	cordon.Flags().Bool("dry-run", false, "Show the operation without applying it")
-	cordon.Flags().String("window", "7d", "Trial window, 1-30 days")
-	uncordon := unavailableCommand("uncordon <id>", "Restore recorded prior state (not implemented)", cobra.ExactArgs(1))
-	uncordon.Flags().Bool("yes", false, "Confirm the CLI operation")
-	uncordon.Flags().Bool("from-history", false, "Use local recorded state")
-	uncordon.Flags().String("prior", "", "Explicit prior state for manual recovery")
+	cordon := cordonCommand(deps, version, options)
+	uncordon := uncordonCommand(deps, version, options)
 	status := statusCommand(deps, version, options)
 	for _, command := range []*cobra.Command{cordon, uncordon, status} {
 		command.Flags().String("subscription", "", "Expected subscription ID")

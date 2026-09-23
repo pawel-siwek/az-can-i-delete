@@ -1,0 +1,17 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {"address": "azurerm_storage_account.logs", "mode": "managed",
+     "change": {"actions": ["delete"], "before": {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/RG/providers/Microsoft.Storage/storageAccounts/stlogs"}}},
+    {"address": "azurerm_network_interface.old", "mode": "managed",
+     "change": {"actions": ["delete", "create"], "before": {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic-old-01"}}},
+    {"address": "azurerm_storage_container.c", "mode": "managed",
+     "change": {"actions": ["delete"], "before": {"id": "https://stlogs.blob.core.windows.net/c"}}},
+    {"address": "azurerm_resource_group.kept", "mode": "managed",
+     "change": {"actions": ["update"], "before": {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/kept"}}},
+    {"address": "data.azurerm_client_config.current", "mode": "data",
+     "change": {"actions": ["delete"], "before": {"id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Compute/disks/data-source"}}},
+    {"address": "azurerm_resource_group.new", "mode": "managed",
+     "change": {"actions": ["create"], "before": null}}
+  ]
+}
