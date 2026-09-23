@@ -220,8 +220,12 @@ func TestSiteStatusReadsEverySlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(status.Slots) != 2 || status.Slots[0] != (SlotStatus{Name: "blue", Prior: "Running", Current: "Running"}) {
+	if len(status.Slots) != 2 || status.Slots[0] != (SlotStatus{Ref: "slot1", Prior: "Running", Current: "Running"}) {
 		t.Fatalf("slots = %+v", status.Slots)
+	}
+	// The name is Azure's text: published under untrusted only.
+	if status.Untrusted["slot1"] != "blue" || status.Untrusted["slot2"] != "green" {
+		t.Fatalf("untrusted = %v", status.Untrusted)
 	}
 	// A slot running again is a reverted cordon even while production is
 	// still stopped.

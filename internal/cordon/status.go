@@ -47,9 +47,11 @@ type Status struct {
 	Untrusted map[string]string `json:"untrusted,omitempty"`
 }
 
-// SlotStatus is a deployment slot's recorded and current state.
+// SlotStatus is a deployment slot's recorded and current state. The slot is
+// named by a reference, "slot1" and on; its name is somebody's text and is
+// only ever published under untrusted, at the same key (ADR-0007).
 type SlotStatus struct {
-	Name    string `json:"name"`
+	Ref     string `json:"ref"`
 	Prior   string `json:"prior"`
 	Current string `json:"current,omitempty"`
 }
@@ -242,8 +244,12 @@ func (r Reader) slots(ctx context.Context, target armid.Target, version string, 
 		current[strings.ToLower(name)] = CurrentState(ModeStop, slot)
 	}
 	out := make([]SlotStatus, 0, len(state.Slots))
-	for _, slot := range state.Slots {
-		row := SlotStatus{Name: slot.Name, Prior: slot.State}
+	for i, slot := range state.Slots {
+		row := SlotStatus{Ref: fmt.Sprintf("slot%d", i+1), Prior: slot.State}
+		if status.Untrusted == nil {
+			status.Untrusted = map[string]string{}
+		}
+		status.Untrusted[row.Ref] = output.Untrusted(slot.Name)
 		if err == nil {
 			row.Current = current[strings.ToLower(slot.Name)]
 			if row.Current == "" {

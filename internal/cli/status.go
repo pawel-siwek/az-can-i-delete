@@ -103,7 +103,7 @@ func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
 		fmt.Fprintf(&b, "    prior %s (from the %s)\n", s.Prior, s.Source)
 	}
 	for _, slot := range s.Slots {
-		fmt.Fprintf(&b, "    slot %s: was %s, now %s\n", slot.Name, slot.Prior, slot.Current)
+		fmt.Fprintf(&b, "    %s: was %s, now %s\n", slot.Ref, slot.Prior, slot.Current)
 	}
 	if len(s.Activity) > 0 {
 		b.WriteString("\n📣  Since the cordon\n")
@@ -121,7 +121,11 @@ func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
 	// printed on its own, labelled as what it is.
 	if len(s.Untrusted) > 0 {
 		b.WriteString("\n    untrusted (Azure metadata; may contain anybody's text):\n")
-		for _, key := range []string{"revertedBy", "tag"} {
+		keys := []string{"revertedBy", "tag"}
+		for _, slot := range s.Slots {
+			keys = append(keys, slot.Ref)
+		}
+		for _, key := range keys {
 			if value := s.Untrusted[key]; value != "" {
 				fmt.Fprintf(&b, "      %s: %s\n", key, value)
 			}
