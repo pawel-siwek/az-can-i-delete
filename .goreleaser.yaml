@@ -53,6 +53,15 @@ archives:
       - REQUIREMENTS.md
       - IMPLEMENTATION-PLAN.md
 
+  # The same binaries again, uncompressed and unwrapped. An archive is the
+  # convention and carries the documents with it, but dropping a tool into a
+  # shell should not need a tar step: this id makes installing one download
+  # and a chmod. Both are checksummed, so the short path is not the unchecked
+  # one.
+  - id: binary
+    formats: [binary]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
 checksum:
   name_template: checksums.txt
   algorithm: sha256
@@ -86,25 +95,23 @@ release:
   footer: |
     ## Installing
 
-    One line, and still verified:
+    One download and a `chmod` — the bare binaries are published alongside
+    the archives:
 
     ```sh
-    d=$(mktemp -d) && gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt -D "$d" && (cd "$d" && sha256sum --ignore-missing -c checksums.txt && bash install.sh {{ .Tag }})
+    gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete && chmod +x ~/.local/bin/az-can-i-delete
     ```
 
-    Azure Cloud Shell ships the GitHub CLI; `gh auth login` once and this works
-    there too, on a private repository, with no token to paste.
+    To have the checksum checked too, use the installer, which verifies the
+    archive's SHA-256 before anything reaches your PATH:
 
-    The installer and the checksums arrive as files, the installer is checked
-    against the release's own checksums, and only then does it run — after
-    which it verifies the archive's SHA-256 before anything reaches your PATH.
-    Installs into `~/.local/bin`; a mismatch installs nothing.
+    ```sh
+    d=$(mktemp -d) && gh release download {{ .Tag }} -R pawel-siwek/az-can-i-delete -p install.sh -D "$d" && bash "$d/install.sh" {{ .Tag }}
+    ```
 
-    It downloads into a temporary directory rather than the one you are
-    standing in, so it overwrites nothing of yours.
-
-    Read `install.sh` first if you would rather: it is on disk before it runs,
-    which is the whole difference from piping it into a shell.
+    Azure Cloud Shell ships the GitHub CLI; `gh auth login` once and both work
+    there, on a private repository, with no token to paste. Every artifact
+    here is listed in `checksums.txt`, including the bare binaries.
 
     A verdict from this tool is evidence, not permission. `yes` means no
     evidence of use was found by the signals it could evaluate, never that

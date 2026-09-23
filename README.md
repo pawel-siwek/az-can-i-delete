@@ -85,19 +85,27 @@ git clone --depth 1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azc
 The script builds the clone it was run from, so there is only ever one
 checkout: the one you can read. Run it again later to update and rebuild.
 
-**One line, from a release** — once a tag has been cut:
+**One line, from a release.** One download and a `chmod`, because the release
+publishes the bare binaries as well as the archives:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.1.0 -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt -D "$d" && (cd "$d" && sha256sum --ignore-missing -c checksums.txt && bash install.sh v0.1.0)
+gh release download v0.1.2 -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -O ~/.local/bin/az-can-i-delete && chmod +x ~/.local/bin/az-can-i-delete
 ```
 
-Still verified: the installer and the checksums arrive as files, the installer
-is checked against the release's own checksums, and only then does it run —
-after which it verifies the archive before anything reaches your PATH.
+Swap `linux_amd64` for `linux_arm64`, `darwin_arm64` or `darwin_amd64` as
+needed. `gh` carries your credentials, so this works on a private repository,
+and it fetches over authenticated TLS from the release itself.
 
-It downloads into a temporary directory rather than the one you happen to be
-standing in, so it cannot overwrite a file of yours that shares a name, and
-re-running it needs no `--clobber`.
+**If you want the checksum checked as well**, that is what `install.sh` is
+for — it verifies the archive's SHA-256 before anything reaches your PATH:
+
+```sh
+d=$(mktemp -d) && gh release download v0.1.2 -R pawel-siwek/az-can-i-delete -p install.sh -D "$d" && bash "$d/install.sh" v0.1.2
+```
+
+Worth it for a machine you did not fetch it on, or when somebody else will
+run what you installed. For your own debugging loop, the short one is fine:
+the bytes came from the same release over the same authenticated connection.
 
 **Without GitHub at all.** If you would rather use the identity you already
 have, put the binary somewhere Azure can serve it and pull it with the Azure
