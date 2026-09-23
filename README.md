@@ -88,12 +88,16 @@ checkout: the one you can read. Run it again later to update and rebuild.
 **One line, from a release** — once a tag has been cut:
 
 ```sh
-gh release download v0.1.0 -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt --clobber && sha256sum --ignore-missing -c checksums.txt && bash install.sh v0.1.0
+d=$(mktemp -d) && gh release download v0.1.0 -R pawel-siwek/az-can-i-delete -p install.sh -p checksums.txt -D "$d" && (cd "$d" && sha256sum --ignore-missing -c checksums.txt && bash install.sh v0.1.0)
 ```
 
 Still verified: the installer and the checksums arrive as files, the installer
 is checked against the release's own checksums, and only then does it run —
 after which it verifies the archive before anything reaches your PATH.
+
+It downloads into a temporary directory rather than the one you happen to be
+standing in, so it cannot overwrite a file of yours that shares a name, and
+re-running it needs no `--clobber`.
 
 **Without GitHub at all.** If you would rather use the identity you already
 have, put the binary somewhere Azure can serve it and pull it with the Azure
