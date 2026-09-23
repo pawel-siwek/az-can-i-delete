@@ -120,7 +120,7 @@ sealed class Reviewer(string endpoint, string deployment, string token)
     }
 
     /// <summary>The documents and the change: what both modes need to read.</summary>
-    async Task<StringBuilder> MaterialAsync(string baseRevision)
+    static async Task<StringBuilder> MaterialAsync(string baseRevision)
     {
         var (diff, truncated) = Diff(baseRevision);
         var records = await RecordsAsync();
