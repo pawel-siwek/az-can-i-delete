@@ -1231,9 +1231,11 @@ Window 2026-06-23 → 2026-09-21 (90 d) · rules 2026-09-21 · fail-on: no · sk
 ```
 `change` ∈ `delete | detach | delete (potential) | unsupported`. Requires a prior `azure/login` (OIDC) with Reader at subscription scope.
 
-**Two places where v0.1 departs from the text above, and why.**
+**Where v0.1 departs from the text above, and why.**
 
 - *`version` has no `latest`.* ADR-0014 holds everything this project asks somebody to run to a version they chose, and "latest" is the one value nobody chose. An empty `version` means the release tag the workflow pinned the action to (`uses: pawel-siwek/az-can-i-delete@v0.4.0` installs v0.4.0); an action pinned to a branch or a commit has no release to match and refuses until `version` is given. The binary is checked against the release's `checksums.txt` before it is made executable.
+- *The action uploads nothing itself.* A composite action that ran `actions/upload-artifact` would run a second action at whatever its tag points to today, unread (ADR-0014), and it cannot be pinned from here to a commit this project has reviewed. The `results-json` output is therefore the directory holding `results.json` and `planned.tsv`, and the workflow uploads it with an action it pins itself.
+- *The comment names a resource by the id the tool parsed.* The table's resource cell is the `resourceId` of the tool's own report (ADR-0007: a canonical parsed id at a typed path), not a name cut from the plan's text. A row with no report — not found, an error, an unsupported what-if row — is named by its number, and `planned.tsv` lists the plan's ids in the same order.
 - *`// ""` before each `ascii_downcase` in §9.2.* A what-if row without `changeCertainty` — an unsupported row, for instance — made the verbatim filter abort, taking every other row with it. With the fallback such a row simply does not match; nothing that matched before stops matching.
 
 ---

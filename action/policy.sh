@@ -5,7 +5,8 @@
 #
 # Reads <out-dir>/changes.tsv, unsupported.txt, skipped and, when any id was
 # checked, results.json. FAIL_ON is `no` or `tentative`; TOOL_EXIT is the
-# check's exit code. Writes <out-dir>/verdict and <out-dir>/summary.md, prints
+# check's exit code. Writes <out-dir>/verdict, summary.md and planned.tsv (the
+# planned ids in table order), prints
 # a warning per tentative resource, and exits 1 when the policy fails.
 #
 # An error never passes: a check that did not complete fails the job whatever
@@ -35,7 +36,11 @@ jq -n \
   --arg skipped "$skipped" \
   --argjson toolExit "$TOOL_EXIT" '
   def esc: tostring | gsub("\\|"; "\\|") | gsub("[\r\n]+"; " ");
-  def short: split("/") as $p | {name: ($p | last), type: $p[($p | length) - 2]};
+  # A row is named by what the tool parsed: the report'"'"'s canonical resourceId
+  # and resourceType. An id straight from the plan is somebody'"'"'s text and is
+  # never printed; a row without a report is named by its number, and the
+  # plan'"'"'s ids are in the results artifact (ADR-0007).
+  def cell: tostring | gsub("[`|\r\n]"; "");
   def rank: {"no": 3, "error": 4, "tentative": 2, "yes": 1}[.] // 0;
 
   ($changes | split("\n") | map(select(length > 0) | split("\t") | {id: .[0], change: .[1]})) as $rows
@@ -51,7 +56,8 @@ jq -n \
             $row + {verdict: "error", policy: "error", reason: ($r.error.code | esc), evidence: "", unknowns: ""}
           end
         else
-          $row + {verdict: $r.verdict, policy: $r.verdict, reason: ($r.reasonClass // ""),
+          $row + {resourceId: $r.resourceId, resourceType: $r.resourceType,
+                  verdict: $r.verdict, policy: $r.verdict, reason: ($r.reasonClass // ""),
                   evidence: ([$r.evidence[]? | select(.status == "present")] | sort_by(.tier) | .[0:2] | map(.summary | esc) | join("; ")),
                   unknowns: ([$r.unknowns[]?] | length | tostring),
                   window: $r.window.requested, rulesDate: $r.rulesDate}
@@ -67,27 +73,31 @@ jq -n \
   | {
       verdict: (if $worst == "error" then "error" else $worst end),
       fail: ($errored or $anyNo or ($failOn == "tentative" and $anyTentative)),
-      warnings: [$all[] | select(.policy == "tentative") | "az-can-i-delete: \(.id) is tentative: ask a human before this deletion"],
+      planned: [$all[] | "\(.id)\t\(.change)"],
+      warnings: [range(0; $all | length) as $i | select($all[$i].policy == "tentative")
+                 | "az-can-i-delete: planned deletion #\($i + 1) is tentative: ask a human before this deletion"],
       summary: (
         if ($all | length) == 0 then
           "### az-can-i-delete — no planned deletions\n\nNothing in this plan deletes an Azure resource. Skipped non-ARM ids: \($skipped).\n"
         else
           "### az-can-i-delete — pre-flight for \($all | length) planned deletions\n"
           + "| resource | change | verdict | reason | top evidence | unknowns |\n|---|---|---|---|---|---|\n"
-          + ([$all[] | (.id | short) as $s
-              | "| `\($s.name | esc)` (\($s.type | esc)) | \(.change) | \(if .policy == "no" then "**no**" else .verdict end) | \(.reason) | \(.evidence) | \(.unknowns) |"]
+          + ([range(0; $all | length) as $i | $all[$i]
+              | (if .resourceId then "`\(.resourceId | cell)`" else "#\($i + 1) (row \($i + 1) of planned.tsv)" end) as $name
+              | "| \($name) | \(.change) | \(if .policy == "no" then "**no**" else .verdict end) | \(.reason) | \(.evidence) | \(.unknowns) |"]
              | join("\n"))
           + "\n"
           + (if $first.window then
                "Window \($first.window.start[0:10]) → \($first.window.end[0:10]) (\($first.window.days) d) · rules \($first.rulesDate) · "
              else "" end)
-          + "fail-on: \($failOn) · skipped non-ARM ids: \($skipped) · results.json artifact\n"
+          + "fail-on: \($failOn) · skipped non-ARM ids: \($skipped) · planned ids in planned.tsv beside results.json\n"
           + "\nA verdict is evidence, not permission: `yes` means no evidence of use was found by the signals this tool could evaluate, never that deleting is safe.\n"
         end)
     }' > "$out/policy.json"
 
 jq -r '.verdict' "$out/policy.json" > "$out/verdict"
 jq -r '.summary' "$out/policy.json" > "$out/summary.md"
+jq -r '.planned[]' "$out/policy.json" > "$out/planned.tsv"
 jq -r '.warnings[] | "::warning::" + .' "$out/policy.json"
 if [ "$(jq -r '.fail' "$out/policy.json")" = "true" ]; then
   exit 1

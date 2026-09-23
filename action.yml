@@ -53,7 +53,10 @@ outputs:
     description: Worst verdict across ids (no > tentative > yes), `none` when there are no ids, `error` when a check did not complete.
     value: ${{ steps.policy.outputs.verdict }}
   results-json:
-    description: Path of the combined JSON results.
+    description: >-
+      Directory holding results.json (the combined JSON results) and
+      planned.tsv (each planned id and its change, in table order). The action
+      uploads nothing itself: upload it with an action pinned to a commit.
     value: ${{ steps.policy.outputs.results-json }}
   summary-markdown:
     description: The comment table.
@@ -119,21 +122,13 @@ runs:
         "$GITHUB_ACTION_PATH/action/policy.sh" "$out" || status=$?
         {
           echo "verdict=$(cat "$out/verdict")"
-          echo "results-json=$out/results.json"
+          echo "results-json=$out"
           echo "summary-markdown<<AZCID_SUMMARY_EOF"
           cat "$out/summary.md"
           echo "AZCID_SUMMARY_EOF"
         } >> "$GITHUB_OUTPUT"
         cat "$out/summary.md" >> "$GITHUB_STEP_SUMMARY"
         echo "$status" > "$out/policy-exit"
-
-    - name: Upload results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: az-can-i-delete
-        path: ${{ runner.temp }}/az-can-i-delete/out/results.json
-        if-no-files-found: ignore
 
     - name: Comment on the pull request
       if: ${{ inputs.comment == 'true' && github.event.pull_request.number }}

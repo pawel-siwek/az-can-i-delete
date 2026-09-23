@@ -32,7 +32,7 @@ tool, not a disclaimer.
 | `patterns list` | the 79 knowledge-base entries in the order they are matched, with the tier a name alone may claim and what would confirm it |
 | `check` on a cordoned resource | the report's `cordon` field says so; the verdict is unchanged |
 | `cordon <id>`, `uncordon <id>` | the scream test, for storage accounts (`publicNetworkAccess` → `Disabled`) and App Service sites (production and up to four slots stopped). `cordon` runs `check` first and refuses a `no` unless `--force`, then the pre-flight in the specification's order — type, already isolated, Cloud Shell account, NFS or premium files, ReadOnly locks, an existing `azcid` tag, automation writers, and Azure Policy asked about the *uncordon* — prints the plan, and changes nothing without `--yes` (`--dry-run` only prints). It changes the state, verifies it, writes the tag, verifies both, and undoes only what it did itself when a step fails. `uncordon` restores from the tag (or `--from-history --yes`, or `--prior <state> --yes`), verifies, and only then removes the tag. Neither deletes anything. **Not yet exercised against a live tenant** |
-| GitHub Action (`action.yml`) | a composite action that reads a `terraform show -json` plan, a deployment stack what-if or a complete-mode ARM what-if, checks every resource it would delete or detach, and fails the job on a `no` (or, with `fail-on: tentative`, a `tentative`). A check that did not complete always fails. One pull request comment, edited in place; results uploaded as an artifact. **Not yet exercised in a live workflow** |
+| GitHub Action (`action.yml`) | a composite action that reads a `terraform show -json` plan, a deployment stack what-if or a complete-mode ARM what-if, checks every resource it would delete or detach, and fails the job on a `no` (or, with `fail-on: tentative`, a `tentative`). A check that did not complete always fails. One pull request comment, edited in place, naming each resource by the id the tool parsed. The action runs no other action; the `results-json` directory is yours to upload with an action you pin. **Not yet exercised in a live workflow** |
 | `--query` | rejected as not implemented |
 
 `IMPLEMENTATION-PLAN.md` has the full status and the order the rest is built in.
@@ -242,10 +242,18 @@ steps:
       tenant-id: ${{ vars.AZURE_TENANT_ID }}
       subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   - run: terraform show -json tfplan > tfplan.json
-  - uses: pawel-siwek/az-can-i-delete@v0.4.0
+  - id: preflight
+    uses: pawel-siwek/az-can-i-delete@v0.4.0
     with:
       terraform-plan-json: tfplan.json
       fail-on: "no"        # or "tentative"
+  # Optional: keep the full results. Pin the upload action to a commit you
+  # have read; the pre-flight action runs no other action itself.
+  - if: always()
+    uses: actions/upload-artifact@<commit-sha>
+    with:
+      name: az-can-i-delete
+      path: ${{ steps.preflight.outputs.results-json }}
 ```
 
 While this repository is private, a workflow in another repository can use

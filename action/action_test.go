@@ -144,7 +144,9 @@ func TestNoInputMeansNoPlannedDeletions(t *testing.T) {
 func report(verdict, reasonClass string) map[string]any {
 	return map[string]any{
 		"schemaVersion": "2", "verdict": verdict, "reasonClass": reasonClass, "rulesDate": "2026-09-21",
-		"window": map[string]any{"requested": map[string]any{"start": "2026-06-23T00:00:00Z", "end": "2026-09-21T00:00:00Z", "days": 90}},
+		"resourceId":   "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st-logs-prod",
+		"resourceType": "Microsoft.Storage/storageAccounts",
+		"window":       map[string]any{"requested": map[string]any{"start": "2026-06-23T00:00:00Z", "end": "2026-09-21T00:00:00Z", "days": 90}},
 		"evidence": []any{
 			map[string]any{"status": "present", "tier": 2, "summary": "approved private endpoint | pe-sql-01"},
 			map[string]any{"status": "absent", "tier": 1, "summary": "no lock"},
@@ -231,15 +233,25 @@ func TestTheSummaryTable(t *testing.T) {
 	summary := read(t, filepath.Join(out, "summary.md"))
 	for _, want := range []string{
 		"### az-can-i-delete — pre-flight for 3 planned deletions",
-		"| `st-logs-prod` (storageaccounts) | delete | **no** | in-use | approved private endpoint \\| pe-sql-01 | 0 |",
-		"| `nic-old-01` (networkinterfaces) | detach | not found | not-found |",
-		"| `d-unknown` (disks) | unsupported | tentative | unsupported |",
+		// Named by the id the tool parsed, from its own report; a row with
+		// no report is named by its number (ADR-0007).
+		"| `/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st-logs-prod` | delete | **no** | in-use | approved private endpoint \\| pe-sql-01 | 0 |",
+		"| #2 (row 2 of planned.tsv) | detach | not found | not-found |",
+		"| #3 (row 3 of planned.tsv) | unsupported | tentative | unsupported |",
 		"Window 2026-06-23 → 2026-09-21 (90 d) · rules 2026-09-21 · fail-on: no · skipped non-ARM ids: 0",
 		"never that deleting is safe",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("missing %q in:\n%s", want, summary)
 		}
+	}
+	// The plan's own ids never reach the comment.
+	if strings.Contains(summary, "nic-old-01") || strings.Contains(summary, "d-unknown") {
+		t.Fatalf("a planned id reached the comment:\n%s", summary)
+	}
+	planned := strings.Split(strings.TrimSpace(read(t, filepath.Join(out, "planned.tsv"))), "\n")
+	if len(planned) != 3 || !strings.HasPrefix(planned[2], sub+"rg/providers/microsoft.compute/disks/d-unknown\tunsupported") {
+		t.Fatalf("planned.tsv = %q", planned)
 	}
 }
 
@@ -276,6 +288,10 @@ func TestTheActionDeclaresTheSpecifiedInterface(t *testing.T) {
 	}
 	if strings.Contains(string(body), "--exit-on-verdict") {
 		t.Error("the action lets the tool's exit code decide the policy")
+	}
+	// ADR-0014: the action runs no other action at a moving tag.
+	if strings.Contains(string(body), "uses:") {
+		t.Error("the action runs another action; it would arrive unpinned and unread")
 	}
 }
 
