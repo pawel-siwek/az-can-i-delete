@@ -81,6 +81,13 @@ func New(clients collect.Clients, toolVersion string) *Runner {
 // reuse the generic layer's observations rather than collecting the Activity
 // Log or the graph probe again, so one assessment stays inside one call budget.
 func (r *Runner) analyze(ctx context.Context, target armid.Target, resource collect.Resource, opts Options, collected generic.Result) []verdict.Evidence {
+	// The data-plane boundary is handed to an analyzer only when the caller
+	// asked for it. Reading inside a container is a different kind of access
+	// from reading an account's shape, so the opt-in is enforced here rather
+	// than trusted to each analyzer.
+	if !opts.DataPlane {
+		r = r.withoutDataPlane()
+	}
 	switch {
 	case strings.EqualFold(target.ResourceType, disk.ResourceType):
 		return disk.Collect(ctx, disk.Input{
@@ -217,4 +224,16 @@ func hostingClass(resourceType string) string {
 	default:
 		return "not-applicable"
 	}
+}
+
+// withoutDataPlane returns a view of this runner with the opt-in boundary
+// removed. The runner itself is unchanged, so one target's choice cannot
+// affect another's.
+func (r *Runner) withoutDataPlane() *Runner {
+	if r.Clients.DataPlane == nil {
+		return r
+	}
+	without := *r
+	without.Clients.DataPlane = nil
+	return &without
 }
