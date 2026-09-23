@@ -38,6 +38,7 @@ next free number.
 | [0008](0008-api-versions-are-pinned-in-rules-yaml.md) | Every Azure api-version is pinned in `rules.yaml` | accepted |
 | [0009](0009-collection-runs-inside-a-budget.md) | Collection runs inside a budget, and adapters never self-retry | accepted |
 | [0010](0010-five-client-boundaries-and-no-live-azure-in-tests.md) | Five client boundaries, and no live Azure in tests | accepted |
-| [0011](0011-the-installer-always-pins-a-version.md) | The installer always names a version, and verifies what it fetched | accepted |
+| [0011](0011-the-installer-always-pins-a-version.md) | The installer always names a version, and verifies what it fetched | superseded by ADR-0014 |
 | [0012](0012-the-66-case-table-is-the-contract.md) | The 66-case table is the contract, and fixtures cite their source | accepted |
 | [0013](0013-review-is-copilot-plus-mechanical-checks.md) | Conformance is checked mechanically first, and by Copilot second | accepted |
+| [0014](0014-nothing-arrives-unread.md) | Nothing this project tells you to run arrives unread | accepted |

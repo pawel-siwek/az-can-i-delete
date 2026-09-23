@@ -56,6 +56,12 @@ archives:
 checksum:
   name_template: checksums.txt
   algorithm: sha256
+  # The install scripts are checksummed too, so the thing you run to verify the
+  # download is itself verifiable. An installer that arrives unverified and then
+  # checks the archive has only moved the trust, not established it.
+  extra_files:
+    - glob: ./scripts/install.sh
+    - glob: ./scripts/cloud-shell.sh
 
 snapshot:
   version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
@@ -72,15 +78,33 @@ changelog:
 release:
   draft: false
   prerelease: auto
+  # The scripts ship as release assets so they can be fetched by tag and
+  # checked against the checksums above, rather than piped from a branch.
+  extra_files:
+    - glob: ./scripts/install.sh
+    - glob: ./scripts/cloud-shell.sh
   footer: |
     ## Installing
 
+    Fetch the installer and the checksums, verify the installer, read it, then
+    run it. Each step is one you can stop at.
+
     ```sh
-    curl -fsSL https://raw.githubusercontent.com/pawel-siwek/az-can-i-delete/{{ .Tag }}/scripts/install.sh | bash -s -- {{ .Tag }}
+    V={{ .Tag }}
+    base=https://github.com/pawel-siwek/az-can-i-delete/releases/download/$V
+    curl -fsSLO $base/install.sh
+    curl -fsSLO $base/checksums.txt
+    grep ' install.sh$' checksums.txt | sha256sum -c -
+    less install.sh
+    bash install.sh $V
     ```
 
-    The installer verifies the SHA-256 checksum of the archive before it puts
+    The installer then verifies the SHA-256 of the archive before it puts
     anything on your PATH, and installs into `~/.local/bin`.
+
+    Nothing here is piped from a URL into a shell. A command you cannot read
+    before it runs is one you are trusting rather than checking, and a
+    truncated download of one can still execute the part that arrived.
 
     A verdict from this tool is evidence, not permission. `yes` means no
     evidence of use was found by the signals it could evaluate, never that
