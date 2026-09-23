@@ -45,7 +45,7 @@ files in `.github/instructions/`.
 | `internal/vm` — the virtual machine analyzer | complete | memberships, platform ownership, backup and replication, images, network references and pools, power state, start events, the three activity thresholds, deallocated silence |
 | `internal/site` — App Service sites, slots and plans | complete | hosting class, domains and fronting, triggers, the request ceiling and probe shape, stopped state, metric and deployment silence, plan site count and autoscale |
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
-| `kb.yaml` storage knowledge base | **not started**; `storage.kb.match` is an honest not_evaluated stub | — |
+| `internal/kb` — the storage name knowledge base | complete | the 79 entries with the section 9.3 corrections, loader validation, ordered matcher, examples, precedence, tier sanity, tag value rules; end to end through the storage analyzer |
 | Fixture replay (`--fixture`), `demo` | **not started** | — |
 | `cordon` / `uncordon` / `status` | **not started** | — |
 | Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
@@ -62,24 +62,20 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **The storage name knowledge base.** `kb.yaml` from the specification's
-   appendix with the six regex corrections and the confirm ladder, so a
-   container, share, queue or table whose name identifies its producer is
-   recognized. The analyzer around it already exists.
-2. **Data-plane collection.** The opt-in OAuth-only prefix walk behind
+1. **Data-plane collection.** The opt-in OAuth-only prefix walk behind
    `--data-plane`, bounded as SPEC section 3.2 requires, with the fifth client
    boundary implemented against the storage data plane.
-3. **Fixture replay and `demo`.** Recorded responses behind the same five
+2. **Fixture replay and `demo`.** Recorded responses behind the same five
    interfaces, golden JSON per scenario, `recorded` in every replayed header.
-4. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
+3. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
-5. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
+4. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
    only; the preflight order, the `azcid` tag grammar, rollback on mismatch and
    the refusal wording for every other type.
-6. **The composite CI action** that extracts ids from `terraform show -json`
+5. **The composite CI action** that extracts ids from `terraform show -json`
    and `az stack group what-if`, with `fail-on: no|tentative`. The build and
    release pipeline already exists.
-7. **The day-1 empirical tests** against a real subscription, each with its
+6. **The day-1 empirical tests** against a real subscription, each with its
    documented rule flip.
 
 ## Deliberate gaps
@@ -97,7 +93,11 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   Azure Monitor disk namespace; the names have not been verified against a live
   tenant, so an unsupported-metric answer surfaces as unknown rather than as an
   absence of activity.
-- `storage.kb.match`, `storage.data-plane.freshness`, `storage.shares.usage`
+- A knowledge base match reports the tier a name alone may claim, never the
+  confirmed one: confirming a producer means finding it in configuration, which
+  is the other storage signals' work. The six mechanism entries carry no name
+  pattern and are unreachable until a confirming collector exists.
+- `storage.data-plane.freshness`, `storage.shares.usage`
   and `storage.metrics.writes-inventory-shaped` are not_evaluated stubs with
   the specification's strings, and a storage operation this version cannot
   classify (NFS, for example) makes the silence signal unknown(unsupported)

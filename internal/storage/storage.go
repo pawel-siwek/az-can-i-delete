@@ -9,6 +9,7 @@ package storage
 import (
 	"context"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -99,7 +100,7 @@ var Catalogue = signal.Catalogue{
 	SignalReverse:         {Tier: verdict.TierHardDependency, Critical: true, Family: "reverse-ref", Confidence: "verified", API: "ARG", ARGBacked: true},
 	SignalVMExt:           {Tier: verdict.TierHardDependency, Critical: true, Family: "reverse-ref", Confidence: "verified", API: "ARG", ARGBacked: true},
 	SignalFunctions:       {Tier: verdict.TierDesignIntent, Family: "kb", Confidence: "heuristic", API: "ARM"},
-	SignalKB:              {Tier: verdict.TierDesignIntent, Family: "kb", Confidence: "unknown", API: "Rules"},
+	SignalKB:              {Tier: verdict.TierDesignIntent, Family: "kb", Confidence: "unknown", API: "ARM"},
 	SignalLists:           {Tier: verdict.TierObservedIdle, Family: "structural", Confidence: "verified", API: "ARM"},
 	SignalLease:           {Tier: verdict.TierLiveActivity, Critical: true, Family: "structural", Confidence: "verified", API: "ARM"},
 	SignalAnonymous:       {Tier: verdict.TierLiveActivity, Critical: true, Family: "metrics", Confidence: "verified", API: "Metrics"},
@@ -123,6 +124,14 @@ var Catalogue = signal.Catalogue{
 	SignalInventoryShaped: {Tier: verdict.TierInfo, Family: "metrics", Confidence: "unknown", API: "Metrics"},
 	SignalDataPlane:       {Tier: verdict.TierInfo, Family: "data-plane", Confidence: "unknown", API: "DataPlane"},
 	SignalSharesUsage:     {Tier: verdict.TierInfo, Family: "structural", Confidence: "unknown", API: "ARM"},
+}
+
+// The knowledge base contributes one catalogue row per entry, so a name match
+// carries the tier that entry allows a name alone to claim.
+func init() {
+	for id, spec := range kbCatalogue() {
+		Catalogue[id] = spec
+	}
 }
 
 // Signals is the catalogue order: what holds the account, what references it,
@@ -178,7 +187,6 @@ func Collect(ctx context.Context, in Input) []verdict.Evidence {
 		SignalCloudShell:      cloudShell(in),
 		SignalSKUGeo:          geoRedundant(in.Resource),
 		SignalBackupLock:      backupLock(in),
-		SignalKB:              Catalogue.NotEvaluated(SignalKB),
 		SignalDataPlane:       Catalogue.NotEvaluated(SignalDataPlane),
 		SignalSharesUsage:     Catalogue.NotEvaluated(SignalSharesUsage),
 		SignalInventoryShaped: Catalogue.NotEvaluated(SignalInventoryShaped),
@@ -205,6 +213,19 @@ func Collect(ctx context.Context, in Input) []verdict.Evidence {
 		}
 		evidence = append(evidence, found)
 	}
+	// A knowledge base match is one signal per matching entry, so the number of
+	// them depends on what the account contains rather than on the catalogue.
+	// They follow the fixed catalogue, in a stable order of their own.
+	matched := make([]string, 0, len(collected))
+	for id := range collected {
+		if strings.HasPrefix(id, SignalKB+".") {
+			matched = append(matched, id)
+		}
+	}
+	sort.Strings(matched)
+	for _, id := range matched {
+		evidence = append(evidence, collected[id])
+	}
 	return evidence
 }
 
@@ -213,7 +234,7 @@ func Collect(ctx context.Context, in Input) []verdict.Evidence {
 func groupSignals(groupID string) []string {
 	switch groupID {
 	case SignalLists:
-		return []string{SignalLists, SignalLease, SignalFunctions, SignalImmutability}
+		return []string{SignalLists, SignalLease, SignalFunctions, SignalImmutability, SignalKB}
 	case SignalReverse:
 		return []string{SignalReverse, SignalNetACL, SignalBootDiag, SignalFlowLogs, SignalBackup, SignalVMExt}
 	case SignalLifecycle:
