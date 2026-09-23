@@ -1,5 +1,9 @@
 # az-can-i-delete
 
+[![CI](https://github.com/pawel-siwek/az-can-i-delete/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pawel-siwek/az-can-i-delete/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pawel-siwek/az-can-i-delete)](https://github.com/pawel-siwek/az-can-i-delete/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 A single Go binary that answers one question about one Azure resource: **is
 anything still using it?** It collects evidence, applies fixed rules and prints
 a verdict with every signal it rests on.
@@ -255,6 +259,9 @@ the verdict model, and `IMPLEMENTATION-PLAN.md` says what exists today.
 
 ## Development
 
+[CONTRIBUTING.md](CONTRIBUTING.md) is how a change gets in, including the
+sign-off every commit needs.
+
 ```sh
 go test ./...        # no test reaches Azure
 go vet ./...
@@ -314,3 +321,14 @@ approval it never gave.
 Its brief is [`.github/copilot-instructions.md`](.github/copilot-instructions.md),
 with path-scoped rules in [`.github/instructions/`](.github/instructions) — the
 same brief a human doing that job should read.
+
+## Community
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md) — the CNCF Code of Conduct
+- [Security policy](SECURITY.md) — report vulnerabilities privately, never in an issue
+- [Governance](GOVERNANCE.md) and [maintainers](MAINTAINERS.md)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

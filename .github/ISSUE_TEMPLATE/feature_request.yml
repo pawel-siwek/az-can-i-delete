@@ -1,0 +1,23 @@
+name: Feature request
+description: A new signal, resource type or command.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can you not find out today?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: The evidence
+      description: Which Azure API, metric or log would show it, and what it proves — and what it cannot prove.
+    validations:
+      required: true
+  - type: textarea
+    id: documents
+    attributes:
+      label: Documents
+      description: Does this fit REQUIREMENTS.md and docs/SPEC.md as written, or would one of them have to change?
