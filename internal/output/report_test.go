@@ -255,12 +255,9 @@ func TestTableViewLeadsWithTheVerdictAndWhatWasFound(t *testing.T) {
 
 // --full restores the complete report, including the limitations verbatim.
 func TestTheFullViewHidesNothing(t *testing.T) {
-	Full = true
-	t.Cleanup(func() { Full = false })
-
 	report := build(t, sample(), config())
 	var out bytes.Buffer
-	if err := Render(&out, "table", []Outcome{Completed(report)}); err != nil {
+	if err := Render(&out, "table", []Outcome{Completed(report)}, Detailed()); err != nil {
 		t.Fatal(err)
 	}
 	rendered := out.String()
@@ -297,5 +294,34 @@ func TestTableViewReportsFailuresByCode(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "not-found") {
 		t.Fatalf("a failed target must name its code: %q", out.String())
+	}
+}
+
+// The view is a property of one rendering, not of the package. Two renders
+// running at once must not be able to change what the other prints — which is
+// what a package-level flag did, and what the race detector caught.
+func TestTheViewDoesNotLeakBetweenRenders(t *testing.T) {
+	report := build(t, sample(), config())
+	done := make(chan string, 2)
+	for _, options := range [][]ViewOption{{Detailed()}, nil} {
+		go func(options []ViewOption) {
+			var out bytes.Buffer
+			if err := Render(&out, "table", []Outcome{Completed(report)}, options...); err != nil {
+				done <- "error: " + err.Error()
+				return
+			}
+			done <- out.String()
+		}(options)
+	}
+	first, second := <-done, <-done
+	full, brief := first, second
+	if strings.Contains(second, "Limitations") {
+		full, brief = second, first
+	}
+	if !strings.Contains(full, "Limitations") {
+		t.Error("the detailed render lost its limitations")
+	}
+	if strings.Contains(brief, "Limitations") {
+		t.Error("the default render picked up the other one's view")
 	}
 }

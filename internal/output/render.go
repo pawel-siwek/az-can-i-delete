@@ -107,10 +107,29 @@ func (o Outcome) bytes() ([]byte, error) {
 	}})
 }
 
+// View is how much of the report a human is shown. It travels with the call
+// rather than sitting in a package variable: two renders can run at once, and
+// one of them asking for everything must not change what the other prints.
+type View struct {
+	// Full prints every signal and the limitations verbatim, rather than the
+	// verdict and what was found.
+	Full bool
+}
+
+// Detailed asks for the complete view.
+func Detailed() ViewOption { return func(v *View) { v.Full = true } }
+
+// ViewOption configures one rendering.
+type ViewOption func(*View)
+
 // Render uses the same sealed JSON for all formats. jsonc intentionally uses
 // plain JSON (valid JSONC), including off-TTY. none suppresses result output;
 // failures remain explicit return errors for the caller's error stream.
-func Render(w io.Writer, format string, outcomes []Outcome) error {
+func Render(w io.Writer, format string, outcomes []Outcome, options ...ViewOption) error {
+	var view View
+	for _, option := range options {
+		option(&view)
+	}
 	if err := ValidateFormat(format); err != nil {
 		return err
 	}
@@ -149,7 +168,7 @@ func Render(w io.Writer, format string, outcomes []Outcome) error {
 			return boundaryError()
 		}
 	case "table":
-		data, err = tableOutput(items)
+		data, err = tableOutput(items, view)
 		if err != nil {
 			return err
 		}
