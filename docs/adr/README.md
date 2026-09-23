@@ -42,3 +42,4 @@ next free number.
 | [0012](0012-the-66-case-table-is-the-contract.md) | The 66-case table is the contract, and fixtures cite their source | accepted |
 | [0013](0013-review-is-copilot-plus-mechanical-checks.md) | Conformance is checked mechanically first, and by Copilot second | accepted |
 | [0014](0014-nothing-arrives-unread.md) | Nothing this project tells you to run arrives unread | accepted |
+| [0015](0015-a-change-is-reviewed-against-the-documents.md) | A change is reviewed against the documents, and that review blocks | accepted |
