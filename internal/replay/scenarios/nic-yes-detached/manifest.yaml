@@ -1,0 +1,11 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/nic-orphan
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A network interface attached to nothing, with no configuration and no event pointing at it
+expect:
+    verdict: "yes"
+    reasonClass: no-evidence-of-use
+    reasons:
+        - generic.arg.visible
+        - nic.detached.ge-30d
+        - nic.structural.detached

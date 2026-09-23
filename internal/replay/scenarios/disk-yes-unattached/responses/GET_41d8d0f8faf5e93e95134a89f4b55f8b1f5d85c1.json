@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "value": [
+      {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Resources/deployments/platform-2025",
+        "name": "platform-2025",
+        "properties": {
+          "outputResources": [
+            {
+              "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/virtualNetworks/vnet-demo"
+            }
+          ],
+          "provisioningState": "Succeeded",
+          "timestamp": "2025-07-26T00:00:00Z"
+        }
+      }
+    ]
+  }
+}

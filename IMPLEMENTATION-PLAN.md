@@ -47,7 +47,7 @@ files in `.github/instructions/`.
 | `internal/cli` — command tree, `check`, exit codes | `check` implemented; every other command exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits |
 | `internal/azure` data-plane adapter and `--data-plane` | complete; **not exercised against a live tenant** | the prefix walk against a local blob endpoint: descent, the call budget, the delimiter, and a 403 classified as permission |
 | `internal/kb` — the storage name knowledge base | complete | the 79 entries with the section 9.3 corrections, loader validation, ordered matcher, examples, precedence, tier sanity, tag value rules; end to end through the storage analyzer |
-| Fixture replay (`--fixture`), `demo` | **not started** | — |
+| Fixture replay (`--fixture`), `demo` | three scenarios recorded of the seven in SPEC 7.6 | every embedded scenario replayed end to end and held to its manifest; the recorder's redaction checked against the committed files; a miss proved to be an error rather than an empty answer |
 | `cordon` / `uncordon` / `status` | **not started** | — |
 | Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
 | MCP server, the composite CI action for `terraform plan` and what-if | **not started** | — |
@@ -65,8 +65,12 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **Fixture replay and `demo`.** Recorded responses behind the same five
-   interfaces, golden JSON per scenario, `recorded` in every replayed header.
+1. **The four scenarios SPEC 7.6 names that are not recorded yet**:
+   `storage-no-pe`, `storage-tentative-defender`, `storage-untrusted-tag` and
+   `site-tentative-linux-consumption`. The machinery is done — recorder,
+   replay, `--fixture`, `demo` — so each is a scenario file and a re-record.
+   `demo` lists what exists and refuses what does not; a missing recording is
+   never answered with a different one.
 2. **MCP server.** `can_i_delete` and `cordon_status` only, read-only, tag
    values redacted by default, the verbatim tool descriptions.
 3. **Cordon, uncordon, status.** Storage `publicNetworkAccess` and site `stop`
@@ -87,8 +91,11 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   `not_evaluated` stubs of SPEC section 4.4, with its strings verbatim.
 - `generic.pe.connections` is `not_evaluated` for a resource body that does not
   carry the collection, rather than reported as having none.
-- `--query` (JMESPath), `--fixture` replay and `--data-plane` are rejected as
-  not implemented rather than silently ignored.
+- `--query` (JMESPath) is rejected as not implemented rather than silently
+  ignored.
+- Four of SPEC 7.6's seven demo scenarios are not recorded yet. `demo` names
+  the ones it has and refuses the rest; nothing substitutes for a missing
+  recording.
 - The disk I/O counters are read under the composite metric names of the
   Azure Monitor disk namespace; the names have not been verified against a live
   tenant, so an unsupported-metric answer surfaces as unknown rather than as an

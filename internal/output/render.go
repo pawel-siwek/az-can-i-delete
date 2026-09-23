@@ -85,6 +85,11 @@ func ExitCode(outcomes []Outcome, exitOnVerdict bool) int {
 	return 0
 }
 
+// IsHuman reports whether a format is meant to be read on a screen rather than
+// parsed. A note addressed to a person belongs only in those; anywhere else it
+// would be corruption in the middle of somebody's data.
+func IsHuman(format string) bool { return format == "table" }
+
 // ValidateFormat rejects unknown formats without echoing potentially unsafe text.
 func ValidateFormat(format string) error {
 	if !slices.Contains([]string{"json", "jsonc", "table", "tsv", "yaml", "none"}, format) {

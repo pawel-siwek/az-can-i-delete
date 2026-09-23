@@ -1,0 +1,34 @@
+{
+  "status": 200,
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet",
+    "location": "westeurope",
+    "name": "vm-quiet",
+    "properties": {
+      "hardwareProfile": {
+        "vmSize": "Standard_D2s_v5"
+      },
+      "networkProfile": {
+        "networkInterfaces": [
+          {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/vm-quiet-nic"
+          }
+        ]
+      },
+      "provisioningState": "Succeeded",
+      "storageProfile": {
+        "osDisk": {
+          "managedDisk": {
+            "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/disks/vm-quiet-os"
+          },
+          "name": "vm-quiet-os"
+        }
+      },
+      "timeCreated": "2025-04-19T00:00:00Z"
+    },
+    "tags": {
+      "owner": "REDACTED"
+    },
+    "type": "Microsoft.Compute/virtualMachines"
+  }
+}

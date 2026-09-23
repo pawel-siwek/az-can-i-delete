@@ -48,6 +48,10 @@ type Options struct {
 	Cutoff     time.Time
 	RedactTags bool
 	DataPlane  bool
+	// Replay marks the run as served from a recording rather than from Azure.
+	// It reaches the report so that nothing recorded can be read as observed:
+	// a demonstration says what it is on every line of its own output.
+	Replay bool
 }
 
 // Runner holds the collection clients and the policy catalogue for a process.
@@ -190,6 +194,7 @@ func (r *Runner) reportInput(target armid.Target, resource collect.Resource, opt
 	return output.Input{
 		ResourceID:   target.ID,
 		GeneratedAt:  opts.Cutoff.UTC(),
+		Replay:       opts.Replay,
 		HostingClass: hostingClass(target.ResourceType),
 		Assessment: verdict.Input{
 			Type:      target.ResourceType,

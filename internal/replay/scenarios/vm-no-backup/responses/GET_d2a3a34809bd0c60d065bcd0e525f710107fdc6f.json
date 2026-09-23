@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "body": {
+    "value": [
+      {
+        "caller": "REDACTED",
+        "claims": {
+          "appid": "REDACTED"
+        },
+        "eventTimestamp": "2026-05-04T00:00:00Z",
+        "httpRequest": {
+          "method": "POST"
+        },
+        "operationName": {
+          "value": "Microsoft.Compute/virtualMachines/deallocate/action"
+        },
+        "properties": {},
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet",
+        "status": {
+          "value": "Succeeded"
+        },
+        "subStatus": {
+          "value": "OK"
+        }
+      }
+    ]
+  }
+}

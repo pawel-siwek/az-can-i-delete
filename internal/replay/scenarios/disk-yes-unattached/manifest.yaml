@@ -1,0 +1,11 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/disks/disk-orphan
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A managed disk detached 400 days ago, with nothing found in any signal this tool can read
+expect:
+    verdict: "yes"
+    reasonClass: no-evidence-of-use
+    reasons:
+        - disk.ownership.age-ge-30d
+        - disk.state.unattached
+        - generic.arg.visible
