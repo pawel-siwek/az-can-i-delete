@@ -170,6 +170,7 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 	})
 	check.Flags().String("window", "30d", "Observation window, 7-93 days")
 	check.Flags().Bool("data-plane", false, "Opt in to bounded OAuth-only storage metadata collection")
+	check.Flags().Bool("full", false, "Print every signal and the limitations, not just what was found")
 	check.Flags().String("subscription", "", "Expected subscription ID")
 	check.Flags().Bool("exit-on-verdict", false, "Exit by verdict severity: no=10, tentative=11, yes=0")
 	check.Flags().String("fixture", "", "Replay recorded responses instead of Azure")
@@ -254,6 +255,10 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	dataPlane, err := cmd.Flags().GetBool("data-plane")
 	if err != nil {
 		return err
+	}
+	// The terminal view shows what was found; --full restores everything.
+	if full, err := cmd.Flags().GetBool("full"); err == nil {
+		output.Full = full
 	}
 	runner, err := deps.Runner(version, dataPlane)
 	if err != nil {

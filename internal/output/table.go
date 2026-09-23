@@ -4,14 +4,32 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
-// The table view is for a person at a terminal. It prints every signal the
-// assessment collected, one row each with its summary, plus the verdict, the
-// coverage and the limitations: a readable layout, not a smaller one. Nothing
-// is dropped here that the JSON carries — the machine formats stay flat.
+// The table view answers the question that was asked — can I delete this? —
+// and then gets out of the way.
+//
+// A run collects fifty-odd signals and most of them find nothing, which is the
+// point: silence is what a `yes` is made of. Printing all of it buries the
+// verdict, so the default view shows what was found, what could not be read,
+// and nothing else. The rest is one flag away and always in the JSON.
 const tableWidth = 100
+
+// Full restores the complete view: every signal, and the limitations verbatim.
+var Full bool
+
+// verdictBanner is the headline and the one sentence that says what it means.
+// Nothing here is collected from Azure; it is the tool's own text.
+var verdictBanner = map[string]struct{ icon, word, remark string }{
+	"yes": {"✅", "YES",
+		"No evidence of use was found. That is not proof it is unused — nothing here can see a consumer that only names this resource in code, a pipeline or a config file."},
+	"no": {"⛔", "NO",
+		"This resource is IN USE. See the evidence below."},
+	"tentative": {"⚠️", "TENTATIVE",
+		"I could not verify everything, so I do not know whether you can delete this. Read the evidence below and decide."},
+}
 
 func tableOutput(items []json.RawMessage) ([]byte, error) {
 	var out bytes.Buffer
@@ -23,62 +41,155 @@ func tableOutput(items []json.RawMessage) ([]byte, error) {
 			return nil, boundaryError()
 		}
 		if i > 0 {
-			out.WriteByte('\n')
+			out.WriteString("\n")
 		}
-		fmt.Fprintf(&out, "Target %d — evidence, not permission\n", i+1)
 		if failure, ok := value["error"].(map[string]any); ok {
-			writeField(&out, "error", text(failure["code"])+" — "+text(failure["message"]))
-			writeField(&out, "exit", text(failure["exitCode"]))
+			fmt.Fprintf(&out, "💥  ERROR — %s\n\n", text(failure["code"]))
+			writeIndented(&out, text(failure["message"]))
 			continue
 		}
-		writeHeader(&out, value)
-		writeEvidence(&out, value)
-		writeList(&out, "Limitations", textList(value["limitations"]))
+		writeVerdict(&out, value)
+		writeFindings(&out, value)
+		writeFooter(&out, value)
+		if Full {
+			writeEverySignal(&out, value)
+			writeList(&out, "Limitations", textList(value["limitations"]))
+		}
 	}
 	return out.Bytes(), nil
 }
 
-func writeHeader(out *bytes.Buffer, value map[string]any) {
-	writeField(out, "resource", text(value["resourceId"]))
-	verdict := text(value["verdict"])
-	if class := text(value["reasonClass"]); class != "" {
-		verdict += " (" + class + ")"
+// writeVerdict is the answer, first, in three lines.
+func writeVerdict(out *bytes.Buffer, value map[string]any) {
+	banner, known := verdictBanner[text(value["verdict"])]
+	if !known {
+		banner = struct{ icon, word, remark string }{"❔", strings.ToUpper(text(value["verdict"])), ""}
 	}
-	writeField(out, "verdict", verdict)
-	if age, ok := value["age"].(map[string]any); ok {
-		writeField(out, "age", fmt.Sprintf("at least %s d (%s, %s)",
-			text(age["lowerBoundDays"]), text(age["confidence"]), text(age["source"])))
+	name := resourceName(text(value["resourceId"]))
+	fmt.Fprintf(out, "%s  %s — %s\n\n", banner.icon, banner.word, name)
+	if banner.remark != "" {
+		writeWrappedAt(out, "    ", "    ", banner.remark)
 	}
-	if window, ok := value["window"].(map[string]any); ok {
-		requested, _ := window["requested"].(map[string]any)
-		effective, _ := window["effective"].(map[string]any)
-		writeField(out, "window", fmt.Sprintf("requested %s d, effective %s d",
-			text(requested["days"]), text(effective["days"])))
-	}
-	if coverage, ok := value["coverage"].(map[string]any); ok {
-		writeField(out, "coverage", fmt.Sprintf("%s signals: %s evaluated, %s unknown (%s critical), %s not evaluated",
-			text(coverage["total"]), text(coverage["evaluated"]), text(coverage["unknown"]),
-			text(coverage["criticalUnknown"]), text(coverage["notEvaluated"])))
-	}
-	if scope, ok := value["scope"].(map[string]any); ok {
-		writeField(out, "scope", fmt.Sprintf("Resource Graph visible: %s; Activity Log: %s d",
-			text(scope["argVisible"]), text(scope["activityLogDays"])))
-	}
-	writeField(out, "rules", fmt.Sprintf("%s (tool %s)", text(value["rulesDate"]), text(value["toolVersion"])))
 	if replay, _ := value["replay"].(bool); replay {
-		writeField(out, "source", "recorded — this is replayed evidence, not a live assessment")
+		fmt.Fprintf(out, "\n🎞️  RECORDED — replayed evidence, not a live assessment.\n")
 	}
-	for _, reason := range textList(value["reasons"]) {
-		writeField(out, "because", reason)
-	}
-	if escalate, _ := value["humanEscalation"].(bool); escalate {
-		writeField(out, "ask a human", text(value["requiredHumanQuestion"]))
+	if question := text(value["requiredHumanQuestion"]); question != "" {
+		if escalate, _ := value["humanEscalation"].(bool); escalate {
+			out.WriteString("\n")
+			writeWrappedAt(out, "    ❓ ", "       ", question)
+		}
 	}
 }
 
-// writeEvidence prints every collected signal. A signal is one row plus its
-// summary, so nothing the report carries is hidden from the terminal.
-func writeEvidence(out *bytes.Buffer, value map[string]any) {
+// resourceName is the last segment of the ARM id, which is what a person calls
+// the thing. The whole id is in the footer and in the JSON.
+func resourceName(id string) string {
+	if index := strings.LastIndex(id, "/"); index >= 0 && index+1 < len(id) {
+		return id[index+1:]
+	}
+	return id
+}
+
+// writeFindings prints what was actually found and what could not be read.
+// Everything that looked and found nothing is counted, not listed.
+func writeFindings(out *bytes.Buffer, value map[string]any) {
+	evidence, _ := value["evidence"].([]any)
+	var found, unreadable []map[string]any
+	var skipped []string
+	quiet := 0
+	for _, item := range evidence {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch text(row["status"]) {
+		case "present":
+			if decisive(row) {
+				found = append(found, row)
+			} else {
+				quiet++
+			}
+		case "unknown":
+			unreadable = append(unreadable, row)
+		case "not_evaluated":
+			skipped = append(skipped, text(row["id"]))
+		default:
+			quiet++
+		}
+	}
+
+	if len(found) > 0 {
+		out.WriteString("\n🔴  Found\n")
+		for _, row := range found {
+			writeSignal(out, row)
+		}
+	}
+	if len(unreadable) > 0 {
+		fmt.Fprintf(out, "\n🚧  Could not check (%d)\n", len(unreadable))
+		for _, row := range unreadable {
+			writeSignal(out, row)
+		}
+	}
+	if len(skipped) > 0 {
+		sort.Strings(skipped)
+		fmt.Fprintf(out, "\n🔍  Not evaluated (%d)\n", len(skipped))
+		writeWrappedAt(out, "    ", "    ", strings.Join(skipped, ", "))
+	}
+	if quiet > 0 {
+		fmt.Fprintf(out, "\n✅  %d signals looked and found nothing\n", quiet)
+	}
+}
+
+// decisive reports whether a present signal is worth a reader's attention.
+// Existence and Resource Graph visibility are present on every successful run.
+func decisive(row map[string]any) bool {
+	switch text(row["tierName"]) {
+	case "BLOCKER", "HARD_DEPENDENCY", "LIVE_ACTIVITY", "DESIGN_INTENT":
+		return true
+	}
+	return false
+}
+
+func writeSignal(out *bytes.Buffer, row map[string]any) {
+	mark := ""
+	if critical, _ := row["critical"].(bool); critical && text(row["status"]) == "unknown" {
+		mark = " ‼"
+	}
+	if unknown, ok := row["unknown"].(map[string]any); ok {
+		fmt.Fprintf(out, "    %s (%s)%s\n", text(row["id"]), text(unknown["code"]), mark)
+	} else {
+		fmt.Fprintf(out, "    %s%s\n", text(row["id"]), mark)
+	}
+	writeWrappedAt(out, "      ", "      ", text(row["summary"]))
+	for _, step := range textList(row["nextSteps"]) {
+		writeWrappedAt(out, "      → ", "        ", step)
+	}
+}
+
+// writeFooter is one line of provenance and one of what else is available.
+func writeFooter(out *bytes.Buffer, value map[string]any) {
+	parts := []string{}
+	if coverage, ok := value["coverage"].(map[string]any); ok {
+		parts = append(parts, fmt.Sprintf("%s/%s checked", text(coverage["evaluated"]), text(coverage["total"])))
+	}
+	if window, ok := value["window"].(map[string]any); ok {
+		if effective, ok := window["effective"].(map[string]any); ok {
+			parts = append(parts, "window "+text(effective["days"])+" d")
+		}
+	}
+	if age, ok := value["age"].(map[string]any); ok {
+		parts = append(parts, "age ≥"+text(age["lowerBoundDays"])+" d")
+	}
+	parts = append(parts, "rules "+text(value["rulesDate"]), "v"+text(value["toolVersion"]))
+	fmt.Fprintf(out, "\n    %s\n", strings.Join(parts, " · "))
+	if !Full {
+		fmt.Fprintf(out, "    everything: --full · machine-readable: -o json\n")
+	}
+	writeWrappedAt(out, "    ", "    ", text(value["resourceId"]))
+}
+
+// writeEverySignal is the complete list, for --full.
+func writeEverySignal(out *bytes.Buffer, value map[string]any) {
 	evidence, ok := value["evidence"].([]any)
 	if !ok || len(evidence) == 0 {
 		return
@@ -93,7 +204,6 @@ func writeEvidence(out *bytes.Buffer, value map[string]any) {
 		if unknown, ok := row["unknown"].(map[string]any); ok {
 			status += "(" + text(unknown["code"]) + ")"
 		}
-		// A critical unknown is what keeps a `yes` out of reach, so it is marked.
 		if critical, _ := row["critical"].(bool); critical && text(row["status"]) == "unknown" {
 			status += " !"
 		}
@@ -104,28 +214,10 @@ func writeEvidence(out *bytes.Buffer, value map[string]any) {
 			writeIndented(out, "consequence: "+text(notEvaluated["consequence"]))
 			writeIndented(out, "how to check: "+text(notEvaluated["howToCheck"]))
 		}
-		if actionable(row) {
-			for _, step := range textList(row["nextSteps"]) {
-				writeIndented(out, "next: "+step)
-			}
+		for _, step := range textList(row["nextSteps"]) {
+			writeIndented(out, "next: "+step)
 		}
 	}
-}
-
-// actionable reports whether a signal leaves the reader something to do: a
-// dependency or activity that was found, or a gap that could not be read.
-// Silence that was successfully established needs no next step.
-func actionable(row map[string]any) bool {
-	switch text(row["status"]) {
-	case "unknown":
-		return true
-	case "present":
-		switch text(row["tierName"]) {
-		case "BLOCKER", "HARD_DEPENDENCY", "LIVE_ACTIVITY", "DESIGN_INTENT":
-			return true
-		}
-	}
-	return false
 }
 
 func writeList(out *bytes.Buffer, title string, values []string) {
@@ -136,13 +228,6 @@ func writeList(out *bytes.Buffer, title string, values []string) {
 	for _, value := range values {
 		writeWrappedAt(out, "  - ", "    ", value)
 	}
-}
-
-func writeField(out *bytes.Buffer, name, value string) {
-	if value == "" {
-		return
-	}
-	writeWrappedAt(out, fmt.Sprintf("  %-13s ", name), "                ", value)
 }
 
 func writeIndented(out *bytes.Buffer, value string) {
