@@ -361,3 +361,28 @@ func TestSubResourceBodyIsKept(t *testing.T) {
 		t.Errorf("id = %q, want the requested path", resource.ID)
 	}
 }
+
+// A site, a plan or a network resource returns no systemData on GET. ARM's
+// resource list with $expand=createdTime answers for every type; the fourth
+// end-to-end run showed those resources with no age source without it.
+func TestCreatedTimeIsReadFromTheResourceList(t *testing.T) {
+	const slotID = groupID + "/providers/Microsoft.Web/sites/app1/slots/staging"
+	s, client := newServer(t)
+	s.answer(groupID+"/resources", `{"value":[
+		{"id":"`+strings.ToUpper(slotID)+`","createdTime":"2026-09-24T21:16:03.1234567Z"},
+		{"id":"`+groupID+`/providers/Microsoft.Web/sites/app1","createdTime":"2020-01-01T00:00:00Z"}]}`)
+	created, err := client.ARM().CreatedTime(context.Background(), slotID)
+	if err != nil || created == nil || !created.Equal(time.Date(2026, 9, 24, 21, 16, 3, 123456700, time.UTC)) {
+		t.Fatalf("created = %v, %v; want the slot's own creation time", created, err)
+	}
+	query := s.last().Query
+	if query["$filter"][0] != "name eq 'app1/staging'" || query["$expand"][0] != "createdTime" ||
+		query["api-version"][0] == "" {
+		t.Errorf("query = %v, want the slot named by its list name, createdTime expanded and a pinned version", query)
+	}
+
+	missing, err := client.ARM().CreatedTime(context.Background(), groupID+"/providers/Microsoft.Web/sites/other")
+	if err != nil || missing != nil {
+		t.Errorf("a resource the list does not return = %v, %v; want none and no error", missing, err)
+	}
+}

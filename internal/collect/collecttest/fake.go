@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/collect"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
@@ -20,6 +21,7 @@ type ARM struct {
 	LocksFunc       func(ctx context.Context, scope string) ([]collect.Lock, error)
 	DenyFunc        func(ctx context.Context, scope string) ([]collect.DenyAssignment, error)
 	DeploymentsFunc func(ctx context.Context, resourceGroupID string, top int) ([]collect.Deployment, error)
+	CreatedFunc     func(ctx context.Context, resourceID string) (*time.Time, error)
 
 	mu     sync.Mutex
 	scopes []string
@@ -74,6 +76,14 @@ func (c *ARM) Deployments(ctx context.Context, resourceGroupID string, top int) 
 		return nil, nil
 	}
 	return c.DeploymentsFunc(ctx, resourceGroupID, top)
+}
+
+// CreatedTime returns the configured creation time, or none.
+func (c *ARM) CreatedTime(ctx context.Context, resourceID string) (*time.Time, error) {
+	if c.CreatedFunc == nil {
+		return nil, nil
+	}
+	return c.CreatedFunc(ctx, resourceID)
 }
 
 // GraphAnswer is one canned Resource Graph reply. Match is a substring of the

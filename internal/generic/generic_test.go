@@ -3,6 +3,7 @@ package generic_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -409,5 +410,48 @@ func TestTheHistoryQueryStartsInsideTheLogsRetention(t *testing.T) {
 	}
 	if asked[0].Days != age.LogDays {
 		t.Errorf("history covers %d days, want %d", asked[0].Days, age.LogDays)
+	}
+}
+
+// A resource ARM can read but Resource Graph cannot has two explanations. For
+// one created today the likely one is the graph's indexing delay, and the
+// fifth end-to-end run's advice to grant Reader was wrong for it.
+func TestAResourceCreatedTodayIsNotBlamedOnPermissions(t *testing.T) {
+	h := newHarness()
+	h.graph.Answers = nil
+	h.props = map[string]any{"creationTime": cutoff.Add(2 * time.Hour).Format(time.RFC3339)}
+	fresh := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if fresh.Unknown == nil || !strings.Contains(fresh.Unknown.Message, "created today") {
+		t.Fatalf("fresh resource unknown = %+v, want the indexing delay named", fresh.Unknown)
+	}
+
+	h.props = map[string]any{"creationTime": cutoff.AddDate(0, 0, -100).Format(time.RFC3339)}
+	old := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if old.Unknown == nil || !strings.Contains(old.Unknown.Message, "lacks Reader") ||
+		!strings.Contains(old.Unknown.Message, "indexing delay") {
+		t.Fatalf("old resource unknown = %+v, want both causes named", old.Unknown)
+	}
+}
+
+// Source 1 falls back to ARM's own creation time when the resource's GET has
+// none, and asks for it only then.
+func TestARMsCreationTimeDatesAResourceWhoseGetCarriesNone(t *testing.T) {
+	h := newHarness()
+	asked := 0
+	created := cutoff.AddDate(0, 0, -45)
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) {
+		asked++
+		return &created, nil
+	}
+	result := h.run(t)
+	if result.Age.Confidence != "verified" || result.Age.Source != "rp.timestamp" || result.Age.LowerBoundDays != 45 {
+		t.Fatalf("age = %+v, want verified 45 days from ARM's creation time", result.Age)
+	}
+
+	asked = 0
+	h.props = map[string]any{"creationTime": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)}
+	result = h.run(t)
+	if asked != 0 || result.Age.LowerBoundDays != 400 {
+		t.Errorf("asked ARM %d times, age %+v; want the GET's own timestamp and no extra call", asked, result.Age)
 	}
 }

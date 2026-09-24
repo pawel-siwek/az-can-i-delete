@@ -65,7 +65,7 @@ func (g *configGroup) run(in Input) func(context.Context) ([]verdict.Evidence, e
 
 // listed runs one ARM list or get under its own call budget, so a slow
 // sub-resource on one site leaves only its own signal unknown rather than
-// every configuration signal read after it (found by the first end-to-end
+// every configuration signal read after it (found by the third end-to-end
 // run, where one slow call took nine signals with it).
 func listed(in Input, path string, read func([]collect.Resource) verdict.Evidence) func(context.Context) ([]verdict.Evidence, error) {
 	return func(ctx context.Context) ([]verdict.Evidence, error) {

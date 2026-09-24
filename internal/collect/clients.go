@@ -177,6 +177,9 @@ type ARMClient interface {
 	Locks(ctx context.Context, scope string) ([]Lock, error)
 	DenyAssignments(ctx context.Context, scope string) ([]DenyAssignment, error)
 	Deployments(ctx context.Context, resourceGroupID string, top int) ([]Deployment, error)
+	// CreatedTime is the creation time ARM records for the resource, for the
+	// types whose own GET carries none. Nil with no error means ARM has none.
+	CreatedTime(ctx context.Context, resourceID string) (*time.Time, error)
 }
 
 // GraphClient is the Azure Resource Graph boundary. Every ARG-backed signal
