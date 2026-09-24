@@ -381,18 +381,26 @@ func TestCreatedTimeIsReadFromTheResourceList(t *testing.T) {
 		t.Errorf("query = %v, want the slot named by its list name, createdTime expanded and a pinned version", query)
 	}
 
+	// The resource exists, so a list that does not return it has not
+	// answered: a failure, never "ARM has none".
 	missing, err := client.ARM().CreatedTime(context.Background(), groupID+"/providers/Microsoft.Web/sites/other")
-	if err != nil || missing != nil {
-		t.Errorf("a resource the list does not return = %v, %v; want none and no error", missing, err)
+	if err == nil || missing != nil {
+		t.Errorf("a resource the list does not return = %v, %v; want a failure", missing, err)
 	}
 }
 
-// A createdTime that cannot be read is a failure, not an absent value.
+// A createdTime that cannot be read, or none at all for a resource that
+// exists, is a failure, not an absent value.
 func TestAnUnreadableCreatedTimeIsAFailure(t *testing.T) {
 	s, client := newServer(t)
-	s.answer(groupID+"/resources", `{"value":[{"id":"`+resourceID+`","createdTime":"yesterday"}]}`)
-	created, err := client.ARM().CreatedTime(context.Background(), resourceID)
-	if err == nil || created != nil {
-		t.Fatalf("created = %v, %v; want a failure", created, err)
+	for _, body := range []string{
+		`{"value":[{"id":"` + resourceID + `","createdTime":"yesterday"}]}`,
+		`{"value":[{"id":"` + resourceID + `"}]}`,
+	} {
+		s.answer(groupID+"/resources", body)
+		created, err := client.ARM().CreatedTime(context.Background(), resourceID)
+		if err == nil || created != nil {
+			t.Errorf("%s: created = %v, %v; want a failure", body, created, err)
+		}
 	}
 }

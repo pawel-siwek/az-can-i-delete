@@ -100,7 +100,8 @@ Age sources in strict order:
 Before sources 2-5, discard observations at or before the last successful
 Activity Log delete or Resource Changes Delete for the same case-folded ID.
 Source 6 is unavailable after such a delete, when the current object's
-creation time could not be read (a failed read is not an absent one), and
+creation time could not be read (a failed read, or a resource list that does
+not return an object ARM just served, is not an absent time), and
 when any observation of the
 current object (RP timestamp, Resource Changes Create, Activity Log event or
 deployment) falls after the cutoff: the log ends at the cutoff, so zero events

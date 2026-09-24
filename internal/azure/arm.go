@@ -234,22 +234,30 @@ type createdBody struct {
 // with $expand=createdTime answers for every type; without it such a resource
 // had no age source at all when the Activity Log held nothing about it.
 func (c *armClient) CreatedTime(ctx context.Context, resourceID string) (*time.Time, error) {
+	// Every path below that ends without a time is a failure. The resource
+	// was just read through ARM, so a list that does not return it, or
+	// returns it without a creation time, has not answered the question.
+	unread := &collect.Failure{ErrorCode: "CreatedTimeNotReturned",
+		Message: "ARM's resource list did not return a creation time for a resource that exists"}
 	group, name, ok := groupAndName(resourceID)
 	if !ok {
-		return nil, nil
+		return nil, unread
 	}
 	query := url.Values{
 		"api-version": {rules.MustOperation("resources")},
 		"$filter":     {"name eq '" + strings.ReplaceAll(name, "'", "''") + "'"},
 		"$expand":     {"createdTime"},
 	}
-	bodies, _, err := list[createdBody](ctx, c.client, group+"/resources", query)
+	bodies, complete, err := list[createdBody](ctx, c.client, group+"/resources", query)
 	if err != nil {
 		return nil, err
 	}
 	for _, body := range bodies {
 		if !strings.EqualFold(body.ID, resourceID) {
 			continue
+		}
+		if body.CreatedTime == "" {
+			return nil, unread
 		}
 		created, err := time.Parse(time.RFC3339, body.CreatedTime)
 		if err != nil {
@@ -260,7 +268,10 @@ func (c *armClient) CreatedTime(ctx context.Context, resourceID string) (*time.T
 		created = created.UTC()
 		return &created, nil
 	}
-	return nil, nil
+	if !complete {
+		return nil, collect.ErrTruncated
+	}
+	return nil, unread
 }
 
 // groupAndName splits an ARM id into its resource group and the name the

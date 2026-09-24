@@ -178,7 +178,9 @@ type ARMClient interface {
 	DenyAssignments(ctx context.Context, scope string) ([]DenyAssignment, error)
 	Deployments(ctx context.Context, resourceGroupID string, top int) ([]Deployment, error)
 	// CreatedTime is the creation time ARM records for the resource, for the
-	// types whose own GET carries none. Nil with no error means ARM has none.
+	// types whose own GET carries none. Any answer without a time is an error:
+	// the resource exists, so ARM not returning its creation time is a failed
+	// read, never "it has none".
 	CreatedTime(ctx context.Context, resourceID string) (*time.Time, error)
 }
 
