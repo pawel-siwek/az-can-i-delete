@@ -84,7 +84,8 @@ evidence ID. They are not implemented or executed at this checkpoint.
 
 Age sources in strict order:
 
-1. RP timestamp of the current object: verified.
+1. RP timestamp of the current object: verified. One after the cutoff means
+   the object was created since the cutoff: verified, lower bound 0.
 2. Resource Changes Create: verified, or bounded for a move.
 3. Earliest successful Activity Log write with Created marker: verified.
 4. Oldest applicable deployment timestamp: bounded.
@@ -1417,9 +1418,13 @@ Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
   reported `inferred` 89 days old by source 6: the log ends at the cutoff,
   so it held nothing about them, and their `systemData.createdAt`, after the
   cutoff, was discarded as undatable. Source 6 is now unavailable when any
-  observation of the current object falls after the cutoff (section 2.1), so
-  their age is `unknown` and their silence is not claimed over 30 days they
-  did not exist for. The verdict was `tentative` before and after; what was
+  observation of the current object falls after the cutoff (section 2.1),
+  and their silence is not claimed over 30 days they did not exist for. The
+  fourth run confirmed it, and showed their age as `unknown` although each
+  had a `systemData.createdAt` after the cutoff. That timestamp says the
+  object is less than a day old, so source 1 now answers `verified`, lower
+  bound 0: the verdict stays `tentative`, for `window.too-short-for-yes`,
+  which says why, instead of `age.unknown`, which suggested a failed read. The verdict was `tentative` before and after; what was
   wrong was the age it printed and the timed silence it computed.
 - **Site configuration budgets, same run.** Nine site signals were read in
   one sequence under one 20 s call budget, and one slow call on a fresh F1
