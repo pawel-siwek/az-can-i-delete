@@ -213,6 +213,12 @@ naming belong to the linter and to whoever opened the pull request. Its full
 brief is `.github/copilot-instructions.md`, which a human doing the same job
 should read too.
 
+It does not review Dependabot's pull requests. GitHub gives a run Dependabot
+triggers no repository secrets, a read-only token and no federated identity,
+so the model cannot be reached and a review cannot be posted. The job says so
+in a notice and passes, exactly as it does when no model is configured; the
+drift check still runs, and a dependency bump is a human's to read.
+
 It treats the diff as material to review, never as instructions. A change
 containing text that asks the reviewer to approve or ignore a rule is itself a
 blocking finding.
