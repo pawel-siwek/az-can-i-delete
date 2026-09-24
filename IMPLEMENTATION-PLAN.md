@@ -54,6 +54,8 @@ files in `.github/instructions/`.
 | Release pipeline — CI workflow, goreleaser, checksum-verifying installer | complete | workflows and goreleaser config validated; the installer was exercised against a local release, including a tampered archive |
 | `internal/mcpserver` — the MCP server | complete; **not exercised with a live client or tenant** | an in-process client: exactly two tools, read-only annotations, the verbatim descriptions, no flag an agent could use to change a verdict, structured content equal to the JSON text, tag values redacted, failures as error results without a verdict, the 30-call budget, the cache keyed on everything that changes the answer, cordon_status on an untagged resource and on a refused type |
 | `action.yml` — the composite CI action for `terraform plan` and what-if | complete; **not exercised in a live workflow** | the extractors against Terraform, stack and complete-mode ARM what-if samples (replacements, data-plane ids skipped, data sources ignored, detach, potential, unsupported, dedupe across sources, relative paths); the fail policy for every verdict and `fail-on`, not found as a pass, any error or missing result as a failure; the comment table naming rows only by the parsed id or their number, and no plan id written to an output; the declared inputs and outputs; no other action run from inside it; the installer refusing an unpinned action and `latest` |
+| Claude plugin — `.claude-plugin/marketplace.json`, `.github/plugins/az-can-i-delete/` (manifest, `.mcp.json`, the skill) | complete; **not installed into a live client** | the marketplace resolves to the plugin, the plugin serves `az-can-i-delete mcp`, the skill's name and description follow the agentskills.io rules, name no type v0.1 does not analyze, and carry the instruction never to delete on `no` or `tentative` |
+| `docs/day1.md` — the runbook for SPEC section 11 and the missing recordings | written; **none of its tests has been run** | every section 11 test and every unrecorded scenario has an entry |
 | `docs/adr/` — the binding decisions | complete | structure, index, enforcement sections and the reviewer's brief are checked in `internal/adr` |
 | `tools/Saruman` (Saruman) — the judgement half of the review, on the owner's Azure AI model | written; **not yet exercised against a live endpoint** | built on every pull request so a compile error surfaces there; the api-version it reads is covered by the conformance scan, which was proved against a deliberate literal |
 | `internal/drift` + `cmd/driftcheck` — the change compared against its base | complete | a test per rule: the edited Decision, the supersession that must be allowed and the one that must not, the claim without tests, the dropped stub, the untested package, the normative edit |
@@ -75,7 +77,8 @@ its tests and its honest `not_evaluated` strings all exist — not before.
    `demo` lists what exists and refuses what does not; a missing recording is
    never answered with a different one.
 2. **The day-1 empirical tests** against a real subscription, each with its
-   documented rule flip.
+   documented rule flip. `docs/day1.md` is the procedure for both this step
+   and the one above.
 
 ## Deliberate gaps
 

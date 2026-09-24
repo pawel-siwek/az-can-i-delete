@@ -1,0 +1,14 @@
+{
+  "name": "az-can-i-delete",
+  "version": "0.4.0",
+  "description": "Deterministic pre-flight before deleting an Azure resource: evidence, not permission.",
+  "author": {
+    "name": "pawel-siwek"
+  },
+  "homepage": "https://github.com/pawel-siwek/az-can-i-delete",
+  "repository": "https://github.com/pawel-siwek/az-can-i-delete",
+  "license": "Apache-2.0",
+  "keywords": ["azure", "deletion", "pre-flight", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
