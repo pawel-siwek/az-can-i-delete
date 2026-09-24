@@ -2,6 +2,7 @@ package generic_test
 
 import (
 	"context"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -453,5 +454,24 @@ func TestARMsCreationTimeDatesAResourceWhoseGetCarriesNone(t *testing.T) {
 	result = h.run(t)
 	if asked != 0 || result.Age.LowerBoundDays != 400 {
 		t.Errorf("asked ARM %d times, age %+v; want the GET's own timestamp and no extra call", asked, result.Age)
+	}
+}
+
+// A failed read of ARM's creation time is not "ARM has none". With an empty,
+// complete log, source 6 would otherwise call a resource that may be minutes
+// old at least 89 days old.
+func TestAFailedCreationTimeReadStopsTheNoEventsInference(t *testing.T) {
+	h := newHarness()
+	h.log.Log = collect.ActivityLog{Days: age.LogDays}
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) {
+		return nil, &collect.Failure{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"}
+	}
+	if got := h.run(t).Age; got.Source == "activitylog.no-events" {
+		t.Fatalf("age = %+v, want no inference from a history whose creation time could not be read", got)
+	}
+
+	h.arm.CreatedFunc = nil
+	if got := h.run(t).Age; got.Source != "activitylog.no-events" {
+		t.Fatalf("age = %+v, want the inference back once ARM answers that it has no creation time", got)
 	}
 }

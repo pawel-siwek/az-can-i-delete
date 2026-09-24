@@ -386,3 +386,13 @@ func TestCreatedTimeIsReadFromTheResourceList(t *testing.T) {
 		t.Errorf("a resource the list does not return = %v, %v; want none and no error", missing, err)
 	}
 }
+
+// A createdTime that cannot be read is a failure, not an absent value.
+func TestAnUnreadableCreatedTimeIsAFailure(t *testing.T) {
+	s, client := newServer(t)
+	s.answer(groupID+"/resources", `{"value":[{"id":"`+resourceID+`","createdTime":"yesterday"}]}`)
+	created, err := client.ARM().CreatedTime(context.Background(), resourceID)
+	if err == nil || created != nil {
+		t.Fatalf("created = %v, %v; want a failure", created, err)
+	}
+}

@@ -253,7 +253,9 @@ func (c *armClient) CreatedTime(ctx context.Context, resourceID string) (*time.T
 		}
 		created, err := time.Parse(time.RFC3339, body.CreatedTime)
 		if err != nil {
-			return nil, nil
+			// A value that cannot be read is not an absent one.
+			return nil, &collect.Failure{ErrorCode: "UnreadableCreatedTime",
+				Message: "ARM returned a createdTime that is not an RFC 3339 time"}
 		}
 		created = created.UTC()
 		return &created, nil

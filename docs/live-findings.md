@@ -129,8 +129,11 @@ SPEC section 11, "Outcomes recorded so far".
   every resource type. The call's api-version is pinned in `rules.yaml` as
   `resources`.
 - **Why:** it is ARM's own record of the creation, as reliable as `systemData`
-  and available for every type. A failure of this call leaves the chain one
-  source fewer, like the change history. It never makes a resource younger.
+  and available for every type. A failed call, or a value that cannot be
+  parsed, is not treated as "ARM has none". Like a failed change history, it
+  marks the history incomplete, so source 6 cannot call a resource that may
+  be minutes old at least 89 days old. The review bot caught the first draft
+  of this, which dropped the error (ADR-0004).
 
 ## 9. A resource created minutes earlier was reported as a permission problem
 

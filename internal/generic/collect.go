@@ -469,16 +469,18 @@ func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]
 			}
 		}
 		// A GET without systemData leaves source 1 empty; ARM's own record of
-		// the creation time fills it. Best effort, like the change history: a
-		// failure leaves the chain one source fewer, never a younger resource.
+		// the creation time fills it. A failed read is not "ARM has none": it
+		// is treated like a failed change history, which makes the history
+		// incomplete, so source 6 cannot call a resource that may be minutes
+		// old at least 89 days old. Sources 2 to 5 still apply; each is a
+		// lower bound from something that did happen.
+		var createdErr error
 		if rpTimestamp(in.Resource) == nil && in.Clients.ARM != nil {
-			if created, err := in.Clients.ARM.CreatedTime(ctx, in.Target.ID); err == nil {
-				g.created = created
-			}
+			g.created, createdErr = in.Clients.ARM.CreatedTime(ctx, in.Target.ID)
 		}
 		changes, changesErr := resourceChanges(ctx, in, probe)
 		g.changes, g.changesRead = changes, changesErr == nil
-		g.truncated = log.Truncated || changesErr != nil
+		g.truncated = log.Truncated || changesErr != nil || createdErr != nil
 		recent, writes := activityEvidence(log, in.Cutoff)
 		return []verdict.Evidence{recent, writes}, nil
 	}
