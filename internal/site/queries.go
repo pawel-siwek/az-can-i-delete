@@ -54,34 +54,50 @@ func (g *configGroup) run(in Input) func(context.Context) ([]verdict.Evidence, e
 		plan := planOf(ctx, in, version)
 		g.capacity, g.class = plan.capacity, hostingClass(in.Resource, plan)
 		g.read = true
+		return []verdict.Evidence{
+			customDomains(in.Resource),
+			fronted(web),
+			accessRestricted(in.Resource, web),
+			Catalogue.Present(SignalHostingClass, map[string]any{"hostingClass": g.class}),
+		}, nil
+	}
+}
 
-		hybrid, err := in.Clients.ARM.List(ctx, in.Target.ID+"/hybridConnectionRelays", version)
+// listed runs one ARM list or get under its own call budget, so a slow
+// sub-resource on one site leaves only its own signal unknown rather than
+// every configuration signal read after it (found by the first end-to-end
+// run, where one slow call took nine signals with it).
+func listed(in Input, path string, read func([]collect.Resource) verdict.Evidence) func(context.Context) ([]verdict.Evidence, error) {
+	return func(ctx context.Context) ([]verdict.Evidence, error) {
+		version, err := apiVersion()
+		if err != nil {
+			return nil, err
+		}
+		items, err := in.Clients.ARM.List(ctx, in.Target.ID+path, version)
 		if err != nil && !collect.NotFound(err) {
 			return nil, err
 		}
-		slots, err := in.Clients.ARM.List(ctx, in.Target.ID+"/slots", version)
-		if err != nil && !collect.NotFound(err) {
+		return []verdict.Evidence{read(items)}, nil
+	}
+}
+
+func sourceControlRun(in Input) func(context.Context) ([]verdict.Evidence, error) {
+	return func(ctx context.Context) ([]verdict.Evidence, error) {
+		version, err := apiVersion()
+		if err != nil {
 			return nil, err
 		}
 		source, err := in.Clients.ARM.Get(ctx, in.Target.ID+"/sourcecontrols/web", version)
 		if err != nil && !collect.NotFound(err) {
 			return nil, err
 		}
-		deployments, err := in.Clients.ARM.List(ctx, in.Target.ID+"/deployments", version)
-		if err != nil && !collect.NotFound(err) {
-			return nil, err
-		}
-		return []verdict.Evidence{
-			customDomains(in.Resource),
-			fronted(web),
-			count(SignalHybrid, len(hybrid)),
-			slotList(slots),
-			sourceControl(source),
-			continuousDeployment(in, deployments),
-			accessRestricted(in.Resource, web),
-			Catalogue.Present(SignalHostingClass, map[string]any{"hostingClass": g.class}),
-			webTests(ctx, in),
-		}, nil
+		return []verdict.Evidence{sourceControl(source)}, nil
+	}
+}
+
+func webTestsRun(in Input) func(context.Context) ([]verdict.Evidence, error) {
+	return func(ctx context.Context) ([]verdict.Evidence, error) {
+		return []verdict.Evidence{webTests(ctx, in)}, nil
 	}
 }
 

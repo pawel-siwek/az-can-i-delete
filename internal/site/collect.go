@@ -21,6 +21,15 @@ func collectSite(ctx context.Context, in Input) map[string]verdict.Evidence {
 	var traffic trafficGroup
 	outcomes := collect.Gather(ctx, []collect.Signal{
 		{ID: SignalCustomDomain, Run: configuration.run(in)},
+		{ID: SignalHybrid, Run: listed(in, "/hybridConnectionRelays", func(items []collect.Resource) verdict.Evidence {
+			return count(SignalHybrid, len(items))
+		})},
+		{ID: SignalSlots, Run: listed(in, "/slots", slotList)},
+		{ID: SignalSourceControl, Run: sourceControlRun(in)},
+		{ID: SignalCIActive, Run: listed(in, "/deployments", func(items []collect.Resource) verdict.Evidence {
+			return continuousDeployment(in, items)
+		})},
+		{ID: SignalWebTests, Run: webTestsRun(in)},
 	})
 	outcomes = append(outcomes, collect.Gather(ctx, []collect.Signal{
 		{ID: SignalNonHTTP, Run: triggers.run(in)},
@@ -53,8 +62,7 @@ func collectSite(ctx context.Context, in Input) map[string]verdict.Evidence {
 func groupSignals(groupID string) []string {
 	switch groupID {
 	case SignalCustomDomain:
-		return []string{SignalCustomDomain, SignalFronted, SignalHybrid, SignalSourceControl,
-			SignalCIActive, SignalSlots, SignalAccessRestrict, SignalHostingClass, SignalWebTests}
+		return []string{SignalCustomDomain, SignalFronted, SignalAccessRestrict, SignalHostingClass}
 	case SignalNonHTTP:
 		return []string{SignalNonHTTP, SignalHTTPOnly}
 	case SignalRealTraffic:
