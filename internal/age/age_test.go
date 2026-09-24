@@ -28,9 +28,9 @@ func TestAgeChainBoundaries(t *testing.T) {
 		confidence, source string
 	}{
 		{"unknown", func(*Input) {}, 0, "unknown", "none"},
-		{"complete-zero-events-90", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 90 }, 90, "inferred", "activitylog.no-events"},
-		{"complete-zero-events-93", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 93 }, 90, "inferred", "activitylog.no-events"},
-		{"short-log-not-inferred", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 89 }, 0, "unknown", "none"},
+		{"complete-zero-events-89", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 89 }, 89, "inferred", "activitylog.no-events"},
+		{"complete-zero-events-93", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 93 }, 89, "inferred", "activitylog.no-events"},
+		{"short-log-not-inferred", func(in *Input) { in.ActivityLogSucceeded = true; in.ActivityLogDays = 88 }, 0, "unknown", "none"},
 		{"truncated-not-inferred", func(in *Input) {
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = 90

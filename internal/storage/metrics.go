@@ -63,7 +63,7 @@ func collectMetrics(ctx context.Context, in Input) observations {
 	m1, err := metrics(ctx, in, collect.MetricQuery{
 		ResourceURI: account, Names: []string{transactionsMetric},
 		Filter: "ApiName eq '*' and TransactionType eq '*'", Aggregation: "Total",
-		Interval: "P1D", Top: 200, OrderBy: "sum desc", Window: in.Requested})
+		Interval: "P1D", Top: 200, OrderBy: "Total desc", Window: in.Requested})
 	if err != nil {
 		out.fail("M1", err)
 	}

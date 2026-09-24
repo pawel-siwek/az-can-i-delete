@@ -55,6 +55,12 @@ type Input struct {
 	ActivityLogDays      int              `json:"activityLogDays"`
 }
 
+// LogDays is the longest complete Activity Log period that ends at a cutoff.
+// Azure keeps the log for 90 days before now, and refuses a query that starts
+// earlier. The cutoff is today's 00:00Z, so the 90th day before it has already
+// partly aged out: 89 whole days is all a query ending at the cutoff can read.
+const LogDays = 89
+
 // ResolveAge implements the seven-source age chain without I/O or clock reads.
 // It discards sources 2-5 at or before the last same-ID successful delete; the
 // current RP timestamp is exempt. Missing/truncated logs cannot infer no events.
@@ -134,9 +140,9 @@ func ResolveAge(in Input) verdict.Age {
 	if !oldestEvent.IsZero() {
 		return answer(oldestEvent, "bounded", "activitylog.oldest-succeeded")
 	}
-	if in.ActivityLogSucceeded && !in.ActivityLogTruncated && in.ActivityLogDays >= 90 &&
+	if in.ActivityLogSucceeded && !in.ActivityLogTruncated && in.ActivityLogDays >= LogDays &&
 		eventCount == 0 && deleted.IsZero() {
-		return verdict.Age{LowerBoundDays: 90, Confidence: "inferred", Source: "activitylog.no-events", Caveats: []string{}}
+		return verdict.Age{LowerBoundDays: LogDays, Confidence: "inferred", Source: "activitylog.no-events", Caveats: []string{}}
 	}
 	return unknown
 }

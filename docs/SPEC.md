@@ -89,8 +89,8 @@ Age sources in strict order:
 3. Earliest successful Activity Log write with Created marker: verified.
 4. Oldest applicable deployment timestamp: bounded.
 5. Oldest successful Activity Log event: bounded.
-6. Successful complete 90-day log with zero events and no successful delete:
-   inferred lower bound 90.
+6. Successful complete 89-day log with zero events and no successful delete:
+   inferred lower bound 89.
 7. Otherwise unknown with lower bound zero.
 
 Before sources 2-5, discard observations at or before the last successful
@@ -868,7 +868,7 @@ Cut entirely from 0.1 (no stub, no flag): MCP `cordon`/`uncordon`; VM/ACA/job co
 | `generic.age` | feeds rules 5–7 | — | §2.1 chain | Reader | — | `age ≥ {lowerBoundDays} d ({confidence}, {source})` |
 | `generic.iac.deployment` | DESIGN_INTENT | no | ARM deployments 2026-06-01 (≤ 200) | Reader* | id in `outputResources[]` | `created by deployment `{deploymentName}` at {timestamp}` |
 | `generic.activitylog.recent-write` | DESIGN_INTENT | no | AL | Reader* | 30d; any Succeeded `write\|action` by a non-`azcid` caller; prints `operationName` + caller class `user\|servicePrincipal\|managedIdentity` | `{operationName} by {callerClass} `{caller}` {daysAgo} d ago` |
-| `generic.activitylog.writes` | INFO | no | same call | Reader* | 90 d, older writes summarised | `{count} write events in 90 d; last {daysAgo} d ago` |
+| `generic.activitylog.writes` | INFO | no | same call | Reader* | 89 d, older writes summarised | `{count} write events in 89 d; last {daysAgo} d ago` |
 | `generic.pe.connections` | HARD_DEP | yes | ARM GET `privateEndpointConnections[]` (types that carry it) | Reader* | any `Approved` | `approved private endpoint {peId}` |
 | `generic.dns.records` | HARD_DEP (public zone) / DESIGN_INTENT (private) | yes | ARG K-DNS | Reader | record points at IP/FQDN/id | `DNS record {recordId} points here` |
 | `generic.advisor` | OBSERVED_IDLE (corroborating) | no | ARG K4 | Reader | cost recommendation present | `Advisor: {recType}` |
@@ -876,7 +876,7 @@ Cut entirely from 0.1 (no stub, no flag): MCP `cordon`/`uncordon`; VM/ACA/job co
 | `generic.policy.state` | INFO | — | **stub** | | | |
 
 ### 5.1 Storage accounts (`Microsoft.Storage/storageAccounts`, ARM 2026-04-01)
-Metric calls (all `interval=P1D`, `aggregation=Total` unless noted, resource URI as listed): M1 `{sa}` `Transactions` `$filter=ApiName eq '*' and TransactionType eq '*'` `top=200` `orderby=sum desc` over **W**; M2 `{sa}` `Transactions` `$filter=Authentication eq '*' and ResponseType eq '*' and TransactionType eq 'User'` `top=50` over W; M3 `{sa}` `Egress` `$filter=Authentication eq '*'` over W; M4 `{sa}/blobServices/default` `BlobCount`, `{sa}/fileServices/default` `FileCount`, `{sa}/queueServices/default` `QueueMessageCount`, `{sa}/tableServices/default` `TableEntityCount`, `aggregation=Average`, over W; M5 `{sa}/fileServices/default` `Transactions` `$filter=ApiName eq '*' and TransactionType eq 'User'` `top=100` over W (SMB verbs). Classes per §3.4. `WRITE′ = WRITE ∪ DELETE \ {SetBlobTags, SetBlobMetadata, SetBlobExpiry, SetBlobTier, DeleteBlob, AbortCopyBlob}`. `defenderOn = defenderForStorageSettings/current.properties.isEnabled`. `scannerCouldRun = (malwareScanning.onUpload.isEnabled ∧ sum(WRITE′ over W) > 0) ∨ sensitiveDataDiscovery.isEnabled`. `oauthOnlyReads = (M2 successful User transactions with Authentication ≠ OAuth) == 0`.
+Metric calls (all `interval=P1D`, `aggregation=Total` unless noted, resource URI as listed): M1 `{sa}` `Transactions` `$filter=ApiName eq '*' and TransactionType eq '*'` `top=200` `orderby=Total desc` over **W**; M2 `{sa}` `Transactions` `$filter=Authentication eq '*' and ResponseType eq '*' and TransactionType eq 'User'` `top=50` over W; M3 `{sa}` `Egress` `$filter=Authentication eq '*'` over W; M4 `{sa}/blobServices/default` `BlobCount`, `{sa}/fileServices/default` `FileCount`, `{sa}/queueServices/default` `QueueMessageCount`, `{sa}/tableServices/default` `TableEntityCount`, `aggregation=Average`, over W; M5 `{sa}/fileServices/default` `Transactions` `$filter=ApiName eq '*' and TransactionType eq 'User'` `top=100` over W (SMB verbs). Classes per §3.4. `WRITE′ = WRITE ∪ DELETE \ {SetBlobTags, SetBlobMetadata, SetBlobExpiry, SetBlobTier, DeleteBlob, AbortCopyBlob}`. `defenderOn = defenderForStorageSettings/current.properties.isEnabled`. `scannerCouldRun = (malwareScanning.onUpload.isEnabled ∧ sum(WRITE′ over W) > 0) ∨ sensitiveDataDiscovery.isEnabled`. `oauthOnlyReads = (M2 successful User transactions with Authentication ≠ OAuth) == 0`.
 
 | id | tier | crit | source | perm | window / rule | summary template |
 |---|---|---|---|---|---|---|
@@ -1326,13 +1326,13 @@ Not imported: `armsecurity` (raw GET), `armpolicyinsights` (stub), `armadvisor` 
 schemaVersion: 1
 rulesDate: "2026-09-21"
 apiVersions: {…§10.3…}
-metrics: {topMax: 200, orderby: "sum desc", absentIsZero: {CpuTime: true, InstanceCount: true, Requests: false, …}}
+metrics: {topMax: 200, orderby: "Total desc", absentIsZero: {CpuTime: true, InstanceCount: true, Requests: false, …}}
 thresholds:
   storage: {writesMin: 10, writesDays: 2, writesBurst: 1000, readsDays: 3, egressMiB: 50, readsMin: 1000, pollingMin: 1000, pollingDays: 3, countDeltaDays: 2}
   site:    {alwaysOnPerWorker: 288, healthCheckPerWorker: 1440, liveFloor: 100, liveFactor: 1.25, liveDays: 3, probeMin: 5000, probe2xxRatio: 0.98, bytesSentScale: null}
   vm:      {cpuP95: 3, flowsP95: 5, bytesMiBMedian: 20, availabilityCoverage: 0.8}
   aca:     {txMiB: 1, replicaDays: 3}
-  age:     {minDaysForYes: 30, deploymentsTop: 200, activityLogDays: 90, resourceChangesDays: 14}
+  age:     {minDaysForYes: 30, deploymentsTop: 200, activityLogDays: 89, resourceChangesDays: 14}
 lists: {maxPages: 20}
 signals:
   <id>: {type, tier, critical, family, details: [allowed keys], summary: "template", summaryRedacted: "template", nextStep: "…", humanQuestion: "…"}
@@ -1379,6 +1379,42 @@ Embedded; fields `id, kind, regex, mechanism (bool), producer, tier, unconfirmed
 | H9 | ARG projections used by 0.1 (K5c, K9, K13, K19 `properties.Enabled` casing) | `az graph query -q "<K> \| take 1" -o jsonc` each. | Missing projection → the signal is `unknown(unsupported)` non-critical with text "Resource Graph does not project this field"; K19 casing → template both spellings. |
 | T25b | SMB verbs appear as metric `ApiName` values | Mount an SMB share from a scratch VM, write 10 files, read them; M5 on `{sa}/fileServices/default`. | Verbs present → nothing changes; absent → `storage.metrics.user-writes/user-reads` add caveat "SMB traffic is not visible in metrics; mounted shares may look idle" and `storage.smb.mounted` is retired. |
 Everything else in research-3 §H (H2, H3, H4, H6, H8, H12–H16, H18–H20) is post-hackathon; H18/H19 are already design.
+
+Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
+
+- **H1.** `orderby=sum desc` is refused with 400 "Detected invalid Aggregation
+  type: sum"; `Total desc` is accepted with `top=200` and `top=1000`. M1's
+  order is `Total desc` from here on. Before this change every live M1 was
+  refused, and every storage metric signal was `unknown(transient)`; the
+  unknowns were honest, but the storage analyzer could never reach `yes` or a
+  metric `no`. No cap below 200 was seen, so `topMax` stays.
+- **Activity Log retention, found by the same run.** Azure keeps the Activity
+  Log for 90 days before *now* and refuses a query that starts earlier. The
+  cutoff is today's 00:00Z (ADR-0003), so a 90-day window ending at the cutoff
+  starts up to a day past that edge: every history read was refused, and every
+  Activity Log signal was `unknown(transient)` while the 30-day cordon
+  pre-flight read, with the same query shape, succeeded. The longest complete
+  log that ends at the cutoff is 89 whole days, so `activityLogDays`, the
+  write-history signal and age source 6 are 89 days. The alternative, keeping
+  90 and clamping the start silently, would claim coverage Azure no longer
+  holds, which is the failure-as-absence error this specification exists to
+  prevent (ADR-0004). The limitation's "Activity Log covers 90 days" is
+  Azure's retention and stays true.
+- **H7.** Neither a storage account nor an App Service plan created by CLI
+  wrote a `Created` marker: the account's `write` went `Started` → `Accepted`
+  (`statusCode` `Accepted`) → `Succeeded` with no sub-status, the plan's
+  `Started` → `Succeeded` with `OK`. Source 3 finds nothing for them and the
+  chain already falls through to sources 4 and 5, which is what the rule
+  change asks for; no code changes. Both have a better source anyway: the
+  storage account's `creationTime` is source 1.
+- **H11.** Five `check`s put `ListShares`, `ListContainers`, `ListQueues` and
+  `QueryTables` into `Transactions`. All four are ENUMERATE (§3.4), which is
+  not an activity class, so they neither break silence nor count as reads:
+  the tool's own listing cannot turn an idle account into a used one. The
+  probe did not split by `TransactionType`, so whether they are `User`
+  transactions, which `status` totals, is not yet known; if they are, a
+  `check` run during a cordon shows in `status`. That is left to 0.2 and said
+  here so it is not mistaken for a consumer.
 
 ---
 

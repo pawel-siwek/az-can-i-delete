@@ -196,7 +196,7 @@ func deploymentEvidence(deployments []collect.Deployment, resourceID string, cap
 }
 
 // activityEvidence reports the recent-write design intent signal and the
-// 90-day write count. A truncated or short log cannot establish silence, so it
+// 89-day write count. A truncated or short log cannot establish silence, so it
 // becomes unknown(partial) rather than an absence of writes.
 func activityEvidence(log collect.ActivityLog, cutoff time.Time) (recent, writes verdict.Evidence) {
 	recentCutoff := cutoff.AddDate(0, 0, -RecentWriteDays)
@@ -229,7 +229,7 @@ func activityEvidence(log collect.ActivityLog, cutoff time.Time) (recent, writes
 			"writeCount": count, "lastWriteDaysAgo": int(cutoff.Sub(newest) / (24 * time.Hour))})
 	case incomplete:
 		writes = unknownAs(SignalWrites, &verdict.Unknown{
-			Code: verdict.UnkPartial, Message: "the Activity Log did not cover the fixed 90-day period"})
+			Code: verdict.UnkPartial, Message: "the Activity Log did not cover the fixed 89-day period"})
 	default:
 		writes = absent(SignalWrites)
 	}
