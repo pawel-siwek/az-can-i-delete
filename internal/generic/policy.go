@@ -151,9 +151,9 @@ func Policies() map[string]output.SignalPolicy {
 			Details: map[string]output.DetailPolicy{
 				"writeCount": {Kind: output.Number}, "lastWriteDaysAgo": {Kind: output.Number}},
 			Summaries: map[verdict.Status]string{
-				verdict.StatusPresent: "Control-plane writes were recorded in the last 90 days.",
-				verdict.StatusAbsent:  "No control-plane write was recorded in the last 90 days.",
-				verdict.StatusUnknown: "The 90-day write history could not be read completely.",
+				verdict.StatusPresent: "Control-plane writes were recorded in the last 89 days.",
+				verdict.StatusAbsent:  "No control-plane write was recorded in the last 89 days.",
+				verdict.StatusUnknown: "The 89-day write history could not be read completely.",
 			},
 		},
 		SignalPEConnections: {

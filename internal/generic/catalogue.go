@@ -9,6 +9,7 @@ package generic
 import (
 	"time"
 
+	"github.com/pawel-siwek/az-can-i-delete/internal/age"
 	"github.com/pawel-siwek/az-can-i-delete/internal/rules"
 	"github.com/pawel-siwek/az-can-i-delete/internal/signal"
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
@@ -50,10 +51,11 @@ var (
 
 // RecentWriteDays and WritesDays are the fixed lookbacks of the two Activity
 // Log signals. They are absolute periods, not the requested window, so a short
-// window can neither widen nor narrow them.
+// window can neither widen nor narrow them. WritesDays is all of the log Azure
+// still keeps that ends at the cutoff (age.LogDays).
 const (
 	RecentWriteDays = 30
-	WritesDays      = 90
+	WritesDays      = age.LogDays
 )
 
 // Catalogue is SPEC section 5.0, in the order every report prints. A deny

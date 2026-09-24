@@ -126,8 +126,8 @@ func (c *Metrics) Metrics(ctx context.Context, query collect.MetricQuery) (colle
 	return c.MetricsFunc(ctx, query)
 }
 
-// ActivityLog is a fake Activity Log client. Days defaults to the full 90-day
-// retention so a test that does not care about coverage gets a complete log.
+// ActivityLog is a fake Activity Log client. Days defaults to the window asked
+// for so a test that does not care about coverage gets a complete log.
 type ActivityLog struct {
 	Log        collect.ActivityLog
 	Err        error

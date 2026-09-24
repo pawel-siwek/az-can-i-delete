@@ -28,9 +28,9 @@ az group create -n "$RG" -l westeurope --subscription "$SUB"
 ## H1 — the metrics `top` cap and the `orderby` token
 
 The storage analyzer asks for `Transactions` split by `ApiName` with
-`top=200` and `orderby=sum desc` (`internal/storage/metrics.go`). If Azure
-caps `top` lower, or rejects `sum`, the analyzer is reading a truncated or a
-refused answer.
+`top=200` and `orderby=Total desc` (`internal/storage/metrics.go`). It asked
+for `sum desc` until this test showed Azure refuses it. If Azure caps `top`
+lower, the analyzer is reading a truncated answer.
 
 ```sh
 SA=$(az storage account create -g "$RG" -n "azcid$RANDOM" --sku Standard_LRS --query id -o tsv)
@@ -188,11 +188,15 @@ the report boundary's sanitizer; read the files before committing them anyway.
 
 | test | date | outcome (paste what Azure answered) | rule changed | pull request |
 |---|---|---|---|---|
-| H1 | | | | |
+| H1 | 2026-09-24 | `sum desc`: `(BadRequest) Detected invalid Aggregation type: sum`, for `top=200` and `top=1000`. `Total desc`: 4 series for both. | M1 orders by `Total desc`; `topMax` stays 200 | this one |
 | H5 | | | | |
-| H7 | | | | |
-| H11 | | | | |
+| H7 | 2026-09-24 | storage account: `write` `Started`, `Accepted` (statusCode `Accepted`), `Succeeded` with no sub-status. Plan: `Started`, `Succeeded` with `OK`. No `Created` on either. | none: source 3 already falls through for both | this one |
+| H11 | 2026-09-24 | after five `check`s: `ListShares` 9, `ListContainers` 6, `ListQueues` 6, `QueryTables` 6 | none: all four are ENUMERATE, which is not activity; the `TransactionType` split is still to read | this one |
 | H17 | | | | |
 | H9 | | | | |
 | T25b | | | | |
 | H10 | | | | |
+
+The same run found that Azure refuses an Activity Log query starting more
+than 90 days before now, which a 90-day window ending at today's 00:00Z
+always does. The history window is 89 days since (SPEC section 11).

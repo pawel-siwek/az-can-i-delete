@@ -381,3 +381,33 @@ func event(ts time.Time, operation, status, caller, callerType string) collect.A
 func deployment(ts time.Time, status string, outputs ...string) age.Deployment {
 	return age.Deployment{Timestamp: ts, Status: status, OutputResources: outputs}
 }
+
+// Azure keeps the Activity Log for 90 days before now and refuses a query that
+// starts earlier. The cutoff is today's 00:00Z, so a query that went back 90
+// days from it started up to a day past that edge, and every live run got a
+// 400 (found by the first end-to-end run). Whatever the time of day, the
+// history query has to start inside what Azure still keeps.
+func TestTheHistoryQueryStartsInsideTheLogsRetention(t *testing.T) {
+	h := newHarness()
+	var asked []verdict.Window
+	h.log.EventsFunc = func(_ context.Context, _ string, window verdict.Window) (collect.ActivityLog, error) {
+		asked = append(asked, window)
+		return collect.ActivityLog{Days: window.Days}, nil
+	}
+	h.run(t)
+	if len(asked) == 0 {
+		t.Fatal("the Activity Log was not read")
+	}
+	latestNow := cutoff.Add(24*time.Hour - time.Second)
+	for _, window := range asked {
+		if window.Start.Before(latestNow.AddDate(0, 0, -90)) {
+			t.Errorf("query starts %s, older than the 90 days Azure keeps before %s", window.Start, latestNow)
+		}
+		if !window.End.Equal(cutoff) || window.Days != int(window.End.Sub(window.Start)/(24*time.Hour)) {
+			t.Errorf("window = %+v, want whole days ending at the cutoff", window)
+		}
+	}
+	if asked[0].Days != age.LogDays {
+		t.Errorf("history covers %d days, want %d", asked[0].Days, age.LogDays)
+	}
+}

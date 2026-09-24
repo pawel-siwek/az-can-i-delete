@@ -800,3 +800,26 @@ func containerList(names ...string) func(context.Context, string, string) ([]col
 		return items, nil
 	}
 }
+
+// Azure Monitor names the aggregation in orderby, and refuses `sum desc` with
+// "Detected invalid Aggregation type: sum" (day-1 test H1). A refused M1 left
+// every storage metric signal unknown on a live account.
+func TestTheOperationSplitIsOrderedByTheAggregationAzureAccepts(t *testing.T) {
+	h := newHarness()
+	var orders []string
+	h.metrics.MetricsFunc = func(_ context.Context, query collect.MetricQuery) (collect.MetricResult, error) {
+		if query.OrderBy != "" {
+			orders = append(orders, query.OrderBy)
+		}
+		return collect.MetricResult{}, nil
+	}
+	h.run(t)
+	if len(orders) == 0 {
+		t.Fatal("no metric call asked for an order")
+	}
+	for _, order := range orders {
+		if order != "Total desc" {
+			t.Errorf("orderby = %q, want %q", order, "Total desc")
+		}
+	}
+}
