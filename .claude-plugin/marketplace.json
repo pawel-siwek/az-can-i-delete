@@ -1,0 +1,13 @@
+{
+  "name": "az-can-i-delete",
+  "owner": {
+    "name": "pawel-siwek"
+  },
+  "plugins": [
+    {
+      "name": "az-can-i-delete",
+      "source": "./.github/plugins/az-can-i-delete",
+      "description": "Deterministic pre-flight before deleting an Azure resource"
+    }
+  ]
+}

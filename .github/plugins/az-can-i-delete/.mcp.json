@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "az-can-i-delete": {
+      "type": "stdio",
+      "command": "az-can-i-delete",
+      "args": ["mcp"]
+    }
+  }
+}

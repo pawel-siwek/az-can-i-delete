@@ -264,6 +264,22 @@ binary without `version`; a tag can be moved, a commit cannot.
 While this repository is private, a workflow in another repository can use
 the action only if the repository's Actions access setting allows it.
 
+## From an agent
+
+`az-can-i-delete mcp` serves the two read-only tools over stdio. As a Claude
+Code plugin, the server and a skill telling the agent to call `can_i_delete`
+before any deletion — and never to delete on `no` or `tentative` — install
+together:
+
+```
+/plugin marketplace add pawel-siwek/az-can-i-delete
+/plugin install az-can-i-delete@az-can-i-delete
+```
+
+The plugin runs the `az-can-i-delete` binary on your PATH; install a release
+first, as above. Any other MCP client takes the same command:
+`{"mcpServers":{"az-can-i-delete":{"type":"stdio","command":"az-can-i-delete","args":["mcp"]}}}`.
+
 ## Exit codes
 
 | Code | Meaning |
