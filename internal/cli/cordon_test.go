@@ -84,6 +84,12 @@ func TestCordonShowsThePlanAndWritesNothingWithoutYes(t *testing.T) {
 	if code != 0 || errOut != "" || !strings.Contains(out, "CORDON PLAN (publicNetworkAccess Enabled → Disabled)\n    resource "+testTarget) || !strings.Contains(out, "nothing was written") {
 		t.Fatalf("dry run: code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
+	// Seen live: the untrusted-text filter read the timestamp's "T12:" as a
+	// URL scheme and hid the whole tag. The tag is this tool's own grammar.
+	if !strings.Contains(out, "state tag azcid=v=1;m=pna;t=2026-09-21T12:00:00Z;by=0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9;p=Enabled;w=7") ||
+		strings.Contains(out, "URL omitted") {
+		t.Fatalf("the plan did not show the tag:\n%s", out)
+	}
 	code, out, errOut = run(t, deps, "cordon", testTarget, "-o", "table")
 	if code != 1 || !strings.Contains(out, "CORDON PLAN") || !strings.Contains(errOut, "pass --yes") {
 		t.Fatalf("no --yes: code=%d stdout=%q stderr=%q", code, out, errOut)
