@@ -223,3 +223,71 @@ func (c *armClient) Deployments(ctx context.Context, resourceGroupID string, top
 	}
 	return deployments, nil
 }
+
+type createdBody struct {
+	ID          string `json:"id"`
+	CreatedTime string `json:"createdTime"`
+}
+
+// CreatedTime asks ARM's resource list for the resource's creation time. A GET
+// of a site, a plan or a network resource carries no systemData, but the list
+// with $expand=createdTime answers for every type; without it such a resource
+// had no age source at all when the Activity Log held nothing about it.
+func (c *armClient) CreatedTime(ctx context.Context, resourceID string) (*time.Time, error) {
+	// Every path below that ends without a time is a failure. The resource
+	// was just read through ARM, so a list that does not return it, or
+	// returns it without a creation time, has not answered the question.
+	unread := &collect.Failure{ErrorCode: "CreatedTimeNotReturned",
+		Message: "ARM's resource list did not return a creation time for a resource that exists"}
+	group, name, ok := groupAndName(resourceID)
+	if !ok {
+		return nil, unread
+	}
+	query := url.Values{
+		"api-version": {rules.MustOperation("resources")},
+		"$filter":     {"name eq '" + strings.ReplaceAll(name, "'", "''") + "'"},
+		"$expand":     {"createdTime"},
+	}
+	bodies, complete, err := list[createdBody](ctx, c.client, group+"/resources", query)
+	if err != nil {
+		return nil, err
+	}
+	for _, body := range bodies {
+		if !strings.EqualFold(body.ID, resourceID) {
+			continue
+		}
+		if body.CreatedTime == "" {
+			return nil, unread
+		}
+		created, err := time.Parse(time.RFC3339, body.CreatedTime)
+		if err != nil {
+			// A value that cannot be read is not an absent one.
+			return nil, &collect.Failure{ErrorCode: "UnreadableCreatedTime",
+				Message: "ARM returned a createdTime that is not an RFC 3339 time"}
+		}
+		created = created.UTC()
+		return &created, nil
+	}
+	if !complete {
+		return nil, collect.ErrTruncated
+	}
+	return nil, unread
+}
+
+// groupAndName splits an ARM id into its resource group and the name the
+// resource list uses, which for a child resource joins the names with a slash
+// (a slot is "site/slot").
+func groupAndName(resourceID string) (string, string, bool) {
+	parts := strings.Split(strings.Trim(resourceID, "/"), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if !strings.EqualFold(parts[i], "providers") || i < 4 || i+3 >= len(parts) {
+			continue
+		}
+		var names []string
+		for j := i + 3; j < len(parts); j += 2 {
+			names = append(names, parts[j])
+		}
+		return "/" + strings.Join(parts[:4], "/"), strings.Join(names, "/"), true
+	}
+	return "", "", false
+}

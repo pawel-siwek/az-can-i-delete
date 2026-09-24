@@ -383,6 +383,11 @@ can be traced back to the build that produced it.
 order. The 66-case acceptance table of `docs/SPEC.md` appendix B is the test
 suite for the verdict rules and must stay green before any analyzer work.
 
+No test reaches Azure, so what the tests cannot show is what Azure actually
+answers. [`docs/live-findings.md`](docs/live-findings.md) lists what the
+first runs against a live subscription found, what changed for each finding
+and why.
+
 ## How a change is reviewed
 
 The decisions a change is not free to reverse in passing are written down as

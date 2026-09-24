@@ -2,7 +2,9 @@ package generic_test
 
 import (
 	"context"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -409,5 +411,75 @@ func TestTheHistoryQueryStartsInsideTheLogsRetention(t *testing.T) {
 	}
 	if asked[0].Days != age.LogDays {
 		t.Errorf("history covers %d days, want %d", asked[0].Days, age.LogDays)
+	}
+}
+
+// A resource ARM can read but Resource Graph cannot has two explanations. For
+// one created today the likely one is the graph's indexing delay, and the
+// fifth end-to-end run's advice to grant Reader was wrong for it.
+func TestAResourceCreatedTodayIsNotBlamedOnPermissions(t *testing.T) {
+	h := newHarness()
+	h.graph.Answers = nil
+	h.props = map[string]any{"creationTime": cutoff.Add(2 * time.Hour).Format(time.RFC3339)}
+	fresh := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if fresh.Unknown == nil || !strings.Contains(fresh.Unknown.Message, "created today") {
+		t.Fatalf("fresh resource unknown = %+v, want the indexing delay named", fresh.Unknown)
+	}
+
+	h.props = map[string]any{"creationTime": cutoff.AddDate(0, 0, -100).Format(time.RFC3339)}
+	old := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if old.Unknown == nil || !strings.Contains(old.Unknown.Message, "lacks Reader") ||
+		!strings.Contains(old.Unknown.Message, "indexing delay") {
+		t.Fatalf("old resource unknown = %+v, want both causes named", old.Unknown)
+	}
+}
+
+// Source 1 falls back to ARM's own creation time when the resource's GET has
+// none, and asks for it only then.
+func TestARMsCreationTimeDatesAResourceWhoseGetCarriesNone(t *testing.T) {
+	h := newHarness()
+	asked := 0
+	created := cutoff.AddDate(0, 0, -45)
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) {
+		asked++
+		return &created, nil
+	}
+	result := h.run(t)
+	if result.Age.Confidence != "verified" || result.Age.Source != "rp.timestamp" || result.Age.LowerBoundDays != 45 {
+		t.Fatalf("age = %+v, want verified 45 days from ARM's creation time", result.Age)
+	}
+
+	asked = 0
+	h.props = map[string]any{"creationTime": cutoff.AddDate(0, 0, -400).Format(time.RFC3339)}
+	result = h.run(t)
+	if asked != 0 || result.Age.LowerBoundDays != 400 {
+		t.Errorf("asked ARM %d times, age %+v; want the GET's own timestamp and no extra call", asked, result.Age)
+	}
+}
+
+// A failed read of ARM's creation time is not "ARM has none". With an empty,
+// complete log, source 6 would otherwise call a resource that may be minutes
+// old at least 89 days old.
+func TestAFailedCreationTimeReadStopsTheNoEventsInference(t *testing.T) {
+	h := newHarness()
+	h.log.Log = collect.ActivityLog{Days: age.LogDays}
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) {
+		return nil, &collect.Failure{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"}
+	}
+	if got := h.run(t).Age; got.Source == "activitylog.no-events" {
+		t.Fatalf("age = %+v, want no inference from a history whose creation time could not be read", got)
+	}
+}
+
+// A site, plan or NSG has no creation time on its GET; the indexing-delay
+// wording has to use ARM's createdTime for them as well.
+func TestARMsCreationTimeAlsoNamesTheIndexingDelay(t *testing.T) {
+	h := newHarness()
+	h.graph.Answers = nil
+	created := cutoff.Add(3 * time.Hour)
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) { return &created, nil }
+	got := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if got.Unknown == nil || !strings.Contains(got.Unknown.Message, "created today") {
+		t.Fatalf("unknown = %+v, want the indexing delay named from ARM's creation time", got.Unknown)
 	}
 }

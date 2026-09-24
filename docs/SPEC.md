@@ -84,8 +84,11 @@ evidence ID. They are not implemented or executed at this checkpoint.
 
 Age sources in strict order:
 
-1. RP timestamp of the current object: verified. One after the cutoff means
-   the object was created since the cutoff: verified, lower bound 0.
+1. RP timestamp of the current object: verified. It is the GET's own
+   `systemData.createdAt` or creation property, or, for a type whose GET
+   carries none, the `createdTime` ARM's resource list returns for it. One
+   after the cutoff means the object was created since the cutoff: verified,
+   lower bound 0.
 2. Resource Changes Create: verified, or bounded for a move.
 3. Earliest successful Activity Log write with Created marker: verified.
 4. Oldest applicable deployment timestamp: bounded.
@@ -96,7 +99,10 @@ Age sources in strict order:
 
 Before sources 2-5, discard observations at or before the last successful
 Activity Log delete or Resource Changes Delete for the same case-folded ID.
-Source 6 is unavailable after such a delete, and when any observation of the
+Source 6 is unavailable after such a delete, when the current object's
+creation time could not be read (a failed read, or a resource list that does
+not return an object ARM just served, is not an absent time), and
+when any observation of the
 current object (RP timestamp, Resource Changes Create, Activity Log event or
 deployment) falls after the cutoff: the log ends at the cutoff, so zero events
 in it is also what an object created after the cutoff shows. Failed/Started/Accepted events
@@ -1293,6 +1299,7 @@ type Cordoner interface { Preflight(ctx, Target, Opts) (Plan, []Refusal, error);
 | `network` | `2026-01-01` |
 | `locks` | `2020-05-01` |
 | `tags` | `2025-04-01` |
+| `resources` (list with `$expand=createdTime`, age source 1) | `2025-04-01` |
 | `deployments` | `2026-06-01` |
 | `roleAssignments` / `denyAssignments` | `2022-04-01` |
 | `arg` | `2024-04-01` |
@@ -1411,20 +1418,34 @@ Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
   `Started` → `Succeeded` with `OK`. Source 3 finds nothing for them and the
   chain already falls through to sources 4 and 5, which is what the rule
   change asks for; no code changes. A site created by CLI shows the same
-  as the plan (second run). All three have a better source anyway: their
-  `systemData.createdAt` is source 1.
-- **Objects created after the cutoff, found by the second run.** A storage
+  as the plan (third run). All three have a better source anyway, source 1:
+  the storage account's own creation time, and for the plan and site the
+  `createdTime` ARM's resource list keeps (fifth run, below).
+- **Objects created after the cutoff, found by the third run, the first built from `main`.** A storage
   account, plan, site and NSG created minutes before the check were each
   reported `inferred` 89 days old by source 6: the log ends at the cutoff,
   so it held nothing about them, and their `systemData.createdAt`, after the
   cutoff, was discarded as undatable. Source 6 is now unavailable when any
   observation of the current object falls after the cutoff (section 2.1),
   and their silence is not claimed over 30 days they did not exist for. The
-  fourth run confirmed it, and showed their age as `unknown` although each
-  had a `systemData.createdAt` after the cutoff. That timestamp says the
-  object is less than a day old, so source 1 now answers `verified`, lower
+  fourth run confirmed it, and showed the storage account's age as `unknown`
+  although it had a `systemData.createdAt` after the cutoff. That timestamp
+  says the object is less than a day old, so source 1 now answers `verified`, lower
   bound 0: the verdict stays `tentative`, for `window.too-short-for-yes`,
-  which says why, instead of `age.unknown`, which suggested a failed read. The verdict was `tentative` before and after; what was
+  which says why, instead of `age.unknown`, which suggested a failed read.
+- **The fifth run.** Sites, plans and NSGs still had no age source: their GET
+  carries no `systemData`. Source 1 now also reads the `createdTime` ARM's
+  resource list keeps for every type (section 2.1). The same run checked a
+  storage account minutes after creating it, before Resource Graph had
+  indexed it, and its graph-backed signals advised granting Reader. Section
+  3.1's `unknown(permission)` stays, but the reason now names both causes,
+  and the indexing delay first for a resource created since the cutoff.
+  With source 1 answering for every type, or failing and so making the
+  history incomplete, source 6 is no longer reached on a live run. It stays in
+  the chain, and in the pure age tests, for a history that reaches the engine
+  without a creation time.
+
+Every live finding, what changed for it and why is in `docs/live-findings.md`. The verdict was `tentative` before and after; what was
   wrong was the age it printed and the timed silence it computed.
 - **Site configuration budgets, same run.** Nine site signals were read in
   one sequence under one 20 s call budget, and one slow call on a fresh F1

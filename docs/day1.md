@@ -190,7 +190,7 @@ the report boundary's sanitizer; read the files before committing them anyway.
 |---|---|---|---|---|
 | H1 | 2026-09-24 | `sum desc`: `(BadRequest) Detected invalid Aggregation type: sum`, for `top=200` and `top=1000`. `Total desc`: 4 series for both. | M1 orders by `Total desc`; `topMax` stays 200 | this one |
 | H5 | | | | |
-| H7 | 2026-09-24 | storage account: `write` `Started`, `Accepted` (statusCode `Accepted`), `Succeeded` with no sub-status. Plan and site (second run): `Started`, `Succeeded` with `OK`. No `Created` on any of them. | none: source 3 already falls through for both | this one |
+| H7 | 2026-09-24 | storage account: `write` `Started`, `Accepted` (statusCode `Accepted`), `Succeeded` with no sub-status. Plan and site (third run): `Started`, `Succeeded` with `OK`. No `Created` on any of them. | none: source 3 already falls through for both | this one |
 | H11 | 2026-09-24 | after five `check`s: `ListShares` 9, `ListContainers` 6, `ListQueues` 6, `QueryTables` 6 | none: all four are ENUMERATE, which is not activity; the `TransactionType` split is still to read | this one |
 | H17 | | | | |
 | H9 | | | | |
@@ -200,3 +200,6 @@ the report boundary's sanitizer; read the files before committing them anyway.
 The same run found that Azure refuses an Activity Log query starting more
 than 90 days before now, which a 90-day window ending at today's 00:00Z
 always does. The history window is 89 days since (SPEC section 11).
+
+Everything the live runs found, including what no day-1 test asked about, is
+in `docs/live-findings.md`.

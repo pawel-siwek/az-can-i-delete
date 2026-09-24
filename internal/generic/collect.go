@@ -222,12 +222,33 @@ func probeGraph(ctx context.Context, in Input) graphProbe {
 		// The caller read the resource through ARM, so it exists. No Resource
 		// Graph row means the caller lacks subscription-scope Reader or the
 		// resource is younger than the graph's ingestion delay.
-		unknown := &verdict.Unknown{Code: verdict.UnkPermission,
-			Message: "the target is not visible in Resource Graph, so no graph-backed signal could be collected"}
+		unknown := notVisible(ctx, in)
 		return graphProbe{evidence: absent(SignalARGVisible), unknown: unknown}
 	default:
 		return graphProbe{visible: true, evidence: present(SignalARGVisible, map[string]any{"rowCount": len(rows.Rows)})}
 	}
+}
+
+// notVisible names both reasons a resource ARM can read may be missing from
+// Resource Graph. A resource created since the cutoff leads with the indexing
+// delay: the end-to-end runs saw one checked minutes after it was created, and
+// "grant Reader" was the wrong advice for it.
+func notVisible(ctx context.Context, in Input) *verdict.Unknown {
+	created := rpTimestamp(in.Resource)
+	if created == nil && in.Clients.ARM != nil {
+		// The same fallback as source 1, for the types whose GET carries no
+		// creation time. Only the wording depends on it: when it cannot be
+		// read, the reason names both causes, which is true either way.
+		if fromARM, err := in.Clients.ARM.CreatedTime(ctx, in.Target.ID); err == nil {
+			created = fromARM
+		}
+	}
+	if created != nil && created.After(in.Cutoff) {
+		return &verdict.Unknown{Code: verdict.UnkPermission,
+			Message: "the target is not visible in Resource Graph yet: it was created today, and Resource Graph indexes a new resource minutes after it exists; if this persists, the caller lacks Reader at subscription scope"}
+	}
+	return &verdict.Unknown{Code: verdict.UnkPermission,
+		Message: "the target is not visible in Resource Graph: the caller lacks Reader at subscription scope, or the resource is newer than Resource Graph's indexing delay"}
 }
 
 // graph is the shared bounded Resource Graph runner for this target.
@@ -440,6 +461,7 @@ type historyGroup struct {
 	changesRead bool
 	truncated   bool
 	callers     []string
+	created     *time.Time
 }
 
 func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]verdict.Evidence, error) {
@@ -455,9 +477,19 @@ func (g *historyGroup) run(in Input, probe graphProbe) func(context.Context) ([]
 				g.callers = append(g.callers, event.Caller)
 			}
 		}
+		// A GET without systemData leaves source 1 empty; ARM's own record of
+		// the creation time fills it. A failed read is not "ARM has none": it
+		// is treated like a failed change history, which makes the history
+		// incomplete, so source 6 cannot call a resource that may be minutes
+		// old at least 89 days old. Sources 2 to 5 still apply; each is a
+		// lower bound from something that did happen.
+		var createdErr error
+		if rpTimestamp(in.Resource) == nil && in.Clients.ARM != nil {
+			g.created, createdErr = in.Clients.ARM.CreatedTime(ctx, in.Target.ID)
+		}
 		changes, changesErr := resourceChanges(ctx, in, probe)
 		g.changes, g.changesRead = changes, changesErr == nil
-		g.truncated = log.Truncated || changesErr != nil
+		g.truncated = log.Truncated || changesErr != nil || createdErr != nil
 		recent, writes := activityEvidence(log, in.Cutoff)
 		return []verdict.Evidence{recent, writes}, nil
 	}
@@ -474,7 +506,7 @@ func resolveAge(in Input, history historyGroup, deployments []collect.Deployment
 	return age.ResolveAge(age.Input{
 		ResourceID:           in.Target.ID,
 		Cutoff:               in.Cutoff,
-		RPTimestamp:          rpTimestamp(in.Resource),
+		RPTimestamp:          creationTime(in.Resource, history.created),
 		ActivityLog:          history.log.AgeEvents(),
 		ResourceChanges:      history.changes,
 		Deployments:          normalized,
@@ -509,6 +541,15 @@ func resourceChanges(ctx context.Context, in Input, probe graphProbe) ([]age.Res
 		})
 	}
 	return changes, nil
+}
+
+// creationTime is source 1: the resource's own creation timestamp when its GET
+// carries one, otherwise the one ARM records for it.
+func creationTime(resource collect.Resource, fromARM *time.Time) *time.Time {
+	if own := rpTimestamp(resource); own != nil {
+		return own
+	}
+	return fromARM
 }
 
 // rpTimestamp reads the resource provider's own creation timestamp when the

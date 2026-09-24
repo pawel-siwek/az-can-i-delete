@@ -388,7 +388,7 @@ func TestPoliciesCoverEverySignal(t *testing.T) {
 	}
 }
 
-// Every configuration read has its own budget: the first end-to-end run lost
+// Every configuration read has its own budget: the third end-to-end run lost
 // nine signals to one slow call, because they were read in one sequence under
 // one call budget. A failing sub-resource leaves only its own signal unknown.
 func TestOneFailingConfigurationReadLeavesTheOthersRead(t *testing.T) {

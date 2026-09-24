@@ -36,6 +36,10 @@ operations:
   # resource writes and removes the azcid tag, and checkPolicyRestrictions is
   # asked what policy would do to the uncordon (SPEC section 4).
   tags: "2025-04-01"
+  # Resources - List By Resource Group with $expand=createdTime: the creation
+  # time ARM keeps for every resource type, read when the resource's own GET
+  # carries none (the age chain's source 1).
+  resources: "2025-04-01"
   policyInsights: "2024-10-01"
   # The storage data-plane REST version the opt-in prefix walk speaks. It is
   # not a control-plane api-version, but it is a version this tool pins and
