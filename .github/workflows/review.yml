@@ -77,9 +77,25 @@ jobs:
       # Optional on purpose. Without the app the reviewer still reviews, as
       # `github-actions[bot]`; a missing identity is not a reason to say
       # nothing.
+      # Whether the identity can be used at all. A run Dependabot triggers
+      # gets no repository secrets, so the key is empty while the app id, a
+      # variable, is not; minting a token then crashes the job. The secret can
+      # only be tested in a step, never in an `if:` (see internal/conformance).
+      - name: Is Saruman's identity available
+        id: identity
+        env:
+          APP_ID: ${{ vars.SARUMAN_APP_ID }}
+          KEY: ${{ secrets.SARUMAN_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APP_ID" ] && [ -n "$KEY" ]; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Speak as Saruman
         id: saruman
-        if: vars.SARUMAN_APP_ID != ''
+        if: steps.identity.outputs.yes == 'true'
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.SARUMAN_APP_ID }}
@@ -90,8 +106,15 @@ jobs:
         env:
           ENDPOINT: ${{ vars.AZURE_AI_ENDPOINT }}
           CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          ACTOR: ${{ github.actor }}
         run: |
-          if [ -n "$ENDPOINT" ] && [ -n "$CLIENT" ]; then
+          # Dependabot's runs get a read-only token and no federated identity,
+          # so the model cannot be reached nor a review posted. Saying so is
+          # the honest outcome; crashing on the login is not.
+          if [ "$ACTOR" = "dependabot[bot]" ]; then
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::A Dependabot run cannot reach the model, so no judgement was made. The drift check still decides; a human reviews the dependency."
+          elif [ -n "$ENDPOINT" ] && [ -n "$CLIENT" ]; then
             echo "yes=true" >> "$GITHUB_OUTPUT"
           else
             echo "yes=false" >> "$GITHUB_OUTPUT"

@@ -7,6 +7,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # golang.org/x releases now require Go 1.26, and taking one rewrites the
+    # module's go directive. REQUIREMENTS section 7 pins Go 1.25, so they wait
+    # for that pin to move rather than arriving as a bump that changes it.
+    ignore:
+      - dependency-name: "golang.org/x/*"
     groups:
       azure-sdk:
         patterns: ["github.com/Azure/*", "github.com/AzureAD/*"]
