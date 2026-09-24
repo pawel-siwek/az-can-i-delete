@@ -269,10 +269,17 @@ the action only if the repository's Actions access setting allows it.
 `az-can-i-delete mcp` serves the two read-only tools over stdio. As a Claude
 Code plugin, the server and a skill telling the agent to call `can_i_delete`
 before any deletion — and never to delete on `no` or `tentative` — install
-together:
+together — from a clone you pinned to a release tag that carries the plugin
+(v0.4.1 or later) and read, never from a branch resolved at install time
+(ADR-0014):
+
+```sh
+git clone --depth 1 --branch v0.4.1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid-plugin
+git -C ~/src/azcid-plugin log -1 --format=%H    # the commit you are about to trust; read the plugin under .github/plugins/
+```
 
 ```
-/plugin marketplace add pawel-siwek/az-can-i-delete
+/plugin marketplace add ~/src/azcid-plugin
 /plugin install az-can-i-delete@az-can-i-delete
 ```
 
