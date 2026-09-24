@@ -78,6 +78,8 @@ const (
 	CaveatHistory = "the azcid tag is missing; this state comes from the local history file, which only knows what this machine did"
 	CaveatCorrupt = "the azcid tag does not parse, so the prior state is unknown and is not guessed; restore it by hand (az storage account update --public-network-access Enabled, or az webapp start)"
 	CaveatBefore  = "metrics older than 93 days are not retained; totals cover only the retained part of the cordon"
+	// CaveatTooYoung is formatted with the time the first total can exist.
+	CaveatTooYoung = "no whole hour has ended since the hour the cordon was applied, so there are no totals yet; the first is readable after %s"
 )
 
 // NotBlocked is printed with a cordon's plan and its status: what the
@@ -321,12 +323,21 @@ func (r Reader) activity(ctx context.Context, target armid.Target, mode Mode, si
 		return
 	}
 	status.Caveats = append(status.Caveats, CaveatOwnHour)
-	start := since
-	if now.Sub(start) > metricRetention {
-		start = now.Add(-metricRetention)
+	// Whole hours only, from the first one after the cordon's own to the
+	// last one that has ended. Azure Monitor refuses a timespan shorter than
+	// its interval, and a cordon a few minutes old asked for exactly that; a
+	// partly elapsed hour would be a partial total besides.
+	start := since.UTC().Truncate(time.Hour).Add(time.Hour)
+	end := now.UTC().Truncate(time.Hour)
+	if !end.After(start) {
+		status.Caveats = append(status.Caveats, fmt.Sprintf(CaveatTooYoung, start.Add(time.Hour).Format(time.RFC3339)))
+		return
+	}
+	if end.Sub(start) > metricRetention {
+		start = end.Add(-metricRetention)
 		status.Caveats = append(status.Caveats, CaveatBefore)
 	}
-	window := hourly(start, now)
+	window := hourly(start, end)
 	switch mode {
 	case ModePNA:
 		r.total(ctx, status, since, collect.MetricQuery{

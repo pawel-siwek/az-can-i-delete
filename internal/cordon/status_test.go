@@ -90,7 +90,8 @@ func TestStorageStatusCountsTheScreamsAfterTheOwnHour(t *testing.T) {
 	if status.Activity[1].Metric != "UsedCapacity" || status.Activity[1].Total != 150 {
 		t.Fatalf("growth = %+v", status.Activity[1])
 	}
-	if asked[0].Filter != "ResponseType eq '*' and TransactionType eq 'User'" || asked[0].Interval != "PT1H" || !asked[0].Window.Start.Equal(cordonedAt) {
+	if asked[0].Filter != "ResponseType eq '*' and TransactionType eq 'User'" || asked[0].Interval != "PT1H" || !asked[0].Window.Start.Equal(time.Date(2026, 9, 20, 11, 0, 0, 0, time.UTC)) ||
+		!asked[0].Window.End.Equal(time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)) {
 		t.Fatalf("query = %+v", asked[0])
 	}
 	if !contains(status.Caveats, CaveatStorage) || !contains(status.Caveats, CaveatOwnHour) {
@@ -314,4 +315,32 @@ func contains(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// A cordon minutes old has no whole hour after its own yet. Asking Azure
+// Monitor for less than one PT1H interval is refused, which read as
+// "the request was rejected" on a live account; now it says when the first
+// total will exist and asks nothing.
+func TestAYoungCordonAsksForNoTotalsYet(t *testing.T) {
+	asked := 0
+	metrics := &collecttest.Metrics{MetricsFunc: func(context.Context, collect.MetricQuery) (collect.MetricResult, error) {
+		asked++
+		return collect.MetricResult{}, nil
+	}}
+	status, err := Reader{ARM: account(map[string]string{TagKey: pnaTag}, "Disabled"), Metrics: metrics}.
+		Status(context.Background(), target(t, accountID), StatusOptions{Now: cordonedAt.Add(50 * time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asked != 0 || len(status.Unknowns) != 0 || len(status.Activity) != 0 {
+		t.Fatalf("asked %d, status %+v", asked, status)
+	}
+	want := "the first is readable after 2026-09-20T12:00:00Z"
+	found := false
+	for _, caveat := range status.Caveats {
+		found = found || strings.Contains(caveat, want)
+	}
+	if !found {
+		t.Fatalf("caveats = %v", status.Caveats)
+	}
 }

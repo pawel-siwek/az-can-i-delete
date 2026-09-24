@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/armid"
 	"github.com/pawel-siwek/az-can-i-delete/internal/assess"
@@ -112,8 +113,11 @@ type cordonReport struct {
 	Applied    bool   `json:"applied"`
 	DryRun     bool   `json:"dryRun"`
 	Prior      string `json:"prior"`
-	// Untrusted holds the tag this cordon writes. It is rendered by this
-	// tool, but a site's tag carries slot names, which are somebody's text.
+	// Tag is the azcid value this cordon writes, with each slot named by
+	// reference. Everything else in it is this tool's own grammar: a mode, a
+	// timestamp, an object id, a prior and a window.
+	Tag string `json:"tag"`
+	// Untrusted holds the slot names, which are somebody's text.
 	Untrusted    map[string]string `json:"untrusted"`
 	Verdict      string            `json:"verdict"`
 	ReasonClass  string            `json:"reasonClass"`
@@ -193,11 +197,36 @@ func planReport(plan cordon.Plan) cordonReport {
 		return values
 	}
 	return cordonReport{
-		ResourceID: plan.Target.ID, Mode: string(plan.Mode), Prior: plan.State.Prior, Untrusted: map[string]string{"tag": output.Untrusted(plan.Tag)},
+		ResourceID: plan.Target.ID, Mode: string(plan.Mode), Prior: plan.State.Prior,
+		Tag: referencedTag(plan.State), Untrusted: slotNames(plan.State),
 		Verdict: plan.Verdict, ReasonClass: plan.ReasonClass, Forced: orEmpty(plan.Forced),
 		Consumers: orEmpty(plan.Consumers), Acknowledged: orEmpty(plan.Acknowledged), Notes: orEmpty(plan.Notes),
 		NotBlocked: plan.NotBlocked,
 	}
+}
+
+// referencedTag renders the state the way the tag does, with slot names
+// replaced by slot1, slot2 and on. It is not run through the untrusted-text
+// filter, which would read the timestamp's "T10:" as a URL scheme and hide
+// the whole value; there is nothing in it that filter exists for.
+func referencedTag(state cordon.State) string {
+	value := fmt.Sprintf("v=1;m=%s;t=%s;by=%s;p=%s;w=%d", state.Mode, state.Since.UTC().Format(time.RFC3339), state.By, state.Prior, state.WindowDays)
+	for i, slot := range state.Slots {
+		sep := ","
+		if i == 0 {
+			sep = ";s="
+		}
+		value += fmt.Sprintf("%sslot%d:%s", sep, i+1, slot.State)
+	}
+	return value
+}
+
+func slotNames(state cordon.State) map[string]string {
+	names := map[string]string{}
+	for i, slot := range state.Slots {
+		names[fmt.Sprintf("slot%d", i+1)] = output.Untrusted(slot.Name)
+	}
+	return names
 }
 
 func renderCordon(cmd *cobra.Command, options *outputOptions, report cordonReport) error {
@@ -223,13 +252,19 @@ func renderCordon(cmd *cobra.Command, options *outputOptions, report cordonRepor
 			fmt.Fprintf(&b, "    %s\n", note)
 		}
 		fmt.Fprintf(&b, "    %s\n", report.NotBlocked)
-		b.WriteString("    state tag: see below\n")
+		fmt.Fprintf(&b, "    state tag azcid=%s\n", report.Tag)
 		if report.Applied {
 			fmt.Fprintf(&b, "\n    watch:  %s\n    undo:   %s\n", report.Status, report.Uncordon)
 		} else {
 			b.WriteString("\n    nothing was written\n")
 		}
-		fmt.Fprintf(&b, "\n    untrusted (may contain Azure names):\n      tag: azcid=%s\n", report.Untrusted["tag"])
+		if len(report.Untrusted) > 0 {
+			b.WriteString("\n    untrusted (Azure names; may contain anybody's text):\n")
+			for i := 1; i <= len(report.Untrusted); i++ {
+				ref := fmt.Sprintf("slot%d", i)
+				fmt.Fprintf(&b, "      %s: %s\n", ref, report.Untrusted[ref])
+			}
+		}
 		_, err := io.WriteString(w, b.String())
 		return err
 	})
