@@ -1385,14 +1385,15 @@ Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
 - **H1.** `orderby=sum desc` is refused with 400 "Detected invalid Aggregation
   type: sum"; `Total desc` is accepted with `top=200` and `top=1000`. M1's
   order is `Total desc` from here on. Before this change every live M1 was
-  refused, and every storage metric signal was `unknown(transient)`; the
+  refused, and every storage metric signal was `unknown(transient)` (a code
+  in the unknown-code list of section 1, `verdict.UnkTransient`); the
   unknowns were honest, but the storage analyzer could never reach `yes` or a
   metric `no`. No cap below 200 was seen, so `topMax` stays.
 - **Activity Log retention, found by the same run.** Azure keeps the Activity
   Log for 90 days before *now* and refuses a query that starts earlier. The
   cutoff is today's 00:00Z (ADR-0003), so a 90-day window ending at the cutoff
   starts up to a day past that edge: every history read was refused, and every
-  Activity Log signal was `unknown(transient)` while the 30-day cordon
+  Activity Log signal was `unknown(transient)`, never an absence, while the 30-day cordon
   pre-flight read, with the same query shape, succeeded. The longest complete
   log that ends at the cutoff is 89 whole days, so `activityLogDays`, the
   write-history signal and age source 6 are 89 days. The alternative, keeping
