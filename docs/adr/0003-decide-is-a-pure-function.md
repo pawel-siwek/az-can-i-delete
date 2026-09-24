@@ -24,6 +24,12 @@ Every caller has to decide what "now" means and say so, which is the
 honest version of the question. Fixture replay, the acceptance suite and a
 live run all exercise the same code path.
 
+The cutoff is a reference point, not a filter. Evidence dated after it is
+still evidence: a resource whose creation time falls after the cutoff was
+created since then and is less than a day old, a verified age of zero days.
+Discarding that timestamp made the age of every resource created on the day
+of the check `unknown` (found by the end-to-end runs of 2026-09-24).
+
 ## Enforcement
 
 `internal/verdict` imports neither `net/http` nor `time.Now`; the 66-case

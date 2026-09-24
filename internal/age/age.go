@@ -73,7 +73,14 @@ func ResolveAge(in Input) verdict.Age {
 	answer := func(ts time.Time, confidence, source string) verdict.Age {
 		return verdict.Age{LowerBoundDays: int(in.Cutoff.Sub(ts) / (24 * time.Hour)), Confidence: confidence, Source: source, Caveats: []string{}}
 	}
-	if in.RPTimestamp != nil && validTime(*in.RPTimestamp) {
+	if in.RPTimestamp != nil && !in.RPTimestamp.IsZero() {
+		// The resource provider's own creation time is the answer whenever it
+		// exists. One after the cutoff means the object was created since
+		// then: less than a day old, which is a verified age of zero days, not
+		// an unknown one.
+		if in.RPTimestamp.After(in.Cutoff) {
+			return verdict.Age{LowerBoundDays: 0, Confidence: "verified", Source: "rp.timestamp", Caveats: []string{}}
+		}
 		return answer(*in.RPTimestamp, "verified", "rp.timestamp")
 	}
 	var deleted time.Time

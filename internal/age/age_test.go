@@ -144,8 +144,6 @@ func TestAgeChainBoundaries(t *testing.T) {
 		}, 0, "unknown", "none"},
 		{"fractional-days-floor", func(in *Input) { ts := at(30).Add(time.Hour); in.RPTimestamp = &ts }, 29, "verified", "rp.timestamp"},
 		{"future-timestamps-do-not-date", func(in *Input) {
-			ts := at(-1)
-			in.RPTimestamp = &ts
 			in.ActivityLog = []ActivityEvent{event(-1, "read", "Succeeded")}
 			in.ResourceChanges = []ResourceChange{change(-1, "Create", "write")}
 			in.Deployments = []Deployment{deployment(-1)}
@@ -153,12 +151,16 @@ func TestAgeChainBoundaries(t *testing.T) {
 		// Found by the first end-to-end run: a storage account created minutes
 		// before the check was reported as inferred 89 days old, because the
 		// log ends at the cutoff and so held nothing about it.
-		{"created-after-cutoff-is-not-inferred-old", func(in *Input) {
+		// Found by the end-to-end runs: a resource created today has a
+		// creation time after the cutoff. It is less than a day old, and the
+		// resource provider says so: verified zero days, neither unknown nor
+		// inferred 89 days from a log that ends before it existed.
+		{"created-after-cutoff-is-verified-zero", func(in *Input) {
 			ts := cutoff.Add(20 * time.Hour)
 			in.RPTimestamp = &ts
 			in.ActivityLogSucceeded = true
 			in.ActivityLogDays = LogDays
-		}, 0, "unknown", "none"},
+		}, 0, "verified", "rp.timestamp"},
 		{"change-after-cutoff-is-not-inferred-old", func(in *Input) {
 			in.ResourceChanges = []ResourceChange{change(-1, "Create", "write")}
 			in.ActivityLogSucceeded = true
