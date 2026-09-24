@@ -33,6 +33,7 @@ type harness struct {
 	plan       map[string]any
 	functions  []collect.Resource
 	slots      []collect.Resource
+	slotsErr   error
 	graph      *collecttest.Graph
 	metrics    *collecttest.Metrics
 	generic    generic.Result
@@ -73,7 +74,7 @@ func (h *harness) arm() *collecttest.ARM {
 			case strings.HasSuffix(path, "/functions"):
 				return h.functions, nil
 			case strings.HasSuffix(path, "/slots"):
-				return h.slots, nil
+				return h.slots, h.slotsErr
 			default:
 				return nil, nil
 			}
@@ -384,5 +385,23 @@ func TestPoliciesCoverEverySignal(t *testing.T) {
 	}
 	if len(policies) != len(all) {
 		t.Errorf("the policy set has %d entries for %d signals", len(policies), len(all))
+	}
+}
+
+// Every configuration read has its own budget: the first end-to-end run lost
+// nine signals to one slow call, because they were read in one sequence under
+// one call budget. A failing sub-resource leaves only its own signal unknown.
+func TestOneFailingConfigurationReadLeavesTheOthersRead(t *testing.T) {
+	h := newHarness(siteID)
+	h.slotsErr = context.DeadlineExceeded
+	evidence := h.run(t)
+	if got := evidence[site.SignalSlots]; got.Status != verdict.StatusUnknown || got.Unknown == nil || got.Unknown.Code != verdict.UnkTimeout {
+		t.Fatalf("slots = %+v, want unknown(timeout)", got)
+	}
+	for _, id := range []string{site.SignalCustomDomain, site.SignalFronted, site.SignalHybrid,
+		site.SignalSourceControl, site.SignalCIActive, site.SignalAccessRestrict, site.SignalHostingClass, site.SignalWebTests} {
+		if evidence[id].Status == verdict.StatusUnknown {
+			t.Errorf("%s = unknown(%v), want it read despite the slots failure", id, evidence[id].Unknown)
+		}
 	}
 }

@@ -150,6 +150,20 @@ func TestAgeChainBoundaries(t *testing.T) {
 			in.ResourceChanges = []ResourceChange{change(-1, "Create", "write")}
 			in.Deployments = []Deployment{deployment(-1)}
 		}, 0, "unknown", "none"},
+		// Found by the first end-to-end run: a storage account created minutes
+		// before the check was reported as inferred 89 days old, because the
+		// log ends at the cutoff and so held nothing about it.
+		{"created-after-cutoff-is-not-inferred-old", func(in *Input) {
+			ts := cutoff.Add(20 * time.Hour)
+			in.RPTimestamp = &ts
+			in.ActivityLogSucceeded = true
+			in.ActivityLogDays = LogDays
+		}, 0, "unknown", "none"},
+		{"change-after-cutoff-is-not-inferred-old", func(in *Input) {
+			in.ResourceChanges = []ResourceChange{change(-1, "Create", "write")}
+			in.ActivityLogSucceeded = true
+			in.ActivityLogDays = LogDays
+		}, 0, "unknown", "none"},
 		{"truncated-positive-event-still-lower-bound", func(in *Input) {
 			in.ActivityLogTruncated = true
 			in.ActivityLog = []ActivityEvent{event(40, "read", "Succeeded")}

@@ -141,10 +141,37 @@ func ResolveAge(in Input) verdict.Age {
 		return answer(oldestEvent, "bounded", "activitylog.oldest-succeeded")
 	}
 	if in.ActivityLogSucceeded && !in.ActivityLogTruncated && in.ActivityLogDays >= LogDays &&
-		eventCount == 0 && deleted.IsZero() {
+		eventCount == 0 && deleted.IsZero() && !seenAfterCutoff(in) {
 		return verdict.Age{LowerBoundDays: LogDays, Confidence: "inferred", Source: "activitylog.no-events", Caveats: []string{}}
 	}
 	return unknown
+}
+
+// seenAfterCutoff reports an observation that dates the current object after
+// the cutoff. The log source 6 reads ends at the cutoff, so it cannot tell an
+// object nobody touched for 89 days from one that did not exist yet: a
+// resource created this morning has no events before midnight either.
+func seenAfterCutoff(in Input) bool {
+	after := func(ts time.Time) bool { return ts.After(in.Cutoff) }
+	if in.RPTimestamp != nil && after(*in.RPTimestamp) {
+		return true
+	}
+	for _, e := range in.ResourceChanges {
+		if strings.EqualFold(e.ResourceID, in.ResourceID) && e.ChangeType == "Create" && after(e.Timestamp) {
+			return true
+		}
+	}
+	for _, e := range in.ActivityLog {
+		if strings.EqualFold(e.ResourceID, in.ResourceID) && after(e.Timestamp) {
+			return true
+		}
+	}
+	for _, e := range in.Deployments {
+		if after(e.Timestamp) && slices.ContainsFunc(e.OutputResources, func(id string) bool { return strings.EqualFold(id, in.ResourceID) }) {
+			return true
+		}
+	}
+	return false
 }
 
 func earlier(a, b time.Time) time.Time {

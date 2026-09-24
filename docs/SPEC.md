@@ -95,7 +95,10 @@ Age sources in strict order:
 
 Before sources 2-5, discard observations at or before the last successful
 Activity Log delete or Resource Changes Delete for the same case-folded ID.
-Source 6 is unavailable after such a delete. Failed/Started/Accepted events
+Source 6 is unavailable after such a delete, and when any observation of the
+current object (RP timestamp, Resource Changes Create, Activity Log event or
+deployment) falls after the cutoff: the log ends at the cutoff, so zero events
+in it is also what an object created after the cutoff shows. Failed/Started/Accepted events
 never establish age; HTTP method is display-only. Identity fields are
 descriptive incarnation evidence, not an extra hidden verdict gate.
 
@@ -1406,8 +1409,23 @@ Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
   (`statusCode` `Accepted`) → `Succeeded` with no sub-status, the plan's
   `Started` → `Succeeded` with `OK`. Source 3 finds nothing for them and the
   chain already falls through to sources 4 and 5, which is what the rule
-  change asks for; no code changes. Both have a better source anyway: the
-  storage account's `creationTime` is source 1.
+  change asks for; no code changes. A site created by CLI shows the same
+  as the plan (second run). All three have a better source anyway: their
+  `systemData.createdAt` is source 1.
+- **Objects created after the cutoff, found by the second run.** A storage
+  account, plan, site and NSG created minutes before the check were each
+  reported `inferred` 89 days old by source 6: the log ends at the cutoff,
+  so it held nothing about them, and their `systemData.createdAt`, after the
+  cutoff, was discarded as undatable. Source 6 is now unavailable when any
+  observation of the current object falls after the cutoff (section 2.1), so
+  their age is `unknown` and their silence is not claimed over 30 days they
+  did not exist for. The verdict was `tentative` before and after; what was
+  wrong was the age it printed and the timed silence it computed.
+- **Site configuration budgets, same run.** Nine site signals were read in
+  one sequence under one 20 s call budget, and one slow call on a fresh F1
+  site left all nine `unknown(timeout)`. Each sub-resource read is now its
+  own call with its own budget (the per-call 20 s of appendix F), so a slow one
+  leaves only its own signal unknown.
 - **H11.** Five `check`s put `ListShares`, `ListContainers`, `ListQueues` and
   `QueryTables` into `Transactions`. All four are ENUMERATE (§3.4), which is
   not an activity class, so they neither break silence nor count as reads:
