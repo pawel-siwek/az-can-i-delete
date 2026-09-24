@@ -45,7 +45,7 @@ done; done
 | outcome | change |
 |---|---|
 | `sum desc` refused with 400 | the `OrderBy` in `internal/storage/metrics.go` becomes `Total desc` |
-| the series count stops at a cap below 200 | that cap becomes `Top`, and a full page is read as `unknown(partial)` on `storage.metrics.*` |
+| the series count stops at a cap below 200 | that cap becomes `Top`, and a full page is read as `unknown(partial)` on `storage.metrics.*` — the outcome SPEC section 11 names for H1, and a reason SPEC section 6 already lists (`unknown(timeout/partial/throttled)`, `verdict.UnkPartial`) |
 
 ## H5 — Always On and health checks in `Requests`
 
