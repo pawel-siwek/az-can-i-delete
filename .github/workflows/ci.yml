@@ -17,9 +17,9 @@ jobs:
     name: Build, vet and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -39,9 +39,9 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -63,18 +63,18 @@ jobs:
     name: Release build (snapshot)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
 
       # Building the release archives on every push means a broken release
       # configuration is found here rather than when a tag is pushed.
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -89,7 +89,7 @@ jobs:
           cp "$(find dist -type f -name az-can-i-delete | head -1)" snapshot/az-can-i-delete
           sha256sum snapshot/az-can-i-delete | tee snapshot/az-can-i-delete.sha256
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: az-can-i-delete-snapshot-linux-amd64
           path: snapshot/

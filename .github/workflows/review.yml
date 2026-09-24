@@ -20,12 +20,12 @@ jobs:
     name: Drift against the spec and the records
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The comparison needs both sides, so the whole history comes along.
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -54,11 +54,11 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0"
 
@@ -96,7 +96,7 @@ jobs:
       - name: Speak as Saruman
         id: saruman
         if: steps.identity.outputs.yes == 'true'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.SARUMAN_APP_ID }}
           private-key: ${{ secrets.SARUMAN_PRIVATE_KEY }}
@@ -123,7 +123,7 @@ jobs:
 
       # Federated credentials: the workflow proves who it is to Entra and gets
       # a short-lived token. No secret is stored anywhere.
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         if: steps.configured.outputs.yes == 'true'
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}

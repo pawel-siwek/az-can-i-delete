@@ -29,12 +29,12 @@ jobs:
     name: Build and publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # goreleaser needs the full history to build the changelog.
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -59,7 +59,7 @@ jobs:
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "$VERSION"
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
