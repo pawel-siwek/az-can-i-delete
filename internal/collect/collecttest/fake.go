@@ -78,10 +78,14 @@ func (c *ARM) Deployments(ctx context.Context, resourceGroupID string, top int) 
 	return c.DeploymentsFunc(ctx, resourceGroupID, top)
 }
 
-// CreatedTime returns the configured creation time, or none.
+// CreatedTime returns the configured creation time. Unlike the other hooks, a
+// nil one is not "found nothing": the live client never answers without a
+// time for a resource that exists (SPEC section 2.1), so an unconfigured fake
+// answers the way a failed read does.
 func (c *ARM) CreatedTime(ctx context.Context, resourceID string) (*time.Time, error) {
 	if c.CreatedFunc == nil {
-		return nil, nil
+		return nil, &collect.Failure{ErrorCode: "CreatedTimeNotReturned",
+			Message: "the fake was given no creation time"}
 	}
 	return c.CreatedFunc(ctx, resourceID)
 }

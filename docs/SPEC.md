@@ -1440,6 +1440,10 @@ Outcomes recorded so far (the answers Azure gave are in `docs/day1.md`):
   indexed it, and its graph-backed signals advised granting Reader. Section
   3.1's `unknown(permission)` stays, but the reason now names both causes,
   and the indexing delay first for a resource created since the cutoff.
+  With source 1 answering for every type, or failing and so making the
+  history incomplete, source 6 is no longer reached on a live run. It stays in
+  the chain, and in the pure age tests, for a history that reaches the engine
+  without a creation time.
 
 Every live finding, what changed for it and why is in `docs/live-findings.md`. The verdict was `tentative` before and after; what was
   wrong was the age it printed and the timed silence it computed.

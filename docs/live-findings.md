@@ -134,9 +134,14 @@ SPEC section 11, "Outcomes recorded so far".
   treated as "ARM has none": the resource was just read, so ARM has not
   answered. Like a failed change history, it
   marks the history incomplete, so source 6 cannot call a resource that may
-  be minutes old at least 89 days old. The review bot caught the first two
+  be minutes old at least 89 days old. The review bot caught the first three
   drafts of this: one dropped the error, the next still read a list without
-  the resource as "none" (ADR-0004).
+  the resource as "none", and the test fake still had a "none" answer the
+  live client never gives (ADR-0004).
+- **Consequence:** with source 1 answering for every type, or failing, source
+  6 ("a complete log with no events means at least 89 days old") is no
+  longer reached on a live run. It was the weakest source, `inferred`, and
+  never allowed `yes`.
 
 ## 9. A resource created minutes earlier was reported as a permission problem
 

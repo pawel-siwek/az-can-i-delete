@@ -469,11 +469,6 @@ func TestAFailedCreationTimeReadStopsTheNoEventsInference(t *testing.T) {
 	if got := h.run(t).Age; got.Source == "activitylog.no-events" {
 		t.Fatalf("age = %+v, want no inference from a history whose creation time could not be read", got)
 	}
-
-	h.arm.CreatedFunc = nil
-	if got := h.run(t).Age; got.Source != "activitylog.no-events" {
-		t.Fatalf("age = %+v, want the inference back once ARM answers that it has no creation time", got)
-	}
 }
 
 // A site, plan or NSG has no creation time on its GET; the indexing-delay
