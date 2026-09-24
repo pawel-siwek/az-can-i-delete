@@ -475,3 +475,16 @@ func TestAFailedCreationTimeReadStopsTheNoEventsInference(t *testing.T) {
 		t.Fatalf("age = %+v, want the inference back once ARM answers that it has no creation time", got)
 	}
 }
+
+// A site, plan or NSG has no creation time on its GET; the indexing-delay
+// wording has to use ARM's createdTime for them as well.
+func TestARMsCreationTimeAlsoNamesTheIndexingDelay(t *testing.T) {
+	h := newHarness()
+	h.graph.Answers = nil
+	created := cutoff.Add(3 * time.Hour)
+	h.arm.CreatedFunc = func(context.Context, string) (*time.Time, error) { return &created, nil }
+	got := byID(t, h.run(t))[generic.SignalRGManagedBy]
+	if got.Unknown == nil || !strings.Contains(got.Unknown.Message, "created today") {
+		t.Fatalf("unknown = %+v, want the indexing delay named from ARM's creation time", got.Unknown)
+	}
+}

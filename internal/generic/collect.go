@@ -222,7 +222,7 @@ func probeGraph(ctx context.Context, in Input) graphProbe {
 		// The caller read the resource through ARM, so it exists. No Resource
 		// Graph row means the caller lacks subscription-scope Reader or the
 		// resource is younger than the graph's ingestion delay.
-		unknown := notVisible(in)
+		unknown := notVisible(ctx, in)
 		return graphProbe{evidence: absent(SignalARGVisible), unknown: unknown}
 	default:
 		return graphProbe{visible: true, evidence: present(SignalARGVisible, map[string]any{"rowCount": len(rows.Rows)})}
@@ -233,8 +233,17 @@ func probeGraph(ctx context.Context, in Input) graphProbe {
 // Resource Graph. A resource created since the cutoff leads with the indexing
 // delay: the end-to-end runs saw one checked minutes after it was created, and
 // "grant Reader" was the wrong advice for it.
-func notVisible(in Input) *verdict.Unknown {
-	if created := rpTimestamp(in.Resource); created != nil && created.After(in.Cutoff) {
+func notVisible(ctx context.Context, in Input) *verdict.Unknown {
+	created := rpTimestamp(in.Resource)
+	if created == nil && in.Clients.ARM != nil {
+		// The same fallback as source 1, for the types whose GET carries no
+		// creation time. Only the wording depends on it: when it cannot be
+		// read, the reason names both causes, which is true either way.
+		if fromARM, err := in.Clients.ARM.CreatedTime(ctx, in.Target.ID); err == nil {
+			created = fromARM
+		}
+	}
+	if created != nil && created.After(in.Cutoff) {
 		return &verdict.Unknown{Code: verdict.UnkPermission,
 			Message: "the target is not visible in Resource Graph yet: it was created today, and Resource Graph indexes a new resource minutes after it exists; if this persists, the caller lacks Reader at subscription scope"}
 	}

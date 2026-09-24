@@ -149,7 +149,8 @@ SPEC section 11, "Outcomes recorded so far".
 - **What changed (this change):** the reason names both causes: the caller
   lacks Reader at subscription scope, or Resource Graph has not indexed the
   resource yet. For a resource created since the cutoff, it names the
-  indexing delay first.
+  indexing delay first, whether the creation time came from the resource's
+  own GET or from ARM's resource list.
 - **Why keep the code `permission`?** SPEC §3.1 maps a readable resource with
   no graph row to `unknown(permission)`. The signals stay `unknown` (ADR-0004);
   what changed is that the advice is no longer wrong.
