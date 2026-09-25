@@ -247,7 +247,7 @@ steps:
   - id: preflight
     uses: pawel-siwek/az-can-i-delete@<commit-sha>
     with:
-      version: v0.4.0      # the release binary to install, checked against its checksums
+      version: v0.4.1      # the release binary to install, checked against its checksums
       terraform-plan-json: tfplan.json
       fail-on: "no"        # or "tentative"
   # Optional: keep the full results.

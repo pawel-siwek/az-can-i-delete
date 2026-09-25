@@ -41,7 +41,7 @@ with Reader at subscription scope (`az login` is enough). Install a named
 release and check it against the release's checksums before running it:
 
 ```sh
-gh release download v0.4.0 -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -p checksums.txt -D /tmp/azcid
+gh release download v0.4.1 -R pawel-siwek/az-can-i-delete -p az-can-i-delete_linux_amd64 -p checksums.txt -D /tmp/azcid
 (cd /tmp/azcid && grep ' az-can-i-delete_linux_amd64$' checksums.txt | sha256sum -c -)
 install -m 0755 /tmp/azcid/az-can-i-delete_linux_amd64 ~/.local/bin/az-can-i-delete
 ```
