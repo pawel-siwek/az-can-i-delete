@@ -13,6 +13,7 @@
         },
         "tags": {
           "azcid-note": "REDACTED",
+          "env": "REDACTED",
           "owner": "REDACTED"
         },
         "type": "x"
