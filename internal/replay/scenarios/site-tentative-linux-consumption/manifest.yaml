@@ -1,0 +1,9 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/sites/fn-demo
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A Linux consumption function app, quiet everywhere, whose hosting class has no execution counter to clear it with
+expect:
+    verdict: tentative
+    reasonClass: inconclusive
+    reasons:
+        - site.metrics.function-executions

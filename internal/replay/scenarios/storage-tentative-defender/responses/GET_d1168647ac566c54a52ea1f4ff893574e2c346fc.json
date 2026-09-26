@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "properties": {
+      "isEnabled": true,
+      "malwareScanning": {
+        "onUpload": {
+          "capGBPerMonth": 5000,
+          "isEnabled": true
+        }
+      },
+      "sensitiveDataDiscovery": {
+        "isEnabled": true
+      }
+    }
+  }
+}

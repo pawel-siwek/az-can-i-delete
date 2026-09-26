@@ -1,5 +1,8 @@
 {
   "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
   "body": {
     "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/disks/disk-orphan",
     "location": "westeurope",

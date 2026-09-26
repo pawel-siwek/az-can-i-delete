@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/sademo",
+    "kind": "StorageV2",
+    "location": "westeurope",
+    "name": "sademo",
+    "properties": {
+      "allowSharedKeyAccess": false,
+      "creationTime": "2025-11-05T00:00:00Z",
+      "provisioningState": "Succeeded",
+      "publicNetworkAccess": "Enabled"
+    },
+    "sku": {
+      "name": "Standard_LRS",
+      "tier": "Standard"
+    },
+    "tags": {},
+    "type": "Microsoft.Storage/storageAccounts"
+  }
+}

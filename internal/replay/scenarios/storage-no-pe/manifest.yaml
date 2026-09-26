@@ -1,0 +1,11 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/sademo
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A storage account with an approved private endpoint and Network Watcher writing flow logs into it
+expect:
+    verdict: "no"
+    reasonClass: in-use
+    reasons:
+        - generic.pe.connections
+        - storage.flowlogs
+        - storage.pe.approved

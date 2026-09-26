@@ -47,7 +47,7 @@ files in `.github/instructions/`.
 | `internal/cli` — command tree, `check`, exit codes | `check`, `cordon`, `uncordon`, `status`, `mcp`, `patterns list`, `demo` and `version` implemented; `history` exits 1 as not implemented | flags, targets, multi-target exit codes, rendering, verdict exits, status in JSON and table, the refusal exit for an uncordonable type, the MCP server's configuration, the pattern list, cordon's dry run, its plan without `--yes`, cordon → status → uncordon end to end over a fake writer, the refused type and the window bounds |
 | `internal/azure` data-plane adapter and `--data-plane` | complete; **not exercised against a live tenant** | the prefix walk against a local blob endpoint: descent, the call budget, the delimiter, and a 403 classified as permission |
 | `internal/kb` — the storage name knowledge base | complete | the 79 entries with the section 9.3 corrections, loader validation, ordered matcher, examples, precedence, tier sanity, tag value rules; end to end through the storage analyzer |
-| Fixture replay (`--fixture`), `demo`, recording (`AZCID_RECORD`) | three scenarios recorded of the seven in SPEC 7.6; the recorder is wired into `check` but has not been run against a live subscription | every embedded scenario replayed end to end and held to its manifest; every string in every committed recording held to the report boundary's sanitizer; a miss proved to be an error rather than an empty answer; the recording command's refusals covered, its network half not |
+| Fixture replay (`--fixture`), `demo`, recording (`AZCID_RECORD`) | all seven scenarios of SPEC 7.6 recorded, each from a scenario source rather than from Azure; the recorder is wired into `check` but has not been run against a live subscription | every embedded scenario replayed end to end and held to its manifest; every string in every committed recording held to the report boundary's sanitizer; a miss proved to be an error rather than an empty answer; the recording command's refusals covered, its network half not; an instruction-shaped tag proved to move no verdict, in memory where the recorder's redaction cannot reach |
 | `internal/cordon` — `azcid` tag grammar, type gate, history, `status` | complete; **not exercised against a live tenant** | the ABNF cases (valid, wrong order, unknown key, bad prior, window bounds, slots, the 200-byte limit refusing three long slot names), the section 4.3 refusal strings, history append at 0600, newest-cordon lookup closed by an uncordon, a damaged line skipped; status: the own hour excluded, an unreadable or truncated counter as unknown rather than zero, a revert and its writer under `untrusted`, a damaged tag never interpreted, a tag of the wrong mode, every slot read, history only when asked; cordon: every pre-flight refusal in order with nothing written, what `--yes` and `--force` acknowledge, slots recorded in name order, the plan's tag; apply: state then tag then history, the undo when the tag is refused or removed, no undo of a concurrent foreign cordon (recorded with its owner), no undo on a timeout, the tag removed when the state is put back, a slot failure restarting only what this run stopped; uncordon: slots before production, the tag kept when the restore did not take or the tag is somebody else's, `--from-history` and `--prior` needing `--yes` |
 | `internal/azure` cordon writer — PATCH, POST actions, the tags resource, `checkPolicyRestrictions`, long-running operations | complete; **not exercised against a live tenant** | against a local TLS server: an operation followed to Succeeded, one that never finishes reported as still running, a failed one as a failure, a poller off the management endpoint not followed, the tags body, Deny and Modify read from both halves of a policy answer, the principal read from the token |
 | `check` on a cordoned resource | complete | the `cordon` field set from a valid tag, only `active` from a damaged one, and the verdict unchanged |
@@ -55,7 +55,7 @@ files in `.github/instructions/`.
 | `internal/mcpserver` — the MCP server | complete; **not exercised with a live client or tenant** | an in-process client: exactly two tools, read-only annotations, the verbatim descriptions, no flag an agent could use to change a verdict, structured content equal to the JSON text, tag values redacted, failures as error results without a verdict, the 30-call budget, the cache keyed on everything that changes the answer, cordon_status on an untagged resource and on a refused type |
 | `action.yml` — the composite CI action for `terraform plan` and what-if | complete; **not exercised in a live workflow** | the extractors against Terraform, stack and complete-mode ARM what-if samples (replacements, data-plane ids skipped, data sources ignored, detach, potential, unsupported, dedupe across sources, relative paths); the fail policy for every verdict and `fail-on`, not found as a pass, any error or missing result as a failure; the comment table naming rows only by the parsed id or their number, and no plan id written to an output; the declared inputs and outputs; no other action run from inside it; the installer refusing an unpinned action and `latest` |
 | Claude plugin — `.claude-plugin/marketplace.json`, `.github/plugins/az-can-i-delete/` (manifest, `.mcp.json`, the skill) | complete; **not installed into a live client** | the marketplace resolves to the plugin, the plugin serves `az-can-i-delete mcp`, the skill's name and description follow the agentskills.io rules, name no type v0.1 does not analyze, and carry the instruction never to delete on `no` or `tentative` |
-| `docs/day1.md` — the runbook for SPEC section 11 and the missing recordings | written; **none of its tests has been run** | every section 11 test and every unrecorded scenario has an entry |
+| `docs/day1.md` — the runbook for SPEC section 11 | written; three of its ten tests run (H1, H7, H11), each with its answer and the rule it moved | every section 11 test has an entry, and a results row is filled in only from what Azure answered |
 | `docs/adr/` — the binding decisions | complete | structure, index, enforcement sections and the reviewer's brief are checked in `internal/adr` |
 | `tools/Saruman` (Saruman) — the judgement half of the review, on the owner's Azure AI model | written; **not yet exercised against a live endpoint** | built on every pull request so a compile error surfaces there; the api-version it reads is covered by the conformance scan, which was proved against a deliberate literal |
 | `internal/drift` + `cmd/driftcheck` — the change compared against its base | complete | a test per rule: the edited Decision, the supersession that must be allowed and the one that must not, the claim without tests, the dropped stub, the untested package, the normative edit |
@@ -70,15 +70,12 @@ commit on this branch, and no test reaches Azure.
 Each step is one commit boundary. A step is finished when its Required signals,
 its tests and its honest `not_evaluated` strings all exist — not before.
 
-1. **The four scenarios SPEC 7.6 names that are not recorded yet**:
-   `storage-no-pe`, `storage-tentative-defender`, `storage-untrusted-tag` and
-   `site-tentative-linux-consumption`. The machinery is done — recorder,
-   replay, `--fixture`, `demo` — so each is a scenario file and a re-record.
-   `demo` lists what exists and refuses what does not; a missing recording is
-   never answered with a different one.
-2. **The day-1 empirical tests** against a real subscription, each with its
-   documented rule flip. `docs/day1.md` is the procedure for both this step
-   and the one above.
+1. **The day-1 empirical tests** against a real subscription, each with its
+   documented rule flip. `docs/day1.md` is the procedure, and its results table
+   the record. Seven of its ten tests are open. This is also what would turn the
+   seven demo recordings from synthesized into observed: every one of them was
+   recorded from a scenario source, which proves the code's own behaviour but
+   says nothing about the shapes Azure actually answers in.
 
 ## Deliberate gaps
 
@@ -91,9 +88,16 @@ its tests and its honest `not_evaluated` strings all exist — not before.
   carry the collection, rather than reported as having none.
 - `--query` (JMESPath) is rejected as not implemented rather than silently
   ignored.
-- Four of SPEC 7.6's seven demo scenarios are not recorded yet. `demo` names
-  the ones it has and refuses the rest; nothing substitutes for a missing
-  recording.
+- All seven of SPEC 7.6's demo scenarios are recorded, and none against Azure:
+  each is recorded from a scenario source through the real collectors, analyzers
+  and rules. That is a claim about this code, not about Azure's answers. The
+  replayed report says it is a replay in every format, and `demo` refuses a name
+  it does not carry rather than answering with a different recording.
+- `storage-untrusted-tag` shows an instruction-shaped tag under `untrusted` with
+  its value removed, because the recorder removes tag values (SPEC 7.5,
+  ADR-0016) and a fixture therefore cannot carry one. That the text moves no
+  verdict is proved in memory instead, by
+  `TestAnInstructionInATagChangesNoVerdict`, where the real values survive.
 - The disk I/O counters are read under the composite metric names of the
   Azure Monitor disk namespace; the names have not been verified against a live
   tenant, so an unsupported-metric answer surfaces as unknown rather than as an

@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "properties": {
+      "alwaysOn": false,
+      "ipSecurityRestrictions": [
+        {
+          "action": "Allow",
+          "ipAddress": "Any",
+          "name": "Allow all",
+          "priority": 2147483647
+        }
+      ],
+      "linuxFxVersion": "Python|3.12",
+      "vnetName": ""
+    }
+  }
+}

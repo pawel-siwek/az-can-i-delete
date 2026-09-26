@@ -1,0 +1,38 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/sites/fn-demo",
+    "kind": "functionapp,linux",
+    "location": "westeurope",
+    "name": "fn-demo",
+    "properties": {
+      "clientAffinityEnabled": false,
+      "defaultHostName": "fn-demo.azurewebsites.net",
+      "enabled": true,
+      "enabledHostNames": [
+        "fn-demo.azurewebsites.net"
+      ],
+      "hostNameSslStates": [
+        {
+          "hostType": "Standard",
+          "name": "fn-demo.azurewebsites.net"
+        },
+        {
+          "hostType": "Repository",
+          "name": "fn-demo.scm.azurewebsites.net"
+        }
+      ],
+      "hostNames": [
+        "fn-demo.azurewebsites.net"
+      ],
+      "httpsOnly": true,
+      "reserved": true,
+      "serverFarmId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/serverfarms/plan-demo",
+      "state": "Running"
+    },
+    "type": "Microsoft.Web/sites"
+  }
+}

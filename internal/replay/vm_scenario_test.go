@@ -2,7 +2,7 @@ package replay_test
 
 import "fmt"
 
-const vmID = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/virtualMachines/vm-quiet"
+const vmID = resourceGroupID + "/providers/Microsoft.Compute/virtualMachines/vm-quiet"
 
 // vmNoBackup is the scenario that matters most to show, because it is the one
 // a reader would otherwise get wrong: a machine that has been switched off for
