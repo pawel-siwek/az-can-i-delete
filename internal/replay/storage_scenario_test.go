@@ -38,13 +38,20 @@ func storageBase(properties, tags string) []answer {
 		{match: "/microsoft.security/defenderforstoragesettings/current",
 			body: `{"properties": {"isEnabled": false}}`},
 		// Counts and transactions, each answered and each nothing.
-		{match: "/blobservices/default/providers/microsoft.insights/metrics", body: quiet("BlobCount", "Average")},
-		{match: "/fileservices/default/providers/microsoft.insights/metrics", query: "FileCount", body: quiet("FileCount", "Average")},
-		{match: "/fileservices/default/providers/microsoft.insights/metrics", body: quiet("Transactions", "Total")},
-		{match: "/queueservices/default/providers/microsoft.insights/metrics", body: quiet("QueueMessageCount", "Average")},
-		{match: "/tableservices/default/providers/microsoft.insights/metrics", body: quiet("TableEntityCount", "Average")},
-		{match: "/microsoft.insights/metrics", query: "Egress", body: quiet("Egress", "Total")},
-		{match: "/microsoft.insights/metrics", body: quiet("Transactions", "Total")},
+		{match: "/blobservices/default/providers/microsoft.insights/metrics", query: "metricnames=BlobCount", body: quiet("BlobCount", "Average")},
+		{match: "/fileservices/default/providers/microsoft.insights/metrics", query: "metricnames=FileCount", body: quiet("FileCount", "Average")},
+		{match: "/fileservices/default/providers/microsoft.insights/metrics", query: "ApiName eq '*' and TransactionType eq 'User'", body: quiet("Transactions", "Total")},
+		{match: "/queueservices/default/providers/microsoft.insights/metrics", query: "metricnames=QueueMessageCount", body: quiet("QueueMessageCount", "Average")},
+		{match: "/tableservices/default/providers/microsoft.insights/metrics", query: "metricnames=TableEntityCount", body: quiet("TableEntityCount", "Average")},
+		{match: "/microsoft.insights/metrics", query: "metricnames=Egress", body: quiet("Egress", "Total")},
+		// Two different Transactions questions, split by their filter: what
+		// every caller did, and what an OAuth caller did. One fallback served
+		// both before, which meant a third question would have been answered
+		// "nothing happened" without anybody deciding that.
+		{match: "/microsoft.insights/metrics", query: "ApiName eq '*' and TransactionType eq '*'",
+			body: quiet("Transactions", "Total")},
+		{match: "/microsoft.insights/metrics", query: "Authentication eq '*' and ResponseType eq '*'",
+			body: quiet("Transactions", "Total")},
 	}, generic(storageID, resourceGroupID, 300, tags)...)
 }
 
@@ -99,7 +106,7 @@ func storageTentativeDefender() answers {
   }
 }`},
 			// OAuth transactions, and enough of them to matter.
-			{match: "/microsoft.insights/metrics", query: "Authentication+eq+%27%2A%27+and+ResponseType", body: fmt.Sprintf(`{
+			{match: "/microsoft.insights/metrics", query: "Authentication eq '*' and ResponseType eq '*'", body: fmt.Sprintf(`{
   "timespan": "%s/%s", "interval": "P1D",
   "value": [{"name": {"value": "Transactions"}, "unit": "Count", "timeseries": [
     {"metadatavalues": [

@@ -95,7 +95,10 @@ func vmNoBackup() answers {
 }`, ago(120), vmID)},
 			{match: "/microsoft.authorization/denyassignments", body: `{"value": []}`},
 			{match: "/microsoft.authorization/locks", body: `{"value": []}`},
-			{match: "/microsoft.insights/metrics", body: `{"value": []}`},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Percentage CPU", body: `{"value": []}`},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Network In Total", body: `{"value": []}`},
+			{match: "/microsoft.insights/metrics", query: "metricnames=VmAvailabilityMetric", body: `{"value": []}`},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Inbound Flows", body: `{"value": []}`},
 		},
 	}
 }
