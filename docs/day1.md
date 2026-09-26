@@ -183,7 +183,7 @@ AZCID_RECORD=internal/replay/scenarios/<scenario> az-can-i-delete check <id>
 |---|---|
 | `storage-no-pe` | an approved private endpoint to the account, and NSG flow logs writing into it |
 | `storage-tentative-defender` | Defender for Storage on, and only OAuth reads in the window |
-| `storage-untrusted-tag` | an `owner` tag whose value is instruction-shaped text — the wording `TestAnInstructionInATagChangesNoVerdict` uses, or any other; the point is that it reads as an order to its reader |
+| `storage-untrusted-tag` | an `owner` tag whose value is instruction-shaped text — the wording `TestAnInstructionInATagChangesNoOutput` uses, or any other; the point is that it reads as an order to its reader |
 | `site-tentative-linux-consumption` | a Linux Function App on the Consumption plan |
 | `disk-yes-unattached` | a disk unattached long enough for the window to mean something, with no deployment naming it |
 | `nic-yes-detached` | an interface attached to nothing, in no backend pool |
