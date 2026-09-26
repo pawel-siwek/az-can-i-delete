@@ -1,0 +1,27 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/serverfarms/plan-demo",
+    "kind": "functionapp",
+    "location": "westeurope",
+    "name": "plan-demo",
+    "properties": {
+      "numberOfSites": 1,
+      "reserved": true,
+      "sku": {
+        "capacity": 0,
+        "tier": "Dynamic"
+      }
+    },
+    "sku": {
+      "capacity": 0,
+      "name": "Y1",
+      "size": "Y1",
+      "tier": "Dynamic"
+    },
+    "type": "Microsoft.Web/serverfarms"
+  }
+}

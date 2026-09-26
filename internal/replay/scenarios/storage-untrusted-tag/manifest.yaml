@@ -1,0 +1,13 @@
+resourceId: /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/sademo
+now: 2026-09-01T00:00:00Z
+subscriptionId: 00000000-0000-0000-0000-000000000001
+title: A storage account whose tags try to give the reader instructions, shown under untrusted and changing nothing
+expect:
+    verdict: "yes"
+    reasonClass: no-evidence-of-use
+    reasons:
+        - generic.arg.visible
+        - storage.activitylog.control-plane-silence
+        - storage.lists.complete
+        - storage.metrics.count-delta-silence
+        - storage.metrics.user-transactions-silence

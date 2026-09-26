@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "value": [
+      {
+        "createdTime": "2025-11-05T00:00:00Z",
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Web/sites/fn-demo"
+      }
+    ]
+  }
+}

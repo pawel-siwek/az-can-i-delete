@@ -1,0 +1,48 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "interval": "P1D",
+    "timespan": "2026-08-02T00:00:00Z/2026-09-01T00:00:00Z",
+    "value": [
+      {
+        "name": {
+          "value": "Transactions"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-30T00:00:00Z",
+                "total": 41288
+              }
+            ],
+            "metadatavalues": [
+              {
+                "name": {
+                  "value": "authentication"
+                },
+                "value": "OAuth"
+              },
+              {
+                "name": {
+                  "value": "responsetype"
+                },
+                "value": "Success"
+              },
+              {
+                "name": {
+                  "value": "transactiontype"
+                },
+                "value": "User"
+              }
+            ]
+          }
+        ],
+        "unit": "Count"
+      }
+    ]
+  }
+}

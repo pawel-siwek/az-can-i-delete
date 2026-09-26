@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "enabled": true,
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkWatchers/NetworkWatcher_westeurope/flowLogs/nsg-demo-flowlog",
+        "storageId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/sademo"
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

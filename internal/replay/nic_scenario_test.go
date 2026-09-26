@@ -2,7 +2,7 @@ package replay_test
 
 import "fmt"
 
-const nicID = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Network/networkInterfaces/nic-orphan"
+const nicID = resourceGroupID + "/providers/Microsoft.Network/networkInterfaces/nic-orphan"
 
 // nicYesDetached is the scenario the specification names for demo beat 3 when
 // no live `yes` can be found: an interface nothing is attached to.
@@ -62,6 +62,10 @@ func nicYesDetached() answers {
     }
   }]
 }`, subscription, ago(412), subscription)},
+			// ARM's resource list with $expand=createdTime: a network interface
+			// carries no systemData, so this is where its age comes from.
+			{match: "/resources", query: "createdTime",
+				body: fmt.Sprintf(`{"value": [{"id": %q, "createdTime": %q}]}`, nicID, ago(410))},
 			{match: "/microsoft.insights/eventtypes/management/values", body: `{"value": []}`},
 			{match: "/microsoft.authorization/denyassignments", body: `{"value": []}`},
 			{match: "/microsoft.authorization/locks", body: `{"value": []}`},

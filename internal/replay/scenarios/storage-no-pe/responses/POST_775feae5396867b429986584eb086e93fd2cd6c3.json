@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "count": 1,
+    "data": [
+      {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Storage/storageAccounts/sademo",
+        "systemData": {
+          "createdAt": "2025-11-05T00:00:00Z"
+        },
+        "tags": {},
+        "type": "x"
+      }
+    ],
+    "resultTruncated": "false",
+    "totalRecords": 1
+  }
+}

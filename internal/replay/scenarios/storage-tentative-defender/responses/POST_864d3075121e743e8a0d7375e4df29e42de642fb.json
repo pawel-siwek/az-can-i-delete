@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "count": 0,
+    "data": [],
+    "resultTruncated": "false",
+    "totalRecords": 0
+  }
+}

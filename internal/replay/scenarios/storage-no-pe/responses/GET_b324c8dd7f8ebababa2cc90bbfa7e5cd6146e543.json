@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "interval": "P1D",
+    "timespan": "2026-08-02T00:00:00Z/2026-09-01T00:00:00Z",
+    "value": [
+      {
+        "name": {
+          "value": "BlobCount"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "average": 0,
+                "timeStamp": "2026-08-03T00:00:00Z"
+              }
+            ]
+          }
+        ],
+        "unit": "Count"
+      }
+    ]
+  }
+}

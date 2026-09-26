@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "interval": "P1D",
+    "timespan": "2026-08-02T00:00:00Z/2026-09-01T00:00:00Z",
+    "value": [
+      {
+        "name": {
+          "value": "Requests"
+        },
+        "timeseries": [
+          {
+            "data": [
+              {
+                "timeStamp": "2026-08-03T00:00:00Z",
+                "total": 0
+              }
+            ]
+          }
+        ],
+        "unit": "Count"
+      }
+    ]
+  }
+}

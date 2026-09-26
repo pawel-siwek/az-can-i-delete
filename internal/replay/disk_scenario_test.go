@@ -1,21 +1,8 @@
 package replay_test
 
-import (
-	"fmt"
-	"testing"
-	"time"
-)
+import "fmt"
 
-const (
-	subscription = "00000000-0000-0000-0000-000000000001"
-	diskID       = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-demo/providers/Microsoft.Compute/disks/disk-orphan"
-)
-
-// cutoff is the same instant for every scenario, so a recorded window and a
-// recorded timestamp can be read against each other by eye.
-var cutoff = time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
-
-func ago(days int) string { return cutoff.AddDate(0, 0, -days).Format(time.RFC3339) }
+const diskID = resourceGroupID + "/providers/Microsoft.Compute/disks/disk-orphan"
 
 // diskYesUnattached is the demo's third beat: a disk nothing holds, old enough
 // for the window to mean something, with no activity anybody recorded.
@@ -54,8 +41,8 @@ func diskYesUnattached() answers {
 			{match: "/providers/microsoft.resourcegraph/resources", contains: "resourcecontainers",
 				body: fmt.Sprintf(`{
   "totalRecords": 1, "count": 1, "resultTruncated": "false",
-  "data": [{"id": "/subscriptions/%s/resourceGroups/rg-demo", "managedBy": "", "tags": {}}]
-}`, subscription)},
+  "data": [{"id": %q, "managedBy": "", "tags": {}}]
+}`, resourceGroupID)},
 			{match: "/providers/microsoft.resourcegraph/resources", contains: "resourcechanges",
 				body: fmt.Sprintf(`{
   "totalRecords": 1, "count": 1, "resultTruncated": "false",
@@ -74,15 +61,15 @@ func diskYesUnattached() answers {
 			// demonstrated at once — see the note under docs/SPEC.md 7.6.
 			{match: "/microsoft.resources/deployments", body: fmt.Sprintf(`{
   "value": [{
-    "id": "/subscriptions/%s/resourceGroups/rg-demo/providers/Microsoft.Resources/deployments/platform-2025",
+    "id": "%[1]s/providers/Microsoft.Resources/deployments/platform-2025",
     "name": "platform-2025",
     "properties": {
-      "timestamp": %q,
+      "timestamp": %[2]q,
       "provisioningState": "Succeeded",
-      "outputResources": [{"id": "/subscriptions/%s/resourceGroups/rg-demo/providers/Microsoft.Network/virtualNetworks/vnet-demo"}]
+      "outputResources": [{"id": "%[1]s/providers/Microsoft.Network/virtualNetworks/vnet-demo"}]
     }
   }]
-}`, subscription, ago(402), subscription)},
+}`, resourceGroupID, ago(402))},
 			{match: "/microsoft.insights/eventtypes/management/values", body: `{"value": []}`},
 			{match: "/microsoft.authorization/denyassignments", body: `{"value": []}`},
 			{match: "/microsoft.authorization/locks", body: `{"value": []}`},
@@ -101,18 +88,5 @@ func diskYesUnattached() answers {
   ]
 }`, ago(30), ago(0), ago(29), ago(29), ago(29), ago(29))},
 		},
-	}
-}
-
-func TestRecordScenarios(t *testing.T) {
-	if !*update {
-		t.Skip("run with -update to re-record the embedded scenarios")
-	}
-	for slug, scenario := range map[string]answers{
-		"disk-yes-unattached": diskYesUnattached(),
-		"nic-yes-detached":    nicYesDetached(),
-		"vm-no-backup":        vmNoBackup(),
-	} {
-		t.Run(slug, func(t *testing.T) { record(t, slug, scenario) })
 	}
 }

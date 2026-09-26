@@ -24,6 +24,18 @@ import (
 
 var update = flag.Bool("update", false, "re-record the embedded demo scenarios")
 
+// Every scenario is in the same subscription and reads the same instant, so a
+// recorded window and a recorded timestamp can be read against each other by
+// eye, and one scenario's fixtures are recognisable next to another's.
+const (
+	subscription    = "00000000-0000-0000-0000-000000000001"
+	resourceGroupID = "/subscriptions/" + subscription + "/resourceGroups/rg-demo"
+)
+
+var cutoff = time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+
+func ago(days int) string { return cutoff.AddDate(0, 0, -days).Format(time.RFC3339) }
+
 // answers is a scenario's Azure: a body per request, matched on the path's
 // suffix and, where one path serves several questions, a distinguishing piece
 // of the query. It exists only to be recorded from; nothing in the product
@@ -180,4 +192,24 @@ func recordedClient(endpoint string, recorder *replay.Recorder) (*azure.Client, 
 	return azure.New(azure.Options{
 		Endpoint: endpoint, Credential: azure.RecordedCredential(), Transport: azure.Transport(recorder),
 	})
+}
+
+// The scenarios docs/SPEC.md 7.6 names, each recorded from a real run of the
+// real code. Adding one here is what puts it in `demo`; nothing else registers
+// it.
+func TestRecordScenarios(t *testing.T) {
+	if !*update {
+		t.Skip("run with -update to re-record the embedded scenarios")
+	}
+	for slug, scenario := range map[string]answers{
+		"disk-yes-unattached":              diskYesUnattached(),
+		"nic-yes-detached":                 nicYesDetached(),
+		"vm-no-backup":                     vmNoBackup(),
+		"storage-no-pe":                    storageNoPE(),
+		"storage-tentative-defender":       storageTentativeDefender(),
+		"storage-untrusted-tag":            storageUntrustedTag(),
+		"site-tentative-linux-consumption": siteTentativeLinuxConsumption(),
+	} {
+		t.Run(slug, func(t *testing.T) { record(t, slug, scenario) })
+	}
 }
