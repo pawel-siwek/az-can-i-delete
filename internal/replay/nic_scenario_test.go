@@ -69,7 +69,7 @@ func nicYesDetached() answers {
 			{match: "/microsoft.insights/eventtypes/management/values", body: `{"value": []}`},
 			{match: "/microsoft.authorization/denyassignments", body: `{"value": []}`},
 			{match: "/microsoft.authorization/locks", body: `{"value": []}`},
-			{match: "/microsoft.insights/metrics", body: `{"value": []}`},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Inbound Flows", body: `{"value": []}`},
 		},
 	}
 }

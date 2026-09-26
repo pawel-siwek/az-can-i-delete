@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,8 +39,13 @@ func ago(days int) string { return cutoff.AddDate(0, 0, -days).Format(time.RFC33
 
 // answers is a scenario's Azure: a body per request, matched on the path's
 // suffix and, where one path serves several questions, a distinguishing piece
-// of the query. It exists only to be recorded from; nothing in the product
-// reads it.
+// of the query or of the body. It exists only to be recorded from; nothing in
+// the product reads it.
+//
+// There is no catch-all. A request no answer matches fails the recording, which
+// is what SPEC 7.6 promises and the only reason a fixture can be trusted: a new
+// signal that asks a question nobody answered has to be answered deliberately,
+// rather than recorded as having found nothing.
 type answers struct {
 	title  string
 	id     string
@@ -50,7 +56,7 @@ type answers struct {
 
 type answer struct {
 	match    string // path suffix
-	query    string // a substring the URL query must contain, when one path serves several questions
+	query    string // a substring the decoded URL query must contain, when one path serves several questions
 	contains string // a substring the request body must contain, which is how Resource Graph questions are told apart
 	body     string
 }
@@ -59,11 +65,18 @@ func (a answers) handler(t *testing.T) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sent, _ := io.ReadAll(r.Body)
+		// The query is matched decoded, so an answer can name the metric or
+		// the filter it is for in the words Azure's own documentation uses
+		// rather than in percent escapes.
+		asked, err := url.QueryUnescape(r.URL.RawQuery)
+		if err != nil {
+			asked = r.URL.RawQuery
+		}
 		for _, candidate := range a.bodies {
 			if !strings.HasSuffix(strings.ToLower(r.URL.Path), strings.ToLower(candidate.match)) {
 				continue
 			}
-			if candidate.query != "" && !strings.Contains(r.URL.RawQuery, candidate.query) {
+			if candidate.query != "" && !strings.Contains(asked, candidate.query) {
 				continue
 			}
 			if candidate.contains != "" && !strings.Contains(string(sent), candidate.contains) {
@@ -73,7 +86,11 @@ func (a answers) handler(t *testing.T) http.Handler {
 			_, _ = w.Write([]byte(candidate.body))
 			return
 		}
-		t.Errorf("the scenario has no answer for %s %s?%s %s", r.Method, r.URL.Path, r.URL.RawQuery, sent)
+		// Nothing is served here on purpose. A question this scenario does
+		// not answer is a question whose answer nobody decided, and recording
+		// it as an empty page would put an absence in a fixture that no Azure
+		// ever reported (ADR-0004).
+		t.Errorf("the scenario has no answer for %s %s?%s %s", r.Method, r.URL.Path, asked, sent)
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":{"code":"NotFound","message":"the scenario has no answer for this"}}`))
 	})

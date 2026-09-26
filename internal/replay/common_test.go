@@ -30,12 +30,29 @@ func generic(id, resourceGroupID string, createdDaysAgo int, tags string) []answ
   "totalRecords": 1, "count": 1, "resultTruncated": "false",
   "data": [{"ts": %q, "changeType": "Create", "op": "Create"}]
 }`, ago(createdDaysAgo))},
-		// Everything else Resource Graph is asked — advisor, backups, other
-		// references, boot diagnostics, extensions, flow logs — is nothing,
-		// unless a scenario says otherwise above this line. An empty page is
-		// an answer; a missing one would be a fixture miss.
-		{match: "/providers/microsoft.resourcegraph/resources",
-			body: `{"totalRecords": 0, "count": 0, "resultTruncated": "false", "data": []}`},
+		// The rest of what Resource Graph is asked, one entry per question,
+		// each answering that nothing was found. A scenario that wants one of
+		// them to find something lists its own answer above this line.
+		//
+		// These are enumerated rather than caught by one fallback on purpose.
+		// A fallback answers a question nobody wrote an answer for, and the
+		// answer it gives is "nothing found" — which is the difference between
+		// a signal that was read and found empty and a signal nobody asked
+		// about, the difference ADR-0004 exists to keep. Adding a signal that
+		// asks a new question should fail every recording until somebody says
+		// what Azure answers, and with a fallback here it would not.
+		empty("advisorresources"),                    // Advisor recommendations
+		empty("backupvaults/backupinstances"),        // Backup vault instances
+		empty("protectioncontainers/protecteditems"), // Recovery Services protected items
+		empty("replicationprotecteditems"),           // Site Recovery replication
+		empty("!startswith"),                         // anything else in the subscription naming this resource
+		empty("bootDiagnostics.storageUri"),          // machines writing boot diagnostics here
+		empty("virtualmachines/extensions"),          // extensions configured with this name
+		empty("insights/webtests"),                   // availability tests calling this host
+		empty("networkwatchers/flowlogs"),            // Network Watcher writing flow logs here
+		empty("network/routetables"),                 // routes pointing at this address
+		empty("dhcpOptions.dnsServers"),              // networks using this address as a resolver
+		empty("compute/galleries/images/versions"),   // images built from this resource
 		// ARM's resource list with $expand=createdTime. A site, a plan or a
 		// network resource carries no systemData on its GET, so this is the
 		// only age source some types have; answering it here means a scenario
@@ -62,4 +79,13 @@ func quiet(name, aggregation string) string {
   "value": [{"name": {"value": %q}, "unit": "Count",
              "timeseries": [{"data": [{"timeStamp": %q, %q: 0}]}]}]
 }`, ago(30), ago(0), name, ago(29), field)
+}
+
+// empty is one Resource Graph question answered with an empty page: the query
+// was run and matched nothing. `question` is the fragment of the KQL that tells
+// this question apart from the others on the same path, so a query whose
+// wording changes stops matching and the recording says so.
+func empty(question string) answer {
+	return answer{match: "/providers/microsoft.resourcegraph/resources", contains: question,
+		body: `{"totalRecords": 0, "count": 0, "resultTruncated": "false", "data": []}`}
 }

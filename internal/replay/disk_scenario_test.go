@@ -73,7 +73,7 @@ func diskYesUnattached() answers {
 			{match: "/microsoft.insights/eventtypes/management/values", body: `{"value": []}`},
 			{match: "/microsoft.authorization/denyassignments", body: `{"value": []}`},
 			{match: "/microsoft.authorization/locks", body: `{"value": []}`},
-			{match: "/microsoft.insights/metrics", body: fmt.Sprintf(`{
+			{match: "/microsoft.insights/metrics", query: "metricnames=Composite Disk Read Bytes/sec", body: fmt.Sprintf(`{
   "timespan": "%s/%s",
   "interval": "P1D",
   "value": [

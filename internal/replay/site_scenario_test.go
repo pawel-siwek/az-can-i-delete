@@ -66,11 +66,10 @@ func siteTentativeLinuxConsumption() answers {
 			// Answered, and each one nothing. The execution counter is not in
 			// this list, because for this hosting class there is none to ask
 			// for, which is the whole point of the scenario.
-			{match: "/microsoft.insights/metrics", query: "Requests", body: quiet("Requests", "Total")},
-			{match: "/microsoft.insights/metrics", query: "Http2xx", body: quiet("Http2xx", "Total")},
-			{match: "/microsoft.insights/metrics", query: "CpuTime", body: quiet("CpuTime", "Total")},
-			{match: "/microsoft.insights/metrics", query: "InstanceCount", body: quiet("InstanceCount", "Average")},
-			{match: "/microsoft.insights/metrics", body: quiet("Requests", "Total")},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Requests", body: quiet("Requests", "Total")},
+			{match: "/microsoft.insights/metrics", query: "metricnames=Http2xx", body: quiet("Http2xx", "Total")},
+			{match: "/microsoft.insights/metrics", query: "metricnames=CpuTime", body: quiet("CpuTime", "Total")},
+			{match: "/microsoft.insights/metrics", query: "metricnames=InstanceCount", body: quiet("InstanceCount", "Average")},
 		}, generic(siteID, resourceGroupID, 300, "")...),
 	}
 }
