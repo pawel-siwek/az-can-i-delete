@@ -89,20 +89,18 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 		banner = struct{ icon, word, remark string }{"❓", strings.ToUpper(verdict), ""}
 	}
 	id := text(value["resourceId"])
-	name := resourceName(id)
 	head := headline(verdict, text(value["reasonClass"]))
 	pill := " " + banner.icon + " " + banner.word + " "
 	about := []string{kindOf(id)}
 	if coverage, ok := value["coverage"].(map[string]any); ok {
 		about = append(about, text(coverage["evaluated"])+" of "+text(coverage["total"])+" signals read")
 	}
-	// The name is an identifier on the pill's line, the way the canonical id
-	// stands alone in the footer; it is never part of a sentence.
+	// The frame holds only the tool's own words. Which resource it is about is
+	// the canonical id in the footer: a name is Azure's text (ADR-0007).
 	indent := strings.Repeat(" ", CellWidth(pill)+2)
-	lines := []string{pill + "  " + name, indent + head, indent + strings.Join(about, " · ")}
+	lines := []string{pill + "  " + head, indent + strings.Join(about, " · ")}
 	paints := []func(string) string{
-		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(name) },
-		func(string) string { return indent + p.Bold(head) },
+		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(head) },
 		func(line string) string { return indent + p.Dim(strings.TrimPrefix(line, indent)) },
 	}
 	if CellWidth(lines[0])+6 <= tableWidth {
@@ -111,7 +109,6 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 		// A name too long for the frame is wrapped rather than cut, and a
 		// frame that cannot close is not drawn at all.
 		fmt.Fprintf(out, "%s\n", p.Pill(verdict, banner.icon+" "+banner.word))
-		writeWrappedStyled(out, "  ", "  ", name, p.style(p.Bold))
 		writeWrappedStyled(out, "  ", "  ", head, p.style(p.Bold))
 		writeWrappedStyled(out, "  ", "  ", strings.Join(about, " · "), p.style(p.Dim))
 	}
@@ -128,15 +125,6 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 			writeWrappedStyled(out, "  ? ", "    ", question, p.style(p.Amber))
 		}
 	}
-}
-
-// resourceName is the last segment of the ARM id, which is what a person calls
-// the thing. The whole id is in the footer and in the JSON.
-func resourceName(id string) string {
-	if index := strings.LastIndex(id, "/"); index >= 0 && index+1 < len(id) {
-		return id[index+1:]
-	}
-	return id
 }
 
 // kinds names the analyzed types the way a person says them.

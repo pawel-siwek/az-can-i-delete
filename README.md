@@ -307,8 +307,7 @@ The terminal view leads with the answer, framed, and what it is about:
 
 ```
 ╭──────────────────────────────────────────────────────────────────────────╮
-│   🟡 TENTATIVE   kacz3h2lx6uy5ebomkb                                     │
-│                  not enough evidence to decide — a person has to look    │
+│   🟡 TENTATIVE   not enough evidence to decide — a person has to look    │
 │                  Storage account · 47 of 56 signals read                 │
 ╰──────────────────────────────────────────────────────────────────────────╯
 
