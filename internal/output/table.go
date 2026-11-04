@@ -31,23 +31,24 @@ var verdictBanner = map[string]struct{ icon, word, remark string }{
 
 // headline is the verdict in words, from the reason class rather than the
 // verdict alone: a lock and a live consumer are both `no`, for different
-// reasons.
-func headline(verdict, reasonClass, name string) string {
+// reasons. It is the tool's own sentence and never names the resource: a
+// name is Azure's text, and it stands on its own line as an identifier.
+func headline(verdict, reasonClass string) string {
 	switch verdict {
 	case "yes":
 		return "no evidence of use found"
 	case "no":
 		if reasonClass == "blocked" {
-			return name + " is blocked — do not delete"
+			return "blocked — do not delete"
 		}
-		return name + " is in use — do not delete"
+		return "in use — do not delete"
 	case "tentative":
 		if reasonClass == "design-intent" {
-			return name + " looks deliberately kept — a person has to decide"
+			return "looks deliberately kept — a person has to decide"
 		}
 		return "not enough evidence to decide — a person has to look"
 	}
-	return name
+	return ""
 }
 
 func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
@@ -89,19 +90,19 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 	}
 	id := text(value["resourceId"])
 	name := resourceName(id)
-	head := headline(verdict, text(value["reasonClass"]), name)
+	head := headline(verdict, text(value["reasonClass"]))
 	pill := " " + banner.icon + " " + banner.word + " "
 	about := []string{kindOf(id)}
-	if group := groupOf(id); group != "" {
-		about = append(about, group)
-	}
 	if coverage, ok := value["coverage"].(map[string]any); ok {
 		about = append(about, text(coverage["evaluated"])+" of "+text(coverage["total"])+" signals read")
 	}
+	// The name is an identifier on the pill's line, the way the canonical id
+	// stands alone in the footer; it is never part of a sentence.
 	indent := strings.Repeat(" ", CellWidth(pill)+2)
-	lines := []string{pill + "  " + head, indent + strings.Join(about, " · ")}
+	lines := []string{pill + "  " + name, indent + head, indent + strings.Join(about, " · ")}
 	paints := []func(string) string{
-		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(head) },
+		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(name) },
+		func(string) string { return indent + p.Bold(head) },
 		func(line string) string { return indent + p.Dim(strings.TrimPrefix(line, indent)) },
 	}
 	if CellWidth(lines[0])+6 <= tableWidth {
@@ -110,6 +111,7 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 		// A name too long for the frame is wrapped rather than cut, and a
 		// frame that cannot close is not drawn at all.
 		fmt.Fprintf(out, "%s\n", p.Pill(verdict, banner.icon+" "+banner.word))
+		writeWrappedStyled(out, "  ", "  ", name, p.style(p.Bold))
 		writeWrappedStyled(out, "  ", "  ", head, p.style(p.Bold))
 		writeWrappedStyled(out, "  ", "  ", strings.Join(about, " · "), p.style(p.Dim))
 	}
@@ -169,16 +171,6 @@ func kindOf(id string) string {
 		return strings.Join(segments, "/")
 	}
 	return "Resource"
-}
-
-func groupOf(id string) string {
-	parts := strings.Split(strings.Trim(id, "/"), "/")
-	for i := 0; i+1 < len(parts); i++ {
-		if strings.EqualFold(parts[i], "resourceGroups") {
-			return parts[i+1]
-		}
-	}
-	return ""
 }
 
 // writeFindings prints what was actually found and what could not be read.

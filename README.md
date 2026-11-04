@@ -306,10 +306,11 @@ evidence: targets that completed are still printed.
 The terminal view leads with the answer, framed, and what it is about:
 
 ```
-╭───────────────────────────────────────────────────────────────────────────╮
-│   🟡 TENTATIVE   not enough evidence to decide — a person has to look     │
-│                  Storage account · rg-data · 47 of 56 signals read        │
-╰───────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│   🟡 TENTATIVE   kacz3h2lx6uy5ebomkb                                     │
+│                  not enough evidence to decide — a person has to look    │
+│                  Storage account · 47 of 56 signals read                 │
+╰──────────────────────────────────────────────────────────────────────────╯
 
   I could not verify everything, so I do not know whether you can delete
   this. Read the evidence below and decide.
