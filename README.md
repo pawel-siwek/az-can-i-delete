@@ -247,7 +247,7 @@ steps:
   - id: preflight
     uses: pawel-siwek/az-can-i-delete@<commit-sha>
     with:
-      version: v0.4.1      # the release binary to install, checked against its checksums
+      version: v0.4.2      # the release binary to install, checked against its checksums
       terraform-plan-json: tfplan.json
       fail-on: "no"        # or "tentative"
   # Optional: keep the full results.
@@ -274,7 +274,7 @@ together — from a clone you pinned to a release tag that carries the plugin
 (ADR-0014):
 
 ```sh
-git clone --depth 1 --branch v0.4.1 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid-plugin
+git clone --depth 1 --branch v0.4.2 https://github.com/pawel-siwek/az-can-i-delete.git ~/src/azcid-plugin
 git -C ~/src/azcid-plugin log -1 --format=%H    # the commit you are about to trust; read the plugin under .github/plugins/
 ```
 
@@ -321,7 +321,7 @@ The terminal view leads with the answer, framed, and what it is about:
 
   🟢 45 signals looked and found nothing
 
-  47/56 checked · window 30 d · age ≥ 96 d · rules 2026-09-21 · v0.4.1
+  47/56 checked · window 30 d · age ≥ 96 d · rules 2026-09-21 · v0.4.2
 ```
 
 `⛔ NO` means the resource is in use, or blocked, and the evidence says where.
