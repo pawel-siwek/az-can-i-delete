@@ -77,6 +77,9 @@ func runReplay(cmd *cobra.Command, version string, options *outputOptions, fixtu
 	if full, flagErr := cmd.Flags().GetBool("full"); flagErr == nil && full {
 		view = append(view, output.Detailed())
 	}
+	if options.color {
+		view = append(view, output.Colored())
+	}
 	if err := output.Render(cmd.OutOrStdout(), options.format, []output.Outcome{outcome}, view...); err != nil {
 		return &ExitError{Code: 1, Err: err}
 	}
@@ -244,7 +247,7 @@ func verdictWord(verdict string) string {
 	case "no":
 		return "⛔ no"
 	case "tentative":
-		return "⚠️  tentative"
+		return "🟡 tentative"
 	default:
 		return verdict
 	}

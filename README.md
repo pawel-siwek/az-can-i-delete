@@ -303,29 +303,39 @@ evidence: targets that completed are still printed.
 
 ## How to read the output
 
-The terminal view leads with the answer and one sentence saying what it means:
+The terminal view leads with the answer, framed, and what it is about:
 
 ```
-⚠️  TENTATIVE — kacz3h2lx6uy5ebomkb
+╭───────────────────────────────────────────────────────────────────────────╮
+│   🟡 TENTATIVE   not enough evidence to decide — a person has to look     │
+│                  Storage account · rg-data · 47 of 56 signals read        │
+╰───────────────────────────────────────────────────────────────────────────╯
 
-    I could not verify everything, so I do not know whether you can delete
-    this. Read the evidence below and decide.
+  I could not verify everything, so I do not know whether you can delete
+  this. Read the evidence below and decide.
 
-🚧  Could not check (2)
-    storage.metrics.user-writes (transient) ‼
-      The transaction metric could not be read.
-      → Find the writer before deleting; its next write will fail.
+  🟡 Could not check 1
+  ? storage.metrics.user-writes (transient) ‼
+    ⎿  The transaction metric could not be read.
+       → Find the writer before deleting; its next write will fail.
 
-✅  45 signals looked and found nothing
+  🟢 45 signals looked and found nothing
 
-    47/56 checked · window 30 d · age ≥96 d · rules 2026-09-21 · v0.2.0
+  47/56 checked · window 30 d · age ≥ 96 d · rules 2026-09-21 · v0.4.1
 ```
 
-`⛔ NO` means the resource is in use and the evidence says where. `✅ YES`
-means no evidence of use was found — which is not proof it is unused, because
-nothing here can see a consumer that names the resource only in code, a
-pipeline or a config file. `⚠️ TENTATIVE` means something could not be read,
-so the tool does not know; `‼` marks the signal that kept it from an answer.
+`⛔ NO` means the resource is in use, or blocked, and the evidence says where.
+`✅ YES` means no evidence of use was found — which is not proof it is unused,
+because nothing here can see a consumer that names the resource only in code,
+a pipeline or a config file. `🟡 TENTATIVE` means something could not be read,
+or looks deliberately kept, so a person has to decide; `‼` marks the signal
+that kept it from an answer.
+
+On a terminal the view is coloured and a progress line on stderr counts the
+reads while a check runs; both stay off a pipe, a log and every format but the
+table. `NO_COLOR=1` or `TERM=dumb` turns colour off, `FORCE_COLOR=1` turns it
+on where no terminal is detected. On Windows the tool switches its console to
+UTF-8 and ANSI itself.
 
 Signals that looked and found nothing are counted rather than listed: their
 silence is what a `yes` is made of, but reading fifty lines of it buries the

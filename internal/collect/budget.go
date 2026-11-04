@@ -166,6 +166,7 @@ func Gather(ctx context.Context, signals []Signal) []Outcome {
 			}
 			callCtx, callCancel := context.WithTimeout(groupCtx, CallTimeout)
 			defer callCancel()
+			defer reportDone(ctx, signal.ID)
 			evidence, err := signal.Run(callCtx)
 			if err != nil {
 				outcomes[i].Unknown = Classify(err)
@@ -178,4 +179,19 @@ func Gather(ctx context.Context, signals []Signal) []Outcome {
 	// No signal returns an error, so Wait only reports a cancelled run.
 	_ = group.Wait()
 	return outcomes
+}
+
+type progressKey struct{}
+
+// WithProgress asks Gather to report each signal it finishes, by id, so a
+// terminal can show that collection is moving. The report carries no result:
+// what was found is the verdict's business, not the progress line's.
+func WithProgress(ctx context.Context, done func(id string)) context.Context {
+	return context.WithValue(ctx, progressKey{}, done)
+}
+
+func reportDone(ctx context.Context, id string) {
+	if done, ok := ctx.Value(progressKey{}).(func(string)); ok && done != nil {
+		done(id)
+	}
 }

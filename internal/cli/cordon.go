@@ -231,38 +231,39 @@ func slotNames(state cordon.State) map[string]string {
 
 func renderCordon(cmd *cobra.Command, options *outputOptions, report cordonReport) error {
 	return output.RenderValues(cmd.OutOrStdout(), options.format, []any{report}, func(w io.Writer) error {
+		p := output.NewPalette(options.color)
 		var b strings.Builder
 		change := "publicNetworkAccess " + report.Prior + " → Disabled"
 		if report.Mode == string(cordon.ModeStop) {
 			change = "stop the site and every slot"
 		}
-		switch {
-		case report.Applied:
-			fmt.Fprintf(&b, "🧱  CORDONED (%s)\n", change)
-		default:
-			fmt.Fprintf(&b, "🧱  CORDON PLAN (%s)\n", change)
-		}
-		// The canonical id on its own line, never the name in a sentence.
-		fmt.Fprintf(&b, "    resource %s\n\n", report.ResourceID)
-		fmt.Fprintf(&b, "    verdict %s (%s) · a cordon is a test, not permission to delete\n", report.Verdict, report.ReasonClass)
-		writeList(&b, "overridden by --force", report.Forced)
-		writeList(&b, "might scream", report.Consumers)
-		writeList(&b, "acknowledged with --yes", report.Acknowledged)
-		for _, note := range report.Notes {
-			fmt.Fprintf(&b, "    %s\n", note)
-		}
-		fmt.Fprintf(&b, "    %s\n", report.NotBlocked)
-		fmt.Fprintf(&b, "    state tag azcid=%s\n", report.Tag)
+		state := "🧱 CORDON PLAN"
 		if report.Applied {
-			fmt.Fprintf(&b, "\n    watch:  %s\n    undo:   %s\n", report.Status, report.Uncordon)
+			state = "🧱 CORDONED"
+		}
+		fmt.Fprintf(&b, "\n  %s  %s\n", p.Pill("cordon", state), p.Bold(change))
+		// The canonical id on its own line, never the name in a sentence.
+		fmt.Fprintf(&b, "  %s  %s\n", p.Dim("⎿"), p.Dim(report.ResourceID))
+		fmt.Fprintf(&b, "  %s  verdict %s %s\n", p.Dim("⎿"), colorVerdict(p, report.Verdict),
+			p.Dim("("+report.ReasonClass+") · a cordon is a test, not permission to delete"))
+		writeList(&b, p, "overridden by --force", report.Forced)
+		writeList(&b, p, "might scream", report.Consumers)
+		writeList(&b, p, "acknowledged with --yes", report.Acknowledged)
+		for _, note := range report.Notes {
+			fmt.Fprintf(&b, "  %s  %s %s\n", p.Dim("⎿"), p.Green("✓"), note)
+		}
+		fmt.Fprintf(&b, "  %s  %s\n", p.Dim("⎿"), p.Dim(report.NotBlocked))
+		fmt.Fprintf(&b, "  %s  %s\n", p.Dim("⎿"), p.Dim("state tag azcid="+report.Tag))
+		if report.Applied {
+			fmt.Fprintf(&b, "\n  %s  %s\n  %s  %s\n", p.Dim("watch"), p.Cyan(report.Status), p.Dim("undo "), p.Cyan(report.Uncordon))
 		} else {
-			b.WriteString("\n    nothing was written\n")
+			fmt.Fprintf(&b, "\n  %s\n", p.Dim("nothing was written · --yes applies this plan"))
 		}
 		if len(report.Untrusted) > 0 {
-			b.WriteString("\n    untrusted (Azure names; may contain anybody's text):\n")
+			fmt.Fprintf(&b, "\n  %s\n", p.Dim("untrusted (Azure names; may contain anybody's text):"))
 			for i := 1; i <= len(report.Untrusted); i++ {
 				ref := fmt.Sprintf("slot%d", i)
-				fmt.Fprintf(&b, "      %s: %s\n", ref, report.Untrusted[ref])
+				fmt.Fprintf(&b, "    %s: %s\n", ref, report.Untrusted[ref])
 			}
 		}
 		_, err := io.WriteString(w, b.String())
@@ -270,11 +271,24 @@ func renderCordon(cmd *cobra.Command, options *outputOptions, report cordonRepor
 	})
 }
 
-func writeList(b *strings.Builder, title string, values []string) {
+// colorVerdict colours a verdict named in a sentence the way its pill is.
+func colorVerdict(p output.Palette, verdict string) string {
+	switch verdict {
+	case "no":
+		return p.Red(verdict)
+	case "tentative":
+		return p.Amber(verdict)
+	case "yes":
+		return p.Green(verdict)
+	}
+	return verdict
+}
+
+func writeList(b *strings.Builder, p output.Palette, title string, values []string) {
 	if len(values) == 0 {
 		return
 	}
-	fmt.Fprintf(b, "    %s: %s\n", title, strings.Join(values, ", "))
+	fmt.Fprintf(b, "  %s  %s %s\n", p.Dim("⎿"), p.Amber(title+":"), strings.Join(values, ", "))
 }
 
 func cordonError(err error) error {
@@ -327,10 +341,12 @@ func runUncordon(cmd *cobra.Command, deps Dependencies, version string, options 
 	report := uncordonReport{ResourceID: target.ID, Mode: string(restored.State.Mode), Restored: restored.State.Prior,
 		Source: restored.Source, TagKept: restored.TagKept, Notes: notes}
 	return output.RenderValues(cmd.OutOrStdout(), options.format, []any{report}, func(w io.Writer) error {
+		p := output.NewPalette(options.color)
 		var b strings.Builder
-		fmt.Fprintf(&b, "✅  UNCORDONED (restored %s, from the %s)\n    resource %s\n", report.Restored, report.Source, target.ID)
+		fmt.Fprintf(&b, "\n  %s  %s\n  %s  %s\n", p.Pill("yes", "✅ UNCORDONED"),
+			p.Bold("restored "+report.Restored+", from the "+report.Source), p.Dim("⎿"), p.Dim(target.ID))
 		for _, note := range report.Notes {
-			fmt.Fprintf(&b, "    %s\n", note)
+			fmt.Fprintf(&b, "  %s  %s\n", p.Dim("⎿"), note)
 		}
 		_, err := io.WriteString(w, b.String())
 		return err

@@ -41,6 +41,7 @@ const defaultWindow = "30d"
 
 type outputOptions struct {
 	format         string
+	color          bool
 	onlyShowErrors bool
 	debug          bool
 	query          string
@@ -148,6 +149,7 @@ func NewRootCommandWith(version string, deps Dependencies) *cobra.Command {
 			if err := output.ValidateFormat(options.format); err != nil {
 				return &ExitError{Code: 2, Err: err}
 			}
+			options.color = options.format == "table" && colorFor(cmd.OutOrStdout())
 			if cmd.Flags().Changed("query") {
 				return &ExitError{Code: 2, Err: errors.New("query is not implemented")}
 			}
@@ -301,8 +303,15 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 
 	outcomes := make([]output.Outcome, 0, len(targets))
 	var failures []error
+	// The progress line is for a person watching a table appear; anything
+	// else reads stdout and wants it quiet.
+	var progress *spinner
+	if options.format == "table" && !options.onlyShowErrors {
+		progress = startSpinner(cmd.ErrOrStderr(), options.color)
+	}
 	for _, target := range targets {
-		outcome, checkErr := runner.Check(cmd.Context(), target, assess.Options{
+		ctx := progress.track(cmd.Context(), target.Name)
+		outcome, checkErr := runner.Check(ctx, target, assess.Options{
 			Requested: requested, Cutoff: cutoff, RedactTags: redactTags, DataPlane: dataPlane,
 		})
 		outcomes = append(outcomes, outcome)
@@ -310,10 +319,14 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 			failures = append(failures, checkErr)
 		}
 	}
+	progress.finish()
 	// The terminal view shows what was found; --full restores everything.
 	var view []output.ViewOption
 	if full, flagErr := cmd.Flags().GetBool("full"); flagErr == nil && full {
 		view = append(view, output.Detailed())
+	}
+	if options.color {
+		view = append(view, output.Colored())
 	}
 	if err := output.Render(cmd.OutOrStdout(), options.format, outcomes, view...); err != nil && len(failures) == 0 {
 		return &ExitError{Code: 1, Err: err}
