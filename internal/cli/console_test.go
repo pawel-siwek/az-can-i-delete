@@ -37,7 +37,7 @@ func TestTheSpinnerStaysOffAPipe(t *testing.T) {
 	if s != nil {
 		t.Fatal("a spinner started on a buffer")
 	}
-	ctx := s.track(t.Context(), "store")
+	ctx := s.track(t.Context(), 1, 1)
 	if ctx == nil {
 		t.Fatal("a nil spinner must hand the context back")
 	}

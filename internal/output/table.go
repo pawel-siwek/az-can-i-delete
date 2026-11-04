@@ -103,7 +103,13 @@ func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
 		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(head) },
 		func(line string) string { return indent + p.Dim(strings.TrimPrefix(line, indent)) },
 	}
-	if CellWidth(lines[0])+6 <= tableWidth {
+	fits := true
+	for _, line := range lines {
+		if CellWidth(line)+6 > tableWidth {
+			fits = false
+		}
+	}
+	if fits {
 		out.WriteString(p.Box(lines, paints, tableWidth))
 	} else {
 		// A name too long for the frame is wrapped rather than cut, and a

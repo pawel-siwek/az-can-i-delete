@@ -65,14 +65,20 @@ func (s *spinner) run() {
 	}
 }
 
-// track names the resource being checked and returns a context whose reads
-// the spinner counts.
-func (s *spinner) track(ctx context.Context, name string) context.Context {
+// track starts counting for target n of total and returns a context whose
+// reads the spinner counts. The label is the tool's own words: a resource
+// name is Azure's text and never part of a sentence this tool says
+// (ADR-0007), on stderr as much as anywhere.
+func (s *spinner) track(ctx context.Context, n, total int) context.Context {
 	if s == nil {
 		return ctx
 	}
+	label := "Checking the resource"
+	if total > 1 {
+		label = fmt.Sprintf("Checking resource %d of %d", n, total)
+	}
 	s.mu.Lock()
-	s.label, s.done, s.last = "Checking "+name, 0, "starting"
+	s.label, s.done, s.last = label, 0, "starting"
 	s.mu.Unlock()
 	return collect.WithProgress(ctx, func(id string) {
 		s.mu.Lock()

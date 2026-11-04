@@ -309,8 +309,8 @@ func runCheck(cmd *cobra.Command, deps Dependencies, version string, options *ou
 	if options.format == "table" && !options.onlyShowErrors {
 		progress = startSpinner(cmd.ErrOrStderr(), options.color)
 	}
-	for _, target := range targets {
-		ctx := progress.track(cmd.Context(), target.Name)
+	for i, target := range targets {
+		ctx := progress.track(cmd.Context(), i+1, len(targets))
 		outcome, checkErr := runner.Check(ctx, target, assess.Options{
 			Requested: requested, Cutoff: cutoff, RedactTags: redactTags, DataPlane: dataPlane,
 		})

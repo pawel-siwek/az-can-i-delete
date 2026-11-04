@@ -21,14 +21,18 @@ func terminalFile(w io.Writer) (*os.File, bool) {
 // draw it; CLICOLOR_FORCE or FORCE_COLOR asks for it where no terminal is
 // detected, such as a recording or a CI log that renders ANSI.
 func colorFor(w io.Writer) bool {
+	// A terminal is prepared whatever is decided about colour: on Windows
+	// that is also what makes UTF-8 glyphs readable, which NO_COLOR does not
+	// opt out of, and what makes forced colour render rather than print.
+	file, terminal := terminalFile(w)
+	ready := terminal && prepareConsole(file)
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
 	if forced("CLICOLOR_FORCE") || forced("FORCE_COLOR") {
-		return true
+		return !terminal || ready
 	}
-	file, ok := terminalFile(w)
-	return ok && prepareConsole(file)
+	return ready
 }
 
 func forced(name string) bool {
