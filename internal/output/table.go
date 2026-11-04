@@ -30,6 +30,7 @@ var verdictBanner = map[string]struct{ icon, word, remark string }{
 
 func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 	var out bytes.Buffer
+	p := painter(view.Color)
 	for i, item := range items {
 		decoder := json.NewDecoder(bytes.NewReader(item))
 		decoder.UseNumber()
@@ -41,15 +42,15 @@ func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 			out.WriteString("\n")
 		}
 		if failure, ok := value["error"].(map[string]any); ok {
-			fmt.Fprintf(&out, "💥  ERROR — %s\n\n", text(failure["code"]))
+			fmt.Fprintf(&out, "%s\n\n", p.paint(onRed, " 💥 ERROR — "+text(failure["code"])+" "))
 			writeIndented(&out, text(failure["message"]))
 			continue
 		}
-		writeVerdict(&out, value)
-		writeFindings(&out, value)
-		writeFooter(&out, value, view)
+		writeVerdict(&out, p, value)
+		writeFindings(&out, p, value)
+		writeFooter(&out, p, value, view)
 		if view.Full {
-			writeEverySignal(&out, value)
+			writeEverySignal(&out, p, value)
 			writeList(&out, "Limitations", textList(value["limitations"]))
 		}
 	}
@@ -57,23 +58,23 @@ func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 }
 
 // writeVerdict is the answer, first, in three lines.
-func writeVerdict(out *bytes.Buffer, value map[string]any) {
+func writeVerdict(out *bytes.Buffer, p painter, value map[string]any) {
 	banner, known := verdictBanner[text(value["verdict"])]
 	if !known {
 		banner = struct{ icon, word, remark string }{"❔", strings.ToUpper(text(value["verdict"])), ""}
 	}
 	name := resourceName(text(value["resourceId"]))
-	fmt.Fprintf(out, "%s  %s — %s\n\n", banner.icon, banner.word, name)
+	fmt.Fprintf(out, "%s %s %s\n\n", p.badge(text(value["verdict"]), banner.icon, banner.word), p.paint(dim, "—"), p.paint(bold, name))
 	if banner.remark != "" {
-		writeWrappedAt(out, "    ", "    ", banner.remark)
+		writeWrappedStyled(out, "    ", "    ", banner.remark, p.style(bold))
 	}
 	if replay, _ := value["replay"].(bool); replay {
-		fmt.Fprintf(out, "\n🎞️  RECORDED — replayed evidence, not a live assessment.\n")
+		fmt.Fprintf(out, "\n%s\n", p.paint(magenta, "🎞️  RECORDED — replayed evidence, not a live assessment."))
 	}
 	if question := text(value["requiredHumanQuestion"]); question != "" {
 		if escalate, _ := value["humanEscalation"].(bool); escalate {
 			out.WriteString("\n")
-			writeWrappedAt(out, "    ❓ ", "       ", question)
+			writeWrappedStyled(out, "    ❓ ", "       ", question, p.style(bold+yellow))
 		}
 	}
 }
@@ -89,7 +90,7 @@ func resourceName(id string) string {
 
 // writeFindings prints what was actually found and what could not be read.
 // Everything that looked and found nothing is counted, not listed.
-func writeFindings(out *bytes.Buffer, value map[string]any) {
+func writeFindings(out *bytes.Buffer, p painter, value map[string]any) {
 	evidence, _ := value["evidence"].([]any)
 	var found, unreadable []map[string]any
 	var skipped []string
@@ -116,24 +117,24 @@ func writeFindings(out *bytes.Buffer, value map[string]any) {
 	}
 
 	if len(found) > 0 {
-		out.WriteString("\n🔴  Found\n")
+		fmt.Fprintf(out, "\n%s\n", p.paint(bold+red, "🔴  Found"))
 		for _, row := range found {
-			writeSignal(out, row)
+			writeSignal(out, p, row)
 		}
 	}
 	if len(unreadable) > 0 {
-		fmt.Fprintf(out, "\n🚧  Could not check (%d)\n", len(unreadable))
+		fmt.Fprintf(out, "\n%s\n", p.paint(bold+yellow, fmt.Sprintf("🚧  Could not check (%d)", len(unreadable))))
 		for _, row := range unreadable {
-			writeSignal(out, row)
+			writeSignal(out, p, row)
 		}
 	}
 	if len(skipped) > 0 {
 		sort.Strings(skipped)
-		fmt.Fprintf(out, "\n🔍  Not evaluated (%d)\n", len(skipped))
-		writeWrappedAt(out, "    ", "    ", strings.Join(skipped, ", "))
+		fmt.Fprintf(out, "\n%s\n", p.paint(bold+blue, fmt.Sprintf("🔍  Not evaluated (%d)", len(skipped))))
+		writeWrappedStyled(out, "    ", "    ", strings.Join(skipped, ", "), p.style(dim))
 	}
 	if quiet > 0 {
-		fmt.Fprintf(out, "\n✅  %d signals looked and found nothing\n", quiet)
+		fmt.Fprintf(out, "\n%s\n", p.paint(green, fmt.Sprintf("✅  %d signals looked and found nothing", quiet)))
 	}
 }
 
@@ -147,31 +148,31 @@ func decisive(row map[string]any) bool {
 	return false
 }
 
-func writeSignal(out *bytes.Buffer, row map[string]any) {
+func writeSignal(out *bytes.Buffer, p painter, row map[string]any) {
 	mark := ""
 	if critical, _ := row["critical"].(bool); critical && text(row["status"]) == "unknown" {
-		mark = " ‼"
+		mark = " " + p.paint(bold+red, "‼")
 	}
 	if unknown, ok := row["unknown"].(map[string]any); ok {
-		fmt.Fprintf(out, "    %s (%s)%s\n", text(row["id"]), text(unknown["code"]), mark)
+		fmt.Fprintf(out, "    %s %s%s\n", p.paint(magenta, text(row["id"])), p.paint(yellow, "("+text(unknown["code"])+")"), mark)
 	} else {
-		fmt.Fprintf(out, "    %s%s\n", text(row["id"]), mark)
+		fmt.Fprintf(out, "    %s%s\n", p.paint(magenta, text(row["id"])), mark)
 	}
 	writeWrappedAt(out, "      ", "      ", text(row["summary"]))
 	// The code is a category; the reason is the one thing that tells a reader
 	// whether this is theirs to fix. `transient` alone sends them nowhere.
 	if unknown, ok := row["unknown"].(map[string]any); ok {
 		if reason := text(unknown["reason"]); reason != "" {
-			writeWrappedAt(out, "      ↳ ", "        ", reason)
+			writeWrappedStyled(out, "      ↳ ", "        ", reason, p.style(dim))
 		}
 	}
 	for _, step := range textList(row["nextSteps"]) {
-		writeWrappedAt(out, "      → ", "        ", step)
+		writeWrappedStyled(out, "      → ", "        ", step, p.style(cyan))
 	}
 }
 
 // writeFooter is one line of provenance and one of what else is available.
-func writeFooter(out *bytes.Buffer, value map[string]any, view View) {
+func writeFooter(out *bytes.Buffer, p painter, value map[string]any, view View) {
 	parts := []string{}
 	if coverage, ok := value["coverage"].(map[string]any); ok {
 		parts = append(parts, fmt.Sprintf("%s/%s checked", text(coverage["evaluated"]), text(coverage["total"])))
@@ -185,20 +186,20 @@ func writeFooter(out *bytes.Buffer, value map[string]any, view View) {
 		parts = append(parts, "age ≥"+text(age["lowerBoundDays"])+" d")
 	}
 	parts = append(parts, "rules "+text(value["rulesDate"]), "v"+text(value["toolVersion"]))
-	fmt.Fprintf(out, "\n    %s\n", strings.Join(parts, " · "))
+	fmt.Fprintf(out, "\n    %s\n", p.paint(dim, strings.Join(parts, " · ")))
 	if !view.Full {
-		fmt.Fprintf(out, "    everything: --full · machine-readable: -o json\n")
+		fmt.Fprintf(out, "    %s\n", p.paint(dim, "everything: --full · machine-readable: -o json"))
 	}
-	writeWrappedAt(out, "    ", "    ", text(value["resourceId"]))
+	writeWrappedStyled(out, "    ", "    ", text(value["resourceId"]), p.style(dim))
 }
 
 // writeEverySignal is the complete list, for --full.
-func writeEverySignal(out *bytes.Buffer, value map[string]any) {
+func writeEverySignal(out *bytes.Buffer, p painter, value map[string]any) {
 	evidence, ok := value["evidence"].([]any)
 	if !ok || len(evidence) == 0 {
 		return
 	}
-	out.WriteString("\nEvidence\n")
+	fmt.Fprintf(out, "\n%s\n", p.paint(bold, "Evidence"))
 	for _, item := range evidence {
 		row, ok := item.(map[string]any)
 		if !ok {
@@ -251,15 +252,28 @@ func writeIndented(out *bytes.Buffer, value string) {
 // single word too long to fit, such as a resource id, is split rather than
 // truncated: the table shows everything the report carries.
 func writeWrappedAt(out *bytes.Buffer, prefix, continuation, value string) {
+	writeWrappedStyled(out, prefix, continuation, value, nil)
+}
+
+// writeWrappedStyled wraps first and colours after, so the escapes never count
+// towards the width. The indentation stays uncoloured.
+func writeWrappedStyled(out *bytes.Buffer, prefix, continuation, value string, style func(string) string) {
 	words := strings.Fields(value)
 	if len(words) == 0 {
 		return
+	}
+	emit := func(line string) {
+		if style != nil {
+			body := strings.TrimLeft(line, " ")
+			line = line[:len(line)-len(body)] + style(body)
+		}
+		out.WriteString(line + "\n")
 	}
 	line, width := prefix, displayWidth(prefix)
 	for i, word := range words {
 		if i > 0 {
 			if width+1+displayWidth(word) > tableWidth {
-				out.WriteString(line + "\n")
+				emit(line)
 				line, width = continuation, displayWidth(continuation)
 			} else {
 				line, width = line+" ", width+1
@@ -267,13 +281,13 @@ func writeWrappedAt(out *bytes.Buffer, prefix, continuation, value string) {
 		}
 		for _, chunk := range split(word, tableWidth-displayWidth(continuation)) {
 			if width+displayWidth(chunk) > tableWidth {
-				out.WriteString(line + "\n")
+				emit(line)
 				line, width = continuation, displayWidth(continuation)
 			}
 			line, width = line+chunk, width+displayWidth(chunk)
 		}
 	}
-	out.WriteString(line + "\n")
+	emit(line)
 }
 
 // split breaks a word that cannot fit on one line into display-width chunks.

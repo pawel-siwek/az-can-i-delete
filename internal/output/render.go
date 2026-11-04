@@ -130,6 +130,9 @@ type View struct {
 	// Full prints every signal and the limitations verbatim, rather than the
 	// verdict and what was found.
 	Full bool
+	// Color decorates the table view for a terminal. It never reaches any
+	// other format.
+	Color bool
 }
 
 // Detailed asks for the complete view.
