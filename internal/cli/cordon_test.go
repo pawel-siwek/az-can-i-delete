@@ -81,7 +81,8 @@ func TestCordonShowsThePlanAndWritesNothingWithoutYes(t *testing.T) {
 	a := &account{access: "Enabled", tags: map[string]string{}}
 	deps := cordonDeps(t, a)
 	code, out, errOut := run(t, deps, "cordon", testTarget, "--dry-run", "-o", "table")
-	if code != 0 || errOut != "" || !strings.Contains(out, "CORDON PLAN (publicNetworkAccess Enabled → Disabled)\n    resource "+testTarget) || !strings.Contains(out, "nothing was written") {
+	if code != 0 || errOut != "" || !strings.Contains(out, "CORDON PLAN") ||
+		!strings.Contains(out, "publicNetworkAccess Enabled → Disabled\n  ⎿  "+testTarget) || !strings.Contains(out, "nothing was written") {
 		t.Fatalf("dry run: code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
 	// Seen live: the untrusted-text filter read the timestamp's "T12:" as a

@@ -282,3 +282,29 @@ func TestGatherReportsSignalsTheBudgetNeverReached(t *testing.T) {
 		t.Fatalf("an unreached signal must still be reported: %+v", outcomes[0])
 	}
 }
+
+// The terminal's progress line counts what Gather really finished, failures
+// included, and learns nothing about what a signal found.
+func TestGatherReportsEachSignalItFinishes(t *testing.T) {
+	var mu sync.Mutex
+	var seen []string
+	ctx := collect.WithProgress(context.Background(), func(id string) {
+		mu.Lock()
+		seen = append(seen, id)
+		mu.Unlock()
+	})
+	collect.Gather(ctx, []collect.Signal{
+		{ID: "a", Run: func(context.Context) ([]verdict.Evidence, error) { return nil, nil }},
+		{ID: "b", Run: func(context.Context) ([]verdict.Evidence, error) { return nil, errors.New("boom") }},
+	})
+	slices.Sort(seen)
+	if !slices.Equal(seen, []string{"a", "b"}) {
+		t.Fatalf("reported %v, want both signals", seen)
+	}
+	// Without a reporter nothing changes.
+	if got := collect.Gather(context.Background(), []collect.Signal{
+		{ID: "a", Run: func(context.Context) ([]verdict.Evidence, error) { return nil, nil }},
+	}); len(got) != 1 {
+		t.Fatalf("outcomes = %v", got)
+	}
+}

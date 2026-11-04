@@ -3,9 +3,11 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/pawel-siwek/az-can-i-delete/internal/verdict"
 )
@@ -213,10 +215,11 @@ func TestTableViewLeadsWithTheVerdictAndWhatWasFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The verdict is the first thing on the page, in words a reader can act on.
+	// The verdict is the first thing on the page, in words a reader can act on:
+	// the first line with any text on it, inside the frame, names it.
 	word := strings.ToUpper(value["verdict"].(string))
-	if !strings.HasPrefix(strings.TrimLeft(rendered, "✅⛔⚠️❔ "), word) {
-		t.Errorf("the verdict must lead the output, got %q", firstLine(rendered))
+	if lead := firstText(rendered); !strings.Contains(lead, " "+word+" ") {
+		t.Errorf("the verdict must lead the output, got %q", lead)
 	}
 	// The remark is wrapped to the terminal width, so compare it flattened.
 	if !strings.Contains(unwrapped(rendered), unwrapped(verdictBanner[value["verdict"].(string)].remark)) {
@@ -282,9 +285,14 @@ func TestTheFullViewHidesNothing(t *testing.T) {
 // printed across several lines.
 func unwrapped(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(s, "\n")
-	return line
+// firstText is the first line that carries words, past the frame's edge.
+func firstText(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.IndexFunc(line, unicode.IsLetter) >= 0 {
+			return line
+		}
+	}
+	return ""
 }
 
 func TestTableViewReportsFailuresByCode(t *testing.T) {
@@ -325,3 +333,35 @@ func TestTheViewDoesNotLeakBetweenRenders(t *testing.T) {
 		t.Error("the default render picked up the other one's view")
 	}
 }
+
+// Colour is decoration only: take the escapes out and the coloured view is
+// the plain one, character for character, so wrapping and the frame never
+// depend on whether a terminal is listening.
+func TestColourChangesNothingButColour(t *testing.T) {
+	report := build(t, sample(), config())
+	var plain, coloured bytes.Buffer
+	if err := Render(&plain, "table", []Outcome{Completed(report)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Render(&coloured, "table", []Outcome{Completed(report)}, Colored()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(coloured.String(), "\x1b[") {
+		t.Fatal("the coloured view carries no colour")
+	}
+	if got := ansi.ReplaceAllString(coloured.String(), ""); got != plain.String() {
+		t.Fatalf("colour changed the text:\n%s\n---\n%s", got, plain.String())
+	}
+	if strings.Contains(plain.String(), "\x1b[") {
+		t.Fatal("the plain view carries colour")
+	}
+	var data bytes.Buffer
+	if err := Render(&data, "json", []Outcome{Completed(report)}, Colored()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(data.String(), "\x1b") {
+		t.Fatal("colour reached the JSON")
+	}
+}
+
+var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)

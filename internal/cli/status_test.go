@@ -46,7 +46,7 @@ func TestStatusSaysWhenACordonWasUndone(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
-	for _, want := range []string{"REVERTED (publicNetworkAccess Enabled)\n    resource " + testTarget, "prior Enabled (from the tag)", "denied public requests may not be recorded"} {
+	for _, want := range []string{"REVERTED", "publicNetworkAccess Enabled\n  ⎿  " + testTarget, "prior Enabled (from the tag)", "denied public requests may not be recorded"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}

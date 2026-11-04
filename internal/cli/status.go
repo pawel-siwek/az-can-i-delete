@@ -56,7 +56,7 @@ func runStatus(cmd *cobra.Command, deps Dependencies, version string, options *o
 		return statusError(err)
 	}
 	return output.RenderValues(cmd.OutOrStdout(), options.format, []any{status}, func(w io.Writer) error {
-		return writeStatus(w, target, status)
+		return writeStatus(w, output.NewPalette(options.color), target, status)
 	})
 }
 
@@ -73,68 +73,73 @@ func statusError(err error) error {
 
 // writeStatus is the human view: the state first, then the screams, then what
 // the cordon cannot hear.
-func writeStatus(w io.Writer, target armid.Target, s cordon.Status) error {
+func writeStatus(w io.Writer, p output.Palette, target armid.Target, s cordon.Status) error {
 	var b strings.Builder
 	field := "publicNetworkAccess"
 	if strings.EqualFold(target.ResourceType, cordon.SiteType) {
 		field = "state"
 	}
+	branch := p.Dim("⎿")
 	switch {
 	case !s.Cordoned:
-		fmt.Fprintf(&b, "   not cordoned (%s %s)\n    resource %s\n", field, s.CurrentState, target.ID)
+		fmt.Fprintf(&b, "\n  %s  %s\n  %s  %s\n", p.Pill("", "not cordoned"), p.Bold(field+" "+s.CurrentState), branch, p.Dim(target.ID))
 		_, err := io.WriteString(w, b.String())
 		return err
 	case s.TagCorrupt:
-		fmt.Fprintf(&b, "‼  CORDON TAG DAMAGED (%s %s)\n", field, s.CurrentState)
+		fmt.Fprintf(&b, "\n  %s  %s\n", p.Pill("no", "‼ CORDON TAG DAMAGED"), p.Bold(field+" "+s.CurrentState))
 	case s.Reverted:
-		fmt.Fprintf(&b, "‼  REVERTED (%s %s)\n", field, s.CurrentState)
+		fmt.Fprintf(&b, "\n  %s  %s\n", p.Pill("no", "‼ REVERTED"), p.Bold(field+" "+s.CurrentState))
 	default:
-		fmt.Fprintf(&b, "🧱  CORDONED (%s %s)\n", field, s.CurrentState)
+		label := "🧱 CORDONED"
+		if s.ElapsedHours != nil {
+			label = fmt.Sprintf("🧱 CORDONED %d h of %d d", *s.ElapsedHours, s.WindowDays)
+		}
+		fmt.Fprintf(&b, "\n  %s  %s\n", p.Pill("cordon", label), p.Bold(field+" "+s.CurrentState))
 	}
 	// The canonical id, never the name on its own: the name is somebody's
 	// text, and the id is the one form of it this tool has parsed.
-	fmt.Fprintf(&b, "    resource %s\n", target.ID)
+	fmt.Fprintf(&b, "  %s  %s\n", branch, p.Dim(target.ID))
 	if s.Reverted && s.RevertedAt != nil {
-		fmt.Fprintf(&b, "    last write at %s by a %s\n", s.RevertedAt.Format(time.RFC3339), s.Untrusted["revertedByClass"])
+		fmt.Fprintf(&b, "  %s  %s\n", branch, p.Red(fmt.Sprintf("last write at %s by a %s", s.RevertedAt.Format(time.RFC3339), s.Untrusted["revertedByClass"])))
 	}
 	if s.Since != nil {
-		fmt.Fprintf(&b, "    mode %s since %s by %s · %d h elapsed · %d h left of %d d\n",
-			s.Mode, s.Since.Format(time.RFC3339), s.By, *s.ElapsedHours, *s.RemainingHours, s.WindowDays)
-		fmt.Fprintf(&b, "    prior %s (from the %s)\n", s.Prior, s.Source)
+		fmt.Fprintf(&b, "  %s  mode %s since %s by %s · %d h elapsed · %d h left of %d d\n",
+			branch, s.Mode, s.Since.Format(time.RFC3339), s.By, *s.ElapsedHours, *s.RemainingHours, s.WindowDays)
+		fmt.Fprintf(&b, "  %s  %s\n", branch, p.Dim(fmt.Sprintf("prior %s (from the %s)", s.Prior, s.Source)))
 	}
 	for _, slot := range s.Slots {
-		fmt.Fprintf(&b, "    %s: was %s, now %s\n", slot.Ref, slot.Prior, slot.Current)
+		fmt.Fprintf(&b, "  %s  %s: was %s, now %s\n", branch, slot.Ref, slot.Prior, slot.Current)
 	}
 	if len(s.Activity) > 0 {
-		b.WriteString("\n📣  Since the cordon\n")
+		fmt.Fprintf(&b, "\n  📣 %s\n", p.Amber("Since the cordon"))
 		for _, counter := range s.Activity {
-			fmt.Fprintf(&b, "    %-14s %12.0f  %s\n", counter.Metric, counter.Total, counter.Meaning)
+			fmt.Fprintf(&b, "     %-14s %12.0f  %s\n", counter.Metric, counter.Total, p.Dim(counter.Meaning))
 		}
 	}
 	if len(s.Unknowns) > 0 {
-		b.WriteString("\n🚧  Could not read\n")
+		fmt.Fprintf(&b, "\n  🟡 %s\n", p.Amber("Could not read"))
 		for _, unknown := range s.Unknowns {
-			fmt.Fprintf(&b, "    %s (%s) — %s\n", unknown.ID, unknown.Code, unknown.Message)
+			fmt.Fprintf(&b, "  %s %s %s %s\n", p.Amber("?"), p.Bold(unknown.ID), p.Dim("("+string(unknown.Code)+")"), p.Dim("— "+unknown.Message))
 		}
 	}
 	// Azure's own text is never part of a sentence this tool says. It is
 	// printed on its own, labelled as what it is.
 	if len(s.Untrusted) > 0 {
-		b.WriteString("\n    untrusted (Azure metadata; may contain anybody's text):\n")
+		fmt.Fprintf(&b, "\n  %s\n", p.Dim("untrusted (Azure metadata; may contain anybody's text):"))
 		keys := []string{"revertedBy", "tag"}
 		for _, slot := range s.Slots {
 			keys = append(keys, slot.Ref)
 		}
 		for _, key := range keys {
 			if value := s.Untrusted[key]; value != "" {
-				fmt.Fprintf(&b, "      %s: %s\n", key, value)
+				fmt.Fprintf(&b, "    %s: %s\n", key, value)
 			}
 		}
 	}
 	if len(s.Caveats) > 0 {
-		b.WriteString("\n    What this cannot see:\n")
+		fmt.Fprintf(&b, "\n  %s\n", p.Dim("What this cannot see:"))
 		for _, caveat := range s.Caveats {
-			fmt.Fprintf(&b, "    · %s\n", caveat)
+			fmt.Fprintf(&b, "  %s  %s\n", branch, p.Dim(caveat))
 		}
 	}
 	_, err := io.WriteString(w, b.String())

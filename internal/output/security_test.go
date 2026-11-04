@@ -277,15 +277,9 @@ func TestTableDisplayWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range strings.Split(out.String(), "\n") {
-		width := 0
-		for _, r := range line {
-			if r < 128 {
-				width++
-			} else {
-				width += 2
-			}
-		}
-		if width > 100 {
+		// Terminal cells: an East Asian character takes two, a box or tree
+		// glyph one.
+		if width := CellWidth(line); width > 100 {
 			t.Fatalf("table wider than 100 columns: %d", width)
 		}
 	}

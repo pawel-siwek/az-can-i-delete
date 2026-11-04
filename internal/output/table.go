@@ -18,18 +18,42 @@ import (
 const tableWidth = 100
 
 // verdictBanner is the headline and the one sentence that says what it means.
-// Nothing here is collected from Azure; it is the tool's own text.
+// Nothing here is collected from Azure; it is the tool's own text. The icons
+// are emoji that take two columns and need no variation selector, so a frame
+// drawn around them stays square on every terminal.
 var verdictBanner = map[string]struct{ icon, word, remark string }{
 	"yes": {"✅", "YES",
 		"No evidence of use was found. That is not proof it is unused — nothing here can see a consumer that only names this resource in code, a pipeline or a config file."},
-	"no": {"⛔", "NO",
-		"This resource is IN USE. See the evidence below."},
-	"tentative": {"⚠️", "TENTATIVE",
+	"no": {"⛔", "NO", ""},
+	"tentative": {"🟡", "TENTATIVE",
 		"I could not verify everything, so I do not know whether you can delete this. Read the evidence below and decide."},
+}
+
+// headline is the verdict in words, from the reason class rather than the
+// verdict alone: a lock and a live consumer are both `no`, for different
+// reasons. It is the tool's own sentence and never names the resource: a
+// name is Azure's text, and it stands on its own line as an identifier.
+func headline(verdict, reasonClass string) string {
+	switch verdict {
+	case "yes":
+		return "no evidence of use found"
+	case "no":
+		if reasonClass == "blocked" {
+			return "blocked — do not delete"
+		}
+		return "in use — do not delete"
+	case "tentative":
+		if reasonClass == "design-intent" {
+			return "looks deliberately kept — a person has to decide"
+		}
+		return "not enough evidence to decide — a person has to look"
+	}
+	return ""
 }
 
 func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 	var out bytes.Buffer
+	p := NewPalette(view.Color)
 	for i, item := range items {
 		decoder := json.NewDecoder(bytes.NewReader(item))
 		decoder.UseNumber()
@@ -41,59 +65,116 @@ func tableOutput(items []json.RawMessage, view View) ([]byte, error) {
 			out.WriteString("\n")
 		}
 		if failure, ok := value["error"].(map[string]any); ok {
-			fmt.Fprintf(&out, "💥  ERROR — %s\n\n", text(failure["code"]))
+			fmt.Fprintf(&out, "%s  %s\n\n", p.Pill("error", "💥 ERROR"), p.Bold(text(failure["code"])))
 			writeIndented(&out, text(failure["message"]))
 			continue
 		}
-		writeVerdict(&out, value)
-		writeFindings(&out, value)
-		writeFooter(&out, value, view)
+		writeVerdict(&out, p, value)
+		writeFindings(&out, p, value)
+		writeFooter(&out, p, value, view)
 		if view.Full {
-			writeEverySignal(&out, value)
+			writeEverySignal(&out, p, value)
 			writeList(&out, "Limitations", textList(value["limitations"]))
 		}
 	}
 	return out.Bytes(), nil
 }
 
-// writeVerdict is the answer, first, in three lines.
-func writeVerdict(out *bytes.Buffer, value map[string]any) {
-	banner, known := verdictBanner[text(value["verdict"])]
+// writeVerdict is the answer, first: a frame holding the verdict and what it
+// is about, then the one sentence that qualifies it.
+func writeVerdict(out *bytes.Buffer, p Palette, value map[string]any) {
+	verdict := text(value["verdict"])
+	banner, known := verdictBanner[verdict]
 	if !known {
-		banner = struct{ icon, word, remark string }{"❔", strings.ToUpper(text(value["verdict"])), ""}
+		banner = struct{ icon, word, remark string }{"❓", strings.ToUpper(verdict), ""}
 	}
-	name := resourceName(text(value["resourceId"]))
-	fmt.Fprintf(out, "%s  %s — %s\n\n", banner.icon, banner.word, name)
+	id := text(value["resourceId"])
+	head := headline(verdict, text(value["reasonClass"]))
+	pill := " " + banner.icon + " " + banner.word + " "
+	about := []string{kindOf(id)}
+	if coverage, ok := value["coverage"].(map[string]any); ok {
+		about = append(about, text(coverage["evaluated"])+" of "+text(coverage["total"])+" signals read")
+	}
+	// The frame holds only the tool's own words. Which resource it is about is
+	// the canonical id in the footer: a name is Azure's text (ADR-0007).
+	indent := strings.Repeat(" ", CellWidth(pill)+2)
+	lines := []string{pill + "  " + head, indent + strings.Join(about, " · ")}
+	paints := []func(string) string{
+		func(string) string { return p.Pill(verdict, banner.icon+" "+banner.word) + "  " + p.Bold(head) },
+		func(line string) string { return indent + p.Dim(strings.TrimPrefix(line, indent)) },
+	}
+	fits := true
+	for _, line := range lines {
+		if CellWidth(line)+6 > tableWidth {
+			fits = false
+		}
+	}
+	if fits {
+		out.WriteString(p.Box(lines, paints, tableWidth))
+	} else {
+		// A name too long for the frame is wrapped rather than cut, and a
+		// frame that cannot close is not drawn at all.
+		fmt.Fprintf(out, "%s\n", p.Pill(verdict, banner.icon+" "+banner.word))
+		writeWrappedStyled(out, "  ", "  ", head, p.style(p.Bold))
+		writeWrappedStyled(out, "  ", "  ", strings.Join(about, " · "), p.style(p.Dim))
+	}
 	if banner.remark != "" {
-		writeWrappedAt(out, "    ", "    ", banner.remark)
+		out.WriteString("\n")
+		writeWrappedStyled(out, "  ", "  ", banner.remark, p.style(p.Dim))
 	}
 	if replay, _ := value["replay"].(bool); replay {
-		fmt.Fprintf(out, "\n🎞️  RECORDED — replayed evidence, not a live assessment.\n")
+		fmt.Fprintf(out, "\n  %s\n", p.Dim("▶ RECORDED — replayed evidence, not a live assessment"))
 	}
 	if question := text(value["requiredHumanQuestion"]); question != "" {
 		if escalate, _ := value["humanEscalation"].(bool); escalate {
 			out.WriteString("\n")
-			writeWrappedAt(out, "    ❓ ", "       ", question)
+			writeWrappedStyled(out, "  ? ", "    ", question, p.style(p.Amber))
 		}
 	}
 }
 
-// resourceName is the last segment of the ARM id, which is what a person calls
-// the thing. The whole id is in the footer and in the JSON.
-func resourceName(id string) string {
-	if index := strings.LastIndex(id, "/"); index >= 0 && index+1 < len(id) {
-		return id[index+1:]
+// kinds names the analyzed types the way a person says them.
+var kinds = map[string]string{
+	"microsoft.storage/storageaccounts":       "Storage account",
+	"microsoft.compute/disks":                 "Managed disk",
+	"microsoft.compute/virtualmachines":       "Virtual machine",
+	"microsoft.network/networkinterfaces":     "Network interface",
+	"microsoft.network/publicipaddresses":     "Public IP",
+	"microsoft.network/networksecuritygroups": "Network security group",
+	"microsoft.web/sites":                     "App Service site",
+	"microsoft.web/sites/slots":               "Deployment slot",
+	"microsoft.web/serverfarms":               "App Service plan",
+}
+
+// kindOf reads the resource type out of the id: the provider namespace and
+// every type segment after it.
+func kindOf(id string) string {
+	parts := strings.Split(strings.Trim(id, "/"), "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if !strings.EqualFold(parts[i], "providers") {
+			continue
+		}
+		segments := []string{parts[i+1]}
+		for j := i + 2; j < len(parts); j += 2 {
+			segments = append(segments, parts[j])
+		}
+		kind := strings.ToLower(strings.Join(segments, "/"))
+		if named, ok := kinds[kind]; ok {
+			return named
+		}
+		return strings.Join(segments, "/")
 	}
-	return id
+	return "Resource"
 }
 
 // writeFindings prints what was actually found and what could not be read.
 // Everything that looked and found nothing is counted, not listed.
-func writeFindings(out *bytes.Buffer, value map[string]any) {
+func writeFindings(out *bytes.Buffer, p Palette, value map[string]any) {
 	evidence, _ := value["evidence"].([]any)
 	var found, unreadable []map[string]any
 	var skipped []string
 	quiet := 0
+	blocking := false
 	for _, item := range evidence {
 		row, ok := item.(map[string]any)
 		if !ok {
@@ -103,6 +184,9 @@ func writeFindings(out *bytes.Buffer, value map[string]any) {
 		case "present":
 			if decisive(row) {
 				found = append(found, row)
+				if text(row["tierName"]) != "DESIGN_INTENT" {
+					blocking = true
+				}
 			} else {
 				quiet++
 			}
@@ -116,24 +200,32 @@ func writeFindings(out *bytes.Buffer, value map[string]any) {
 	}
 
 	if len(found) > 0 {
-		out.WriteString("\n🔴  Found\n")
+		if blocking {
+			fmt.Fprintf(out, "\n  🔴 %s %s\n", p.Red("Found"), p.Dim(fmt.Sprint(len(found))))
+		} else {
+			fmt.Fprintf(out, "\n  🟠 %s %s\n", p.Amber("Found"), p.Dim(fmt.Sprint(len(found))))
+		}
 		for _, row := range found {
-			writeSignal(out, row)
+			mark := p.Red("✗")
+			if text(row["tierName"]) == "DESIGN_INTENT" {
+				mark = p.Amber("◆")
+			}
+			writeSignal(out, p, row, mark)
 		}
 	}
 	if len(unreadable) > 0 {
-		fmt.Fprintf(out, "\n🚧  Could not check (%d)\n", len(unreadable))
+		fmt.Fprintf(out, "\n  🟡 %s %s\n", p.Amber("Could not check"), p.Dim(fmt.Sprint(len(unreadable))))
 		for _, row := range unreadable {
-			writeSignal(out, row)
+			writeSignal(out, p, row, p.Amber("?"))
 		}
 	}
 	if len(skipped) > 0 {
 		sort.Strings(skipped)
-		fmt.Fprintf(out, "\n🔍  Not evaluated (%d)\n", len(skipped))
-		writeWrappedAt(out, "    ", "    ", strings.Join(skipped, ", "))
+		fmt.Fprintf(out, "\n  ⚪ %s %s\n", p.Bold("Not evaluated"), p.Dim(fmt.Sprint(len(skipped))))
+		writeWrappedStyled(out, "     ", "     ", strings.Join(skipped, " · "), p.style(p.Dim))
 	}
 	if quiet > 0 {
-		fmt.Fprintf(out, "\n✅  %d signals looked and found nothing\n", quiet)
+		fmt.Fprintf(out, "\n  🟢 %s\n", p.Green(fmt.Sprintf("%d signals looked and found nothing", quiet)))
 	}
 }
 
@@ -147,31 +239,33 @@ func decisive(row map[string]any) bool {
 	return false
 }
 
-func writeSignal(out *bytes.Buffer, row map[string]any) {
-	mark := ""
-	if critical, _ := row["critical"].(bool); critical && text(row["status"]) == "unknown" {
-		mark = " ‼"
+// writeSignal is one row as a small tree: the id, what it means, why it could
+// not be read, and what to do.
+func writeSignal(out *bytes.Buffer, p Palette, row map[string]any, mark string) {
+	critical := ""
+	if c, _ := row["critical"].(bool); c && text(row["status"]) == "unknown" {
+		critical = " " + p.Red("‼")
 	}
+	code := ""
 	if unknown, ok := row["unknown"].(map[string]any); ok {
-		fmt.Fprintf(out, "    %s (%s)%s\n", text(row["id"]), text(unknown["code"]), mark)
-	} else {
-		fmt.Fprintf(out, "    %s%s\n", text(row["id"]), mark)
+		code = " " + p.Dim("("+text(unknown["code"])+")")
 	}
-	writeWrappedAt(out, "      ", "      ", text(row["summary"]))
+	fmt.Fprintf(out, "  %s %s%s%s\n", mark, p.Bold(text(row["id"])), code, critical)
+	writeWrappedStyled(out, "    ⎿  ", "       ", text(row["summary"]), nil)
 	// The code is a category; the reason is the one thing that tells a reader
 	// whether this is theirs to fix. `transient` alone sends them nowhere.
 	if unknown, ok := row["unknown"].(map[string]any); ok {
 		if reason := text(unknown["reason"]); reason != "" {
-			writeWrappedAt(out, "      ↳ ", "        ", reason)
+			writeWrappedStyled(out, "       ↳ ", "         ", reason, p.style(p.Dim))
 		}
 	}
 	for _, step := range textList(row["nextSteps"]) {
-		writeWrappedAt(out, "      → ", "        ", step)
+		writeWrappedStyled(out, "       → ", "         ", step, p.style(p.Cyan))
 	}
 }
 
 // writeFooter is one line of provenance and one of what else is available.
-func writeFooter(out *bytes.Buffer, value map[string]any, view View) {
+func writeFooter(out *bytes.Buffer, p Palette, value map[string]any, view View) {
 	parts := []string{}
 	if coverage, ok := value["coverage"].(map[string]any); ok {
 		parts = append(parts, fmt.Sprintf("%s/%s checked", text(coverage["evaluated"]), text(coverage["total"])))
@@ -182,23 +276,23 @@ func writeFooter(out *bytes.Buffer, value map[string]any, view View) {
 		}
 	}
 	if age, ok := value["age"].(map[string]any); ok {
-		parts = append(parts, "age ≥"+text(age["lowerBoundDays"])+" d")
+		parts = append(parts, "age ≥ "+text(age["lowerBoundDays"])+" d")
 	}
 	parts = append(parts, "rules "+text(value["rulesDate"]), "v"+text(value["toolVersion"]))
-	fmt.Fprintf(out, "\n    %s\n", strings.Join(parts, " · "))
+	fmt.Fprintf(out, "\n  %s\n", p.Dim(strings.Join(parts, " · ")))
 	if !view.Full {
-		fmt.Fprintf(out, "    everything: --full · machine-readable: -o json\n")
+		fmt.Fprintf(out, "  %s\n", p.Dim("--full every signal · -o json for machines"))
 	}
-	writeWrappedAt(out, "    ", "    ", text(value["resourceId"]))
+	writeWrappedStyled(out, "  ", "  ", text(value["resourceId"]), p.style(p.Dim))
 }
 
 // writeEverySignal is the complete list, for --full.
-func writeEverySignal(out *bytes.Buffer, value map[string]any) {
+func writeEverySignal(out *bytes.Buffer, p Palette, value map[string]any) {
 	evidence, ok := value["evidence"].([]any)
 	if !ok || len(evidence) == 0 {
 		return
 	}
-	out.WriteString("\nEvidence\n")
+	fmt.Fprintf(out, "\n%s\n", p.Bold("Evidence"))
 	for _, item := range evidence {
 		row, ok := item.(map[string]any)
 		if !ok {
@@ -251,15 +345,28 @@ func writeIndented(out *bytes.Buffer, value string) {
 // single word too long to fit, such as a resource id, is split rather than
 // truncated: the table shows everything the report carries.
 func writeWrappedAt(out *bytes.Buffer, prefix, continuation, value string) {
+	writeWrappedStyled(out, prefix, continuation, value, nil)
+}
+
+// writeWrappedStyled wraps first and colours after, so the escapes never count
+// towards the width. The indentation stays uncoloured.
+func writeWrappedStyled(out *bytes.Buffer, prefix, continuation, value string, style func(string) string) {
 	words := strings.Fields(value)
 	if len(words) == 0 {
 		return
+	}
+	emit := func(line string) {
+		if style != nil {
+			body := strings.TrimLeft(line, " ")
+			line = line[:len(line)-len(body)] + style(body)
+		}
+		out.WriteString(line + "\n")
 	}
 	line, width := prefix, displayWidth(prefix)
 	for i, word := range words {
 		if i > 0 {
 			if width+1+displayWidth(word) > tableWidth {
-				out.WriteString(line + "\n")
+				emit(line)
 				line, width = continuation, displayWidth(continuation)
 			} else {
 				line, width = line+" ", width+1
@@ -267,13 +374,13 @@ func writeWrappedAt(out *bytes.Buffer, prefix, continuation, value string) {
 		}
 		for _, chunk := range split(word, tableWidth-displayWidth(continuation)) {
 			if width+displayWidth(chunk) > tableWidth {
-				out.WriteString(line + "\n")
+				emit(line)
 				line, width = continuation, displayWidth(continuation)
 			}
 			line, width = line+chunk, width+displayWidth(chunk)
 		}
 	}
-	out.WriteString(line + "\n")
+	emit(line)
 }
 
 // split breaks a word that cannot fit on one line into display-width chunks.
