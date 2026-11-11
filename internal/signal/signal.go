@@ -3,6 +3,8 @@
 // observation into evidence, and the bounded Resource Graph helper. Keeping
 // these in one place is what makes "a failure is never an absence" a property
 // of the code rather than a rule each analyzer has to remember.
+//
+//nolint:revive // The shared internal package name is deliberate.
 package signal
 
 import (
